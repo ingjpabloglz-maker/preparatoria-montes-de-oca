@@ -23,6 +23,153 @@ import LevelCard from '../components/dashboard/LevelCard';
 import StatsOverview from '../components/dashboard/StatsOverview';
 import SubjectCard from '../components/dashboard/SubjectCard';
 
+function AdminDashboardView({ user }) {
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['allUsers'],
+    queryFn: () => base44.entities.User.list(),
+  });
+  const { data: allProgress = [] } = useQuery({
+    queryKey: ['allProgress'],
+    queryFn: () => base44.entities.UserProgress.list(),
+  });
+  const { data: payments = [] } = useQuery({
+    queryKey: ['payments'],
+    queryFn: () => base44.entities.Payment.list(),
+  });
+  const { data: subjects = [] } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: () => base44.entities.Subject.list(),
+  });
+
+  const students = allUsers.filter(u => u.role !== 'admin');
+  const availableFolios = payments.filter(p => p.status === 'available').length;
+  const usedFolios = payments.filter(p => p.status === 'used').length;
+
+  // Distribución por nivel
+  const levelDist = [1,2,3,4,5,6].map(lvl => ({
+    level: lvl,
+    count: allProgress.filter(p => p.current_level === lvl).length
+  }));
+
+  const adminLinks = [
+    { label: 'Administración completa', page: 'AdminDashboard', icon: BarChart2, desc: 'Panel con estadísticas y actividad reciente' },
+    { label: 'Gestionar Folios', page: 'ManageFolios', icon: CreditCard, desc: 'Crear, listar y eliminar folios de pago' },
+    { label: 'Gestionar Materias', page: 'ManageSubjects', icon: BookOpen, desc: 'Agregar o editar materias por nivel' },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-6xl mx-auto p-6 space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Panel de Administración
+          </h1>
+          <p className="text-gray-500 mt-1">Hola, {user?.full_name?.split(' ')[0]}. Aquí tienes el resumen del sistema.</p>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{students.length}</p>
+                  <p className="text-xs text-gray-500">Estudiantes</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{availableFolios}</p>
+                  <p className="text-xs text-gray-500">Folios disponibles</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{usedFolios}</p>
+                  <p className="text-xs text-gray-500">Folios usados</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <BookOpen className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{subjects.length}</p>
+                  <p className="text-xs text-gray-500">Materias</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Level Distribution */}
+        <Card className="border-0 shadow-md">
+          <CardHeader>
+            <CardTitle className="text-base">Distribución de estudiantes por nivel</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+              {levelDist.map(({ level, count }) => (
+                <div key={level} className="text-center p-3 bg-blue-50 rounded-xl">
+                  <p className="text-xl font-bold text-blue-700">{count}</p>
+                  <p className="text-xs text-gray-500 mt-1">Nivel {level}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Access */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">Accesos rápidos</h2>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {adminLinks.map(({ label, page, icon: Icon, desc }) => (
+              <Card 
+                key={page} 
+                className="border-0 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => window.location.href = createPageUrl(page)}
+              >
+                <CardContent className="p-5 flex items-start gap-4">
+                  <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
+                    <Icon className="w-5 h-5 text-slate-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-800">{label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0 mt-1" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [user, setUser] = useState(null);
 
