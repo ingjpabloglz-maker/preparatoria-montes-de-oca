@@ -18,7 +18,7 @@ import {
 
 import SubjectCard from '../components/dashboard/SubjectCard';
 import LevelTest from '../components/tests/LevelTest';
-import LevelInsightsCard from '../components/analytics/LevelInsightsCard';
+import LevelInsights from '../components/analytics/LevelInsights';
 
 export default function Level() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -209,7 +209,7 @@ export default function Level() {
                 );
               })}
             </div>
-            <LevelInsightsCard subjects={subjects} subjectProgress={subjectProgress} />
+            <LevelInsights subjects={subjects} subjectProgress={subjectProgress} />
           </TabsContent>
 
           <TabsContent value="tests" className="mt-6">
