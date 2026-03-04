@@ -3,7 +3,8 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, CheckCircle2, AlertCircle } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 
 import FolioValidator from '../components/payment/FolioValidator';
 
@@ -27,12 +28,41 @@ export default function UnlockLevel() {
     enabled: !!user?.email,
   });
 
+  const { data: subjects = [] } = useQuery({
+    queryKey: ['levelSubjects', levelNum - 1],
+    queryFn: () => base44.entities.Subject.filter({ level: levelNum - 1 }),
+    enabled: levelNum > 1,
+  });
+
+  const { data: subjectProgress = [] } = useQuery({
+    queryKey: ['subjectProgress', user?.email],
+    queryFn: () => base44.entities.SubjectProgress.filter({ user_email: user?.email }),
+    enabled: !!user?.email,
+  });
+
   const progress = userProgress?.[0];
   const currentLevel = progress?.current_level || 1;
 
   // Verificar si puede desbloquear este nivel
   const canUnlock = levelNum === currentLevel + 1;
   const alreadyUnlocked = levelNum <= currentLevel;
+
+  // Verificar si el nivel anterior está completado
+  const prevLevelSubjects = subjects;
+  const prevLevelProgress = prevLevelSubjects.length > 0
+    ? prevLevelSubjects.reduce((sum, subject) => {
+        const sp = subjectProgress.find(p => p.subject_id === subject.id);
+        return sum + (sp?.progress_percent || 0);
+      }, 0) / prevLevelSubjects.length
+    : 0;
+
+  const testScores = progress?.test_scores || [];
+  const prevLevelTests = testScores.filter(t => t.level === levelNum - 1);
+  const test1Passed = prevLevelTests.find(t => t.test_number === 1 && t.passed);
+  const test2Passed = prevLevelTests.find(t => t.test_number === 2 && t.passed);
+  const allTestsPassed = test1Passed && test2Passed;
+
+  const prevLevelComplete = prevLevelProgress >= 100 && allTestsPassed;
 
   const handleUnlockSuccess = async () => {
     // Actualizar el nivel del usuario
