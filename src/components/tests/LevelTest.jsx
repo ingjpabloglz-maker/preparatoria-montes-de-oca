@@ -116,12 +116,17 @@ export default function LevelTest({
             </Badge>
           </div>
 
-          {!passed && (
-            <Button onClick={resetTest} variant="outline" className="gap-2">
-              <RotateCcw className="w-4 h-4" />
-              Intentar de Nuevo
+          <div className="flex gap-3 justify-center mt-4">
+            {!passed && (
+              <Button onClick={resetTest} variant="outline" className="gap-2">
+                <RotateCcw className="w-4 h-4" />
+                Intentar de Nuevo
+              </Button>
+            )}
+            <Button onClick={onExit} className="gap-2">
+              Volver al Nivel
             </Button>
-          )}
+          </div>
         </CardContent>
       </Card>
     );
