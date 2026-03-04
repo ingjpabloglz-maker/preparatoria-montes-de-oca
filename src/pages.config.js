@@ -47,8 +47,30 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
+import Dashboard from './pages/Dashboard';
+import Level from './pages/Level';
+import Subject from './pages/Subject';
+import UnlockLevel from './pages/UnlockLevel';
+import AdminDashboard from './pages/AdminDashboard';
+import ManageFolios from './pages/ManageFolios';
+import ManageSubjects from './pages/ManageSubjects';
+import StudentDetail from './pages/StudentDetail';
+import __Layout from './Layout.jsx';
 
-export const pagesConfig = {
-	Pages: {}
+
+export const PAGES = {
+    "Dashboard": Dashboard,
+    "Level": Level,
+    "Subject": Subject,
+    "UnlockLevel": UnlockLevel,
+    "AdminDashboard": AdminDashboard,
+    "ManageFolios": ManageFolios,
+    "ManageSubjects": ManageSubjects,
+    "StudentDetail": StudentDetail,
 }
 
+export const pagesConfig = {
+    mainPage: "Dashboard",
+    Pages: PAGES,
+    Layout: __Layout,
+};
