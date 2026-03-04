@@ -91,7 +91,15 @@ export default function Level() {
   const handleTestComplete = async (testNumber, score, passed) => {
     if (!progress) return;
     
-    const newTestScores = [...(progress.test_scores || []), {
+    // Evitar guardar duplicados si ya existe ese test aprobado
+    const existingScores = progress.test_scores || [];
+    const alreadySaved = existingScores.find(t => t.level === levelNum && t.test_number === testNumber && t.passed);
+    if (alreadySaved) {
+      setTakingTest(null);
+      return;
+    }
+
+    const newTestScores = [...existingScores, {
       level: levelNum,
       test_number: testNumber,
       score,
@@ -103,7 +111,11 @@ export default function Level() {
       test_scores: newTestScores
     });
 
+    // Refrescar datos para que se reflejen inmediatamente
+    await queryClient.invalidateQueries({ queryKey: ['userProgress'] });
+
     setTakingTest(null);
+    setActiveTab('tests');
   };
 
   if (takingTest) {
