@@ -335,7 +335,6 @@ export default function ManageFolios() {
           </CardContent>
         </Card>
       </div>
-    </div>
-    </AdminGuard>
+    </div></AdminGuard>
   );
 }

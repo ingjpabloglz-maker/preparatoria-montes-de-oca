@@ -315,7 +315,6 @@ export default function StudentDetail() {
           </CardContent>
         </Card>
       </div>
-    </div>
-    </AdminGuard>
+    </div></AdminGuard>
   );
 }

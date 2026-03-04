@@ -279,7 +279,6 @@ export default function ManageSubjects() {
           ))}
         </Tabs>
       </div>
-    </div>
-    </AdminGuard>
+    </div></AdminGuard>
   );
 }

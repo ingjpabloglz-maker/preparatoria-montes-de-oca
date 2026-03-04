@@ -378,7 +378,6 @@ export default function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
-    </AdminGuard>
+    </div></AdminGuard>
   );
 }
