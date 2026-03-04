@@ -51,9 +51,6 @@ export default function ManageSubjects() {
     const loadUser = async () => {
       const userData = await base44.auth.me();
       setUser(userData);
-      if (userData?.role !== 'admin') {
-        window.location.href = createPageUrl('Dashboard');
-      }
     };
     loadUser();
   }, []);

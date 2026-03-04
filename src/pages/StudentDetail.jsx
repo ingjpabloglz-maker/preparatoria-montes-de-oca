@@ -38,9 +38,6 @@ export default function StudentDetail() {
     const loadUser = async () => {
       const userData = await base44.auth.me();
       setAdminUser(userData);
-      if (userData?.role !== 'admin') {
-        window.location.href = createPageUrl('Dashboard');
-      }
     };
     loadUser();
   }, []);

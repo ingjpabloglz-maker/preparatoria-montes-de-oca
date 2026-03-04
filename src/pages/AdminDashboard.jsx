@@ -38,11 +38,6 @@ export default function AdminDashboard() {
     const loadUser = async () => {
       const userData = await base44.auth.me();
       setUser(userData);
-      
-      // Verificar si es admin
-      if (userData?.role !== 'admin') {
-        window.location.href = createPageUrl('Dashboard');
-      }
     };
     loadUser();
   }, []);
