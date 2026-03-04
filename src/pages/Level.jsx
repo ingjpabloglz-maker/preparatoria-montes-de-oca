@@ -134,6 +134,7 @@ export default function Level() {
             level={levelNum}
             testNumber={takingTest}
             onComplete={(score, passed) => handleTestComplete(takingTest, score, passed)}
+            onExit={() => setTakingTest(null)}
           />
         </div>
       </div>
