@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createPageUrl } from '@/utils';
@@ -7,14 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
 import { 
   ArrowLeft,
   BookOpen,
   CheckCircle2,
   Clock,
-  Play,
-  FileText
+  FileText,
+  Plus,
+  X
 } from "lucide-react";
+import SubjectAnalytics from '../components/analytics/SubjectAnalytics';
 
 export default function Subject() {
   const urlParams = new URLSearchParams(window.location.search);
