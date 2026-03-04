@@ -114,6 +114,11 @@ export default function Dashboard() {
     ? (subjectProgress.reduce((sum, p) => sum + (p.progress_percent || 0), 0) / totalSubjectsCount)
     : 0;
 
+  // Vista de administrador
+  if (user?.role === 'admin') {
+    return <AdminDashboardView user={user} />;
+  }
+
   if (loadingLevels || loadingSubjects || loadingProgress) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
