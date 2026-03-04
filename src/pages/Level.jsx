@@ -48,18 +48,24 @@ export default function Level() {
   const { data: subjects = [] } = useQuery({
     queryKey: ['levelSubjects', levelNum],
     queryFn: () => base44.entities.Subject.filter({ level: levelNum }, 'order'),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
-  const { data: userProgress } = useQuery({
+  const { data: userProgress, refetch: refetchProgress } = useQuery({
     queryKey: ['userProgress', user?.email],
     queryFn: () => base44.entities.UserProgress.filter({ user_email: user?.email }),
     enabled: !!user?.email,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const { data: subjectProgress = [] } = useQuery({
     queryKey: ['subjectProgress', user?.email],
     queryFn: () => base44.entities.SubjectProgress.filter({ user_email: user?.email }),
     enabled: !!user?.email,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const progress = userProgress?.[0];
