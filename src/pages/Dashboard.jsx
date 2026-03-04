@@ -32,23 +32,31 @@ export default function Dashboard() {
   const { data: levels = [], isLoading: loadingLevels } = useQuery({
     queryKey: ['levels'],
     queryFn: () => base44.entities.LevelConfig.list('level_number'),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const { data: subjects = [], isLoading: loadingSubjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => base44.entities.Subject.list('level,order'),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const { data: userProgress, isLoading: loadingProgress } = useQuery({
     queryKey: ['userProgress', user?.email],
     queryFn: () => base44.entities.UserProgress.filter({ user_email: user?.email }),
     enabled: !!user?.email,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const { data: subjectProgress = [] } = useQuery({
     queryKey: ['subjectProgress', user?.email],
     queryFn: () => base44.entities.SubjectProgress.filter({ user_email: user?.email }),
     enabled: !!user?.email,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const progress = userProgress?.[0];
