@@ -24,6 +24,7 @@ import {
   CheckCircle2,
   XCircle
 } from "lucide-react";
+import AdminGuard from '../components/auth/AdminGuard';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 

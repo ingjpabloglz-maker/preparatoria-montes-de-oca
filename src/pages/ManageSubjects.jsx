@@ -31,6 +31,7 @@ import {
   BookOpen
 } from "lucide-react";
 import { toast } from "sonner";
+import AdminGuard from '../components/auth/AdminGuard';
 
 export default function ManageSubjects() {
   const [user, setUser] = useState(null);

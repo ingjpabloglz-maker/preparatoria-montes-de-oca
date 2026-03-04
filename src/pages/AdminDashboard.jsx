@@ -27,6 +27,7 @@ import {
   Plus,
   Eye
 } from "lucide-react";
+import AdminGuard from '../components/auth/AdminGuard';
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);

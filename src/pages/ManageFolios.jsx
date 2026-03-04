@@ -37,6 +37,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
+import AdminGuard from '../components/auth/AdminGuard';
 
 export default function ManageFolios() {
   const [user, setUser] = useState(null);
