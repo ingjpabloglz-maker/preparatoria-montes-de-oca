@@ -110,11 +110,65 @@ export default function UnlockLevel() {
       {/* Content */}
       <div className="flex-1 flex items-center justify-center p-6">
         {canUnlock ? (
-          <FolioValidator 
-            levelToUnlock={levelNum}
-            userEmail={user?.email}
-            onSuccess={handleUnlockSuccess}
-          />
+          <div className="w-full max-w-lg space-y-6">
+            {/* Requisitos previos */}
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-6 space-y-3">
+                <h3 className="font-semibold text-gray-700 mb-4">Requisitos para desbloquear Nivel {levelNum}</h3>
+                <div className="flex items-center gap-3">
+                  {prevLevelProgress >= 100 ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                  )}
+                  <span className={prevLevelProgress >= 100 ? "text-green-700" : "text-gray-600"}>
+                    100% de avance en Nivel {levelNum - 1} ({Math.round(prevLevelProgress)}% completado)
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  {test1Passed ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                  )}
+                  <span className={test1Passed ? "text-green-700" : "text-gray-600"}>
+                    Prueba 1 del Nivel {levelNum - 1} aprobada
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  {test2Passed ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                  )}
+                  <span className={test2Passed ? "text-green-700" : "text-gray-600"}>
+                    Prueba 2 del Nivel {levelNum - 1} aprobada
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Folio de pago — solo si cumple requisitos */}
+            {prevLevelComplete ? (
+              <FolioValidator 
+                levelToUnlock={levelNum}
+                userEmail={user?.email}
+                onSuccess={handleUnlockSuccess}
+              />
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-amber-600 font-medium">
+                  Debes completar todos los requisitos del Nivel {levelNum - 1} antes de ingresar tu folio de pago.
+                </p>
+                <Button 
+                  className="mt-4" 
+                  onClick={() => window.location.href = createPageUrl(`Level?level=${levelNum - 1}`)}
+                >
+                  Ir al Nivel {levelNum - 1}
+                </Button>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="text-center max-w-md">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
