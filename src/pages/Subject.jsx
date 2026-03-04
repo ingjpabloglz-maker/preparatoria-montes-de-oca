@@ -24,6 +24,9 @@ export default function Subject() {
   const subjectId = urlParams.get('id');
   
   const [user, setUser] = useState(null);
+  const [newError, setNewError] = useState('');
+  const [difficultyRating, setDifficultyRating] = useState(0);
+  const sessionStartRef = useRef(Date.now());
   const queryClient = useQueryClient();
 
   useEffect(() => {
