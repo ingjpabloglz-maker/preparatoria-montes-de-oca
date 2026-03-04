@@ -85,6 +85,7 @@ export default function AdminDashboard() {
   };
 
   return (
+    <AdminGuard>
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
