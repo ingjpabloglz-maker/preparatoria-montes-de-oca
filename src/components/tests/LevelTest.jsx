@@ -67,6 +67,7 @@ export default function LevelTest({
       const finalScore = Math.round((correct / questions.length) * 100);
       setScore(finalScore);
       setShowResults(true);
+      // Guardar resultado
       onComplete?.(finalScore, finalScore >= 70);
     }
   };
