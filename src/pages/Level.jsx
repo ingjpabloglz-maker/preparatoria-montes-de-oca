@@ -27,6 +27,7 @@ export default function Level() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('subjects');
   const [takingTest, setTakingTest] = useState(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const loadUser = async () => {
