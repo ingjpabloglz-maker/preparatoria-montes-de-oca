@@ -211,7 +211,25 @@ export default function Level() {
             </div>
           </TabsContent>
 
-          <TabsContent value="tests" className="mt-6">
+          <TabsContent value="subjects" className="mt-6 space-y-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {subjects.map((subject) => {
+                const sp = subjectProgress.find(p => p.subject_id === subject.id);
+                return (
+                  <SubjectCard
+                    key={subject.id}
+                    subject={subject}
+                    progress={sp?.progress_percent || 0}
+                    isCompleted={sp?.completed || false}
+                    onClick={() => window.location.href = createPageUrl(`Subject?id=${subject.id}`)}
+                  />
+                );
+              })}
+            </div>
+            <LevelInsights subjects={subjects} subjectProgress={subjectProgress} />
+          </TabsContent>
+
+          <TabsContent value="tests_DUPLICATE_PLACEHOLDER" className="mt-6">
             <div className="grid md:grid-cols-2 gap-6">
               {/* Prueba 1 */}
               <Card className={test1Passed ? "border-green-200 bg-green-50/50" : ""}>
