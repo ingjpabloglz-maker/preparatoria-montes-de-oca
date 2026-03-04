@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createPageUrl } from '@/utils';
@@ -7,26 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
 import { 
   ArrowLeft,
   BookOpen,
   CheckCircle2,
   Clock,
-  FileText,
-  Plus,
-  X
+  Play,
+  FileText
 } from "lucide-react";
-import SubjectAnalytics from '../components/analytics/SubjectAnalytics';
+import SubjectAnalyticsCard from '../components/analytics/SubjectAnalyticsCard';
 
 export default function Subject() {
   const urlParams = new URLSearchParams(window.location.search);
   const subjectId = urlParams.get('id');
   
   const [user, setUser] = useState(null);
-  const [newError, setNewError] = useState('');
-  const [difficultyRating, setDifficultyRating] = useState(0);
-  const sessionStartRef = useRef(Date.now());
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -58,37 +53,6 @@ export default function Subject() {
     enabled: !!user?.email && !!subjectId,
   });
 
-  // Sync difficulty rating from loaded data
-  useEffect(() => {
-    if (progressData?.difficulty_rating) {
-      setDifficultyRating(progressData.difficulty_rating);
-    }
-  }, [progressData]);
-
-  // Save session time on unmount
-  useEffect(() => {
-    return () => {
-      if (!user?.email || !subjectId) return;
-      const durationMinutes = Math.round((Date.now() - sessionStartRef.current) / 60000);
-      if (durationMinutes < 1) return;
-      // Fire and forget — update time spent
-      base44.entities.SubjectProgress.filter({ user_email: user.email, subject_id: subjectId })
-        .then(results => {
-          const existing = results[0];
-          if (!existing) return;
-          const sessions = [...(existing.sessions || []), {
-            date: new Date().toISOString(),
-            duration_minutes: durationMinutes,
-            progress_at_end: existing.progress_percent || 0
-          }];
-          base44.entities.SubjectProgress.update(existing.id, {
-            time_spent_minutes: (existing.time_spent_minutes || 0) + durationMinutes,
-            sessions
-          });
-        });
-    };
-  }, [user, subjectId]);
-
   const updateProgressMutation = useMutation({
     mutationFn: async (newProgress) => {
       if (progressData) {
@@ -103,46 +67,13 @@ export default function Subject() {
           subject_id: subjectId,
           progress_percent: newProgress,
           completed: newProgress >= 100,
-          last_activity: new Date().toISOString(),
-          time_spent_minutes: 0,
-          sessions: [],
-          errors_noted: []
+          last_activity: new Date().toISOString()
         });
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['subjectProgress']);
     }
-  });
-
-  const updateDifficultyMutation = useMutation({
-    mutationFn: async (rating) => {
-      if (progressData) {
-        await base44.entities.SubjectProgress.update(progressData.id, { difficulty_rating: rating });
-      }
-    },
-    onSuccess: () => queryClient.invalidateQueries(['subjectProgress'])
-  });
-
-  const addErrorMutation = useMutation({
-    mutationFn: async (error) => {
-      if (!progressData) return;
-      const errors = [...(progressData.errors_noted || []), error];
-      await base44.entities.SubjectProgress.update(progressData.id, { errors_noted: errors });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['subjectProgress']);
-      setNewError('');
-    }
-  });
-
-  const removeErrorMutation = useMutation({
-    mutationFn: async (index) => {
-      if (!progressData) return;
-      const errors = (progressData.errors_noted || []).filter((_, i) => i !== index);
-      await base44.entities.SubjectProgress.update(progressData.id, { errors_noted: errors });
-    },
-    onSuccess: () => queryClient.invalidateQueries(['subjectProgress'])
   });
 
   const currentProgress = progressData?.progress_percent || 0;
