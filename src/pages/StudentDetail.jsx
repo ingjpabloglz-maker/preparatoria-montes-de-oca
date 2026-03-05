@@ -35,6 +35,7 @@ export default function StudentDetail() {
   const studentEmail = urlParams.get('email');
   
   const [adminUser, setAdminUser] = useState(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const loadUser = async () => {
