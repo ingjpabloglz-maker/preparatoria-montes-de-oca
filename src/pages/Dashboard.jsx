@@ -173,11 +173,13 @@ function AdminDashboardView({ user }) {
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
   useEffect(() => {
     const loadUser = async () => {
       const userData = await base44.auth.me();
       setUser(userData);
+      setLoadingUser(false);
     };
     loadUser();
   }, []);
