@@ -142,7 +142,7 @@ function AdminDashboardView({ user }) {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="overview">
+        <Tabs defaultValue={defaultTab}>
           <TabsList className="bg-white shadow-sm">
             <TabsTrigger value="overview">Vista General</TabsTrigger>
             <TabsTrigger value="students">Gestión de Alumnos</TabsTrigger>
