@@ -78,11 +78,6 @@ export default function StudentDetail() {
   const progress = progressData[0];
   const currentLevel = progress?.current_level || 1;
 
-  const handleAdminUpdateProfile = async (formData) => {
-    await base44.entities.User.update(student.id, formData);
-    queryClient.invalidateQueries({ queryKey: ['student', studentEmail] });
-  };
-
   // Calcular estadísticas
   const completedSubjects = subjectProgress.filter(sp => sp.completed).length;
   const totalProgress = subjects.length > 0
@@ -119,24 +114,46 @@ export default function StudentDetail() {
         {/* Student Info */}
         <Card className="border-0 shadow-sm">
           <CardContent className="p-6">
-            <div className="flex items-start gap-6 mb-6">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                <User className="w-8 h-8 text-blue-600" />
+            <div className="flex items-start gap-6">
+              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <User className="w-10 h-10 text-blue-600" />
               </div>
-              <div>
-                <p className="font-semibold text-xl">{student.full_name || 'Sin nombre'}</p>
-                <p className="text-gray-500 flex items-center gap-1">
-                  <Mail className="w-4 h-4" />
-                  {student.email}
-                </p>
-                <p className="text-sm text-gray-400 mt-1">
-                  Inscrito: {student.created_date ? format(new Date(student.created_date), "d 'de' MMMM, yyyy", { locale: es }) : 'N/A'}
-                </p>
+              <div className="flex-1 grid md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Nombre completo</p>
+                  <p className="font-semibold text-lg">{student.full_name || 'Sin nombre'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Email</p>
+                  <p className="font-medium flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-400" />
+                    {student.email}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Fecha de Inscripción</p>
+                  <p className="font-medium flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    {student.created_date 
+                      ? format(new Date(student.created_date), "d 'de' MMMM, yyyy", { locale: es })
+                      : 'N/A'
+                    }
+                  </p>
+                </div>
               </div>
             </div>
-            <ProfileForm user={student} onAdminUpdate={handleAdminUpdateProfile} mode="admin" />
           </CardContent>
         </Card>
+
+        {/* Personal Info Form (admin editable) */}
+        <ProfileForm
+          user={student}
+          mode="admin"
+          onAdminUpdate={async (data) => {
+            await base44.entities.User.update(student.id, data);
+            queryClient.invalidateQueries({ queryKey: ['student', studentEmail] });
+          }}
+        />
 
         {/* Progress Stats */}
         <div className="grid md:grid-cols-4 gap-4">
