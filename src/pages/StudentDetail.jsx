@@ -10,7 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { 
-  ArrowLeft, User, Mail, Calendar, GraduationCap, Clock, CheckCircle2, XCircle
+  ArrowLeft, User, Mail, CheckCircle2, XCircle
 } from "lucide-react";
 import AdminGuard from '../components/auth/AdminGuard';
 import ProfileForm from '../components/profile/ProfileForm';
