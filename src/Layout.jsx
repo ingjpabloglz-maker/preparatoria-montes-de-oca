@@ -76,15 +76,26 @@ export default function Layout({ children, currentPageName }) {
               )}
               
               {isAdmin && (
-                <Link to={createPageUrl('AdminDashboard')}>
-                  <Button 
-                    variant={isAdminPage ? 'secondary' : 'ghost'}
-                    size="sm"
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    Administración
-                  </Button>
-                </Link>
+                <>
+                  <Link to={createPageUrl('AdminDashboard')}>
+                    <Button 
+                      variant={isAdminPage ? 'secondary' : 'ghost'}
+                      size="sm"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Administración
+                    </Button>
+                  </Link>
+                  <Link to={createPageUrl('AdminDashboard') + '?tab=students'}>
+                    <Button 
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      Gestión de Alumnos
+                    </Button>
+                  </Link>
+                </>
               )}
             </nav>
 
