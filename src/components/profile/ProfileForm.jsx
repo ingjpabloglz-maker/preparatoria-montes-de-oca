@@ -6,7 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserCircle, Save } from "lucide-react";
 
-export default function ProfileForm({ user, onSaved, readOnly = false, onUpdate }) {
+const FIELDS = [
+  { key: 'nombres', label: 'Nombres', required: true },
+  { key: 'apellido_paterno', label: 'Apellido Paterno', required: true },
+  { key: 'apellido_materno', label: 'Apellido Materno', required: false },
+  { key: 'telefono_personal', label: 'Teléfono Personal', required: true },
+  { key: 'telefono_tutor', label: 'Teléfono del Tutor (opcional)', required: false },
+  { key: 'correo_contacto', label: 'Correo Electrónico de Contacto', required: true },
+];
+
+// mode: 'student' = alumno edita su propio perfil | 'admin' = admin edita datos del alumno
+export default function ProfileForm({ user, onSaved, onAdminUpdate, mode = 'student' }) {
   const [form, setForm] = useState({
     nombres: user?.nombres || '',
     apellido_paterno: user?.apellido_paterno || '',
@@ -24,29 +34,16 @@ export default function ProfileForm({ user, onSaved, readOnly = false, onUpdate 
 
   const handleSave = async () => {
     setSaving(true);
-    await base44.auth.updateMe(form);
+    if (mode === 'admin') {
+      await onAdminUpdate?.(form);
+    } else {
+      await base44.auth.updateMe(form);
+      onSaved?.();
+    }
     setSaving(false);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    onSaved?.();
+    setTimeout(() => setSaved(false), 2500);
   };
-
-  const handleAdminUpdate = async () => {
-    setSaving(true);
-    await onUpdate(form);
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
-  const fields = [
-    { key: 'nombres', label: 'Nombres', required: true },
-    { key: 'apellido_paterno', label: 'Apellido Paterno', required: true },
-    { key: 'apellido_materno', label: 'Apellido Materno', required: false },
-    { key: 'telefono_personal', label: 'Teléfono Personal', required: true },
-    { key: 'telefono_tutor', label: 'Teléfono del Tutor', required: false },
-    { key: 'correo_contacto', label: 'Correo Electrónico de Contacto', required: true },
-  ];
 
   const isComplete = form.nombres && form.apellido_paterno && form.telefono_personal && form.correo_contacto;
 
@@ -60,7 +57,7 @@ export default function ProfileForm({ user, onSaved, readOnly = false, onUpdate 
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
-          {fields.map(({ key, label, required }) => (
+          {FIELDS.map(({ key, label, required }) => (
             <div key={key} className="space-y-1">
               <Label>
                 {label}
@@ -69,34 +66,20 @@ export default function ProfileForm({ user, onSaved, readOnly = false, onUpdate 
               <Input
                 value={form[key]}
                 onChange={(e) => handleChange(key, e.target.value)}
-                disabled={readOnly}
                 placeholder={label}
               />
             </div>
           ))}
         </div>
 
-        {!readOnly && (
-          <Button
-            onClick={handleSave}
-            disabled={saving || !isComplete}
-            className="w-full mt-2"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {saving ? 'Guardando...' : saved ? '¡Guardado!' : 'Guardar Información'}
-          </Button>
-        )}
-
-        {onUpdate && !readOnly === false && (
-          <Button
-            onClick={handleAdminUpdate}
-            disabled={saving}
-            className="w-full mt-2"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {saving ? 'Guardando...' : saved ? '¡Guardado!' : 'Guardar Cambios'}
-          </Button>
-        )}
+        <Button
+          onClick={handleSave}
+          disabled={saving || !isComplete}
+          className="w-full mt-2"
+        >
+          <Save className="w-4 h-4 mr-2" />
+          {saving ? 'Guardando...' : saved ? '¡Guardado exitosamente!' : 'Guardar Información'}
+        </Button>
       </CardContent>
     </Card>
   );
