@@ -126,126 +126,64 @@ export default function Level() {
                 <p className="text-2xl font-bold">{Math.round(levelProgress)}%</p>
               </div>
               <div className="space-y-2">
-                <p className="text-sm text-gray-500">Materias</p>
+                <p className="text-sm text-gray-500">Materias completadas</p>
                 <p className="text-2xl font-bold">
                   {subjectProgress.filter(p => p.completed && subjects.some(s => s.id === p.subject_id)).length}
                   <span className="text-gray-400 font-normal">/{subjects.length}</span>
                 </p>
               </div>
               <div className="space-y-2">
-                <p className="text-sm text-gray-500">Pruebas Aprobadas</p>
+                <p className="text-sm text-gray-500">Pruebas aprobadas</p>
                 <p className="text-2xl font-bold">
-                  {(test1Passed ? 1 : 0) + (test2Passed ? 1 : 0)}
-                  <span className="text-gray-400 font-normal">/2</span>
+                  {subjectProgress.filter(p => p.test_passed && subjects.some(s => s.id === p.subject_id)).length}
+                  <span className="text-gray-400 font-normal">/{subjects.length}</span>
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="bg-white shadow-sm">
-            <TabsTrigger value="subjects" className="gap-2">
-              <BookOpen className="w-4 h-4" />
-              Materias
-            </TabsTrigger>
-            <TabsTrigger value="tests" className="gap-2">
-              <FileCheck className="w-4 h-4" />
-              Pruebas
-            </TabsTrigger>
-          </TabsList>
+        {/* Estado del nivel */}
+        {allSubjectTestsPassed && (
+          <Card className="border-green-200 bg-green-50 border-0 shadow-lg">
+            <CardContent className="p-6 flex items-center gap-4">
+              <Trophy className="w-10 h-10 text-green-500 flex-shrink-0" />
+              <div>
+                <p className="font-bold text-green-800 text-lg">¡Nivel Completado!</p>
+                <p className="text-green-700 text-sm">Has aprobado todas las materias y pruebas. Puedes avanzar al siguiente nivel ingresando tu folio de pago.</p>
+              </div>
+              <Button
+                className="ml-auto bg-green-600 hover:bg-green-700 flex-shrink-0"
+                onClick={() => window.location.href = createPageUrl(`UnlockLevel?level=${levelNum + 1}`)}
+              >
+                Desbloquear Nivel {levelNum + 1}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
-          <TabsContent value="subjects" className="mt-6 space-y-6">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {subjects.map((subject) => {
-                const sp = subjectProgress.find(p => p.subject_id === subject.id);
-                return (
-                  <SubjectCard
-                    key={subject.id}
-                    subject={subject}
-                    progress={sp?.progress_percent || 0}
-                    isCompleted={sp?.completed || false}
-                    onClick={() => window.location.href = createPageUrl(`Subject?id=${subject.id}`)}
-                  />
-                );
-              })}
-            </div>
-            <LevelInsights subjects={subjects} subjectProgress={subjectProgress} />
-          </TabsContent>
-
-          <TabsContent value="tests" className="mt-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Prueba 1 */}
-              <Card className={test1Passed ? "border-green-200 bg-green-50/50" : ""}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Prueba 1</CardTitle>
-                    {test1Passed ? (
-                      <Badge className="bg-green-500">
-                        <CheckCircle2 className="w-3 h-3 mr-1" />
-                        Aprobada ({test1Passed.score}%)
-                      </Badge>
-                    ) : levelProgress < 50 ? (
-                      <Badge variant="secondary">
-                        <Lock className="w-3 h-3 mr-1" />
-                        Requiere 50% de avance
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline">Disponible</Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-500 text-sm mb-4">
-                    Primera evaluación del nivel. Debes tener al menos 50% de avance para presentarla.
-                  </p>
-                  <Button 
-                    className="w-full"
-                    disabled={levelProgress < 50 || test1Passed}
-                    onClick={() => setTakingTest(1)}
-                  >
-                    {test1Passed ? "Aprobada" : "Iniciar Prueba"}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Prueba 2 */}
-              <Card className={test2Passed ? "border-green-200 bg-green-50/50" : ""}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Prueba 2</CardTitle>
-                    {test2Passed ? (
-                      <Badge className="bg-green-500">
-                        <CheckCircle2 className="w-3 h-3 mr-1" />
-                        Aprobada ({test2Passed.score}%)
-                      </Badge>
-                    ) : levelProgress < 100 ? (
-                      <Badge variant="secondary">
-                        <Lock className="w-3 h-3 mr-1" />
-                        Requiere 100% de avance
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline">Disponible</Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-500 text-sm mb-4">
-                    Evaluación final del nivel. Debes completar todas las materias para presentarla.
-                  </p>
-                  <Button 
-                    className="w-full"
-                    disabled={levelProgress < 100 || test2Passed}
-                    onClick={() => setTakingTest(2)}
-                  >
-                    {test2Passed ? "Aprobada" : "Iniciar Prueba"}
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
+        {/* Materias */}
+        <div className="space-y-6">
+          <h2 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
+            <BookOpen className="w-5 h-5" />
+            Materias
+          </h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {subjects.map((subject) => {
+              const sp = subjectProgress.find(p => p.subject_id === subject.id);
+              return (
+                <SubjectCard
+                  key={subject.id}
+                  subject={subject}
+                  progress={sp?.progress_percent || 0}
+                  isCompleted={sp?.test_passed || false}
+                  onClick={() => window.location.href = createPageUrl(`Subject?id=${subject.id}`)}
+                />
+              );
+            })}
+          </div>
+          <LevelInsights subjects={subjects} subjectProgress={subjectProgress} />
+        </div>
       </div>
     </div>
   );
