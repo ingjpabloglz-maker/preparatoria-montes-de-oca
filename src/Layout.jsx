@@ -87,7 +87,7 @@ export default function Layout({ children, currentPageName }) {
                       Administración
                     </Button>
                   </Link>
-                  <Link to={createPageUrl('AdminDashboard') + '?tab=students'}>
+                  <Link to={createPageUrl('ManageStudents')}>
                     <Button 
                       variant="ghost"
                       size="sm"
