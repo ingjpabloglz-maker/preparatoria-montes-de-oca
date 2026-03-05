@@ -139,15 +139,17 @@ export default function Layout({ children, currentPageName }) {
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t bg-white p-4 space-y-2">
-            <Link 
-              to={createPageUrl('Dashboard')}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <Button variant="ghost" className="w-full justify-start">
-                <LayoutDashboard className="w-4 h-4 mr-2" />
-                Mi Progreso
-              </Button>
-            </Link>
+            {!isAdmin && (
+              <Link 
+                to={createPageUrl('Dashboard')}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Button variant="ghost" className="w-full justify-start">
+                  <LayoutDashboard className="w-4 h-4 mr-2" />
+                  Mi Progreso
+                </Button>
+              </Link>
+            )}
             {isAdmin && (
               <Link 
                 to={createPageUrl('AdminDashboard')}
