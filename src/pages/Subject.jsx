@@ -146,6 +146,24 @@ export default function Subject() {
     );
   }
 
+  if (takingTest) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <Button variant="ghost" className="mb-6 gap-2" onClick={() => setTakingTest(false)}>
+            <ArrowLeft className="w-4 h-4" />
+            Volver
+          </Button>
+          <SubjectTest
+            subject={subject}
+            onComplete={handleTestComplete}
+            onExit={() => setTakingTest(false)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -161,12 +179,17 @@ export default function Subject() {
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">{subject.name}</h1>
-              {isCompleted && (
+              {testPassed ? (
                 <Badge className="bg-green-500">
-                  <CheckCircle2 className="w-3 h-3 mr-1" />
-                  Completada
+                  <Trophy className="w-3 h-3 mr-1" />
+                  Aprobada ({finalGrade}%)
                 </Badge>
-              )}
+              ) : isCompleted ? (
+                <Badge className="bg-blue-500">
+                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                  Lista para examen
+                </Badge>
+              ) : null}
             </div>
             <p className="text-gray-500">Nivel {subject.level}</p>
           </div>
