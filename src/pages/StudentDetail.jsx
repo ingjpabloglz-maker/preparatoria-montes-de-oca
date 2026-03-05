@@ -78,6 +78,11 @@ export default function StudentDetail() {
   const progress = progressData[0];
   const currentLevel = progress?.current_level || 1;
 
+  const handleAdminUpdateProfile = async (formData) => {
+    await base44.entities.User.update(student.id, formData);
+    queryClient.invalidateQueries({ queryKey: ['student', studentEmail] });
+  };
+
   // Calcular estadísticas
   const completedSubjects = subjectProgress.filter(sp => sp.completed).length;
   const totalProgress = subjects.length > 0
