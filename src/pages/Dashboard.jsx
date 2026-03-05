@@ -186,6 +186,7 @@ export default function Dashboard() {
     queryKey: ['levels'],
     queryFn: () => base44.entities.LevelConfig.list('level_number'),
     staleTime: 0,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });
 
@@ -193,6 +194,7 @@ export default function Dashboard() {
     queryKey: ['subjects'],
     queryFn: () => base44.entities.Subject.list('level,order'),
     staleTime: 0,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });
 
@@ -201,6 +203,7 @@ export default function Dashboard() {
     queryFn: () => base44.entities.UserProgress.filter({ user_email: user?.email }),
     enabled: !!user?.email,
     staleTime: 0,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });
 
@@ -209,6 +212,7 @@ export default function Dashboard() {
     queryFn: () => base44.entities.SubjectProgress.filter({ user_email: user?.email }),
     enabled: !!user?.email,
     staleTime: 0,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });
 
