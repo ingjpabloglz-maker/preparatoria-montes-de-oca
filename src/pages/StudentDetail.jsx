@@ -61,11 +61,7 @@ export default function StudentDetail() {
   const progress = progressData[0];
   const currentLevel = progress?.current_level || 1;
 
-  const completedSubjects = subjectProgress.filter(sp => sp.completed).length;
-  const totalProgress = subjects.length > 0
-    ? subjectProgress.reduce((sum, sp) => sum + (sp.progress_percent || 0), 0) / subjects.length
-    : 0;
-  const testScores = progress?.test_scores || [];
+  const completedSubjects = subjectProgress.filter(sp => sp.test_passed).length;
 
   const handleAdminUpdate = async (data) => {
     await base44.entities.User.update(student.id, data);
