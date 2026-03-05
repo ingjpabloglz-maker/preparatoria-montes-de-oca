@@ -81,62 +81,11 @@ export default function Level() {
       }, 0) / subjects.length
     : 0;
 
-  // Verificar pruebas completadas
-  const testScores = progress?.test_scores || [];
-  const levelTests = testScores.filter(t => t.level === levelNum);
-  const test1Passed = levelTests.find(t => t.test_number === 1 && t.passed);
-  const test2Passed = levelTests.find(t => t.test_number === 2 && t.passed);
-  const allTestsPassed = test1Passed && test2Passed;
-
-  const handleTestComplete = async (testNumber, score, passed) => {
-    if (!progress) return;
-    
-    const existingScores = progress.test_scores || [];
-
-    // Si ya está aprobada, no duplicar
-    const alreadyPassed = existingScores.find(t => t.level === levelNum && t.test_number === testNumber && t.passed);
-    if (alreadyPassed) return;
-
-    // Siempre agregar el intento (aprobado o no)
-    const newTestScores = [...existingScores, {
-      level: levelNum,
-      test_number: testNumber,
-      score,
-      passed,
-      date: new Date().toISOString()
-    }];
-
-    await base44.entities.UserProgress.update(progress.id, {
-      test_scores: newTestScores
-    });
-
-    // Refrescar inmediatamente
-    await refetchProgress();
-    await queryClient.invalidateQueries({ queryKey: ['userProgress'] });
-  };
-
-  if (takingTest) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-4xl mx-auto">
-          <Button 
-            variant="ghost" 
-            className="mb-6 gap-2"
-            onClick={() => setTakingTest(null)}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Volver
-          </Button>
-          <LevelTest 
-            level={levelNum}
-            testNumber={takingTest}
-            onComplete={(score, passed) => handleTestComplete(takingTest, score, passed)}
-            onExit={() => setTakingTest(null)}
-          />
-        </div>
-      </div>
-    );
-  }
+  // Verificar pruebas de materias aprobadas
+  const allSubjectTestsPassed = subjects.length > 0 && subjects.every(s => {
+    const sp = subjectProgress.find(p => p.subject_id === s.id);
+    return sp?.test_passed === true;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
