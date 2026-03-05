@@ -4,19 +4,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserCircle, Save } from "lucide-react";
+import { UserCircle, Save, Trash2 } from "lucide-react";
 
-const FIELDS = [
-  { key: 'nombres', label: 'Nombres', required: true },
-  { key: 'apellido_paterno', label: 'Apellido Paterno', required: true },
-  { key: 'apellido_materno', label: 'Apellido Materno', required: false },
-  { key: 'telefono_personal', label: 'Teléfono Personal', required: true },
-  { key: 'telefono_tutor', label: 'Teléfono del Tutor (opcional)', required: false },
-  { key: 'correo_contacto', label: 'Correo Electrónico de Contacto', required: true },
+const TEXT_FIELDS = [
+  { key: 'nombres', label: 'Nombres', required: true, type: 'text' },
+  { key: 'apellido_paterno', label: 'Apellido Paterno', required: true, type: 'text' },
+  { key: 'apellido_materno', label: 'Apellido Materno', required: false, type: 'text' },
+  { key: 'correo_contacto', label: 'Correo Electrónico de Contacto', required: true, type: 'text' },
 ];
 
-// mode: 'student' = alumno edita su propio perfil | 'admin' = admin edita datos del alumno
-export default function ProfileForm({ user, onSaved, onAdminUpdate, mode = 'student' }) {
+const PHONE_FIELDS = [
+  { key: 'telefono_personal', label: 'Teléfono Personal', required: true },
+  { key: 'telefono_tutor', label: 'Teléfono del Tutor (opcional)', required: false },
+];
+
+function validatePhone(value) {
+  if (!value) return true; // handled by required check
+  return /^\d{10}$/.test(value);
+}
+
+export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClearField, mode = 'student' }) {
   const [form, setForm] = useState({
     nombres: user?.nombres || '',
     apellido_paterno: user?.apellido_paterno || '',
@@ -27,9 +34,27 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, mode = 'stud
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [phoneErrors, setPhoneErrors] = useState({});
 
   const handleChange = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePhoneChange = (field, value) => {
+    // Only allow digits
+    const digits = value.replace(/\D/g, '').slice(0, 10);
+    setForm(prev => ({ ...prev, [field]: digits }));
+    if (digits.length > 0 && digits.length < 10) {
+      setPhoneErrors(prev => ({ ...prev, [field]: 'Debe tener exactamente 10 dígitos' }));
+    } else {
+      setPhoneErrors(prev => ({ ...prev, [field]: null }));
+    }
+  };
+
+  const isValid = () => {
+    const requiredOk = form.nombres && form.apellido_paterno && form.telefono_personal && form.correo_contacto;
+    const phonesOk = validatePhone(form.telefono_personal) && validatePhone(form.telefono_tutor);
+    return requiredOk && phonesOk;
   };
 
   const handleSave = async () => {
@@ -45,7 +70,14 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, mode = 'stud
     setTimeout(() => setSaved(false), 2500);
   };
 
-  const isComplete = form.nombres && form.apellido_paterno && form.telefono_personal && form.correo_contacto;
+  const handleClear = async (field) => {
+    if (mode === 'admin' && onAdminClearField) {
+      await onAdminClearField(field);
+      setForm(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const allFields = [...TEXT_FIELDS, ...PHONE_FIELDS];
 
   return (
     <Card className="border-0 shadow-md">
@@ -57,24 +89,73 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, mode = 'stud
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
-          {FIELDS.map(({ key, label, required }) => (
+          {TEXT_FIELDS.map(({ key, label, required }) => (
             <div key={key} className="space-y-1">
               <Label>
                 {label}
                 {required && <span className="text-red-500 ml-1">*</span>}
               </Label>
-              <Input
-                value={form[key]}
-                onChange={(e) => handleChange(key, e.target.value)}
-                placeholder={label}
-              />
+              <div className="flex gap-2">
+                <Input
+                  value={form[key]}
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  placeholder={label}
+                  className="flex-1"
+                />
+                {mode === 'admin' && form[key] && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-red-400 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
+                    title="Borrar campo"
+                    onClick={() => handleClear(key)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {PHONE_FIELDS.map(({ key, label, required }) => (
+            <div key={key} className="space-y-1">
+              <Label>
+                {label}
+                {required && <span className="text-red-500 ml-1">*</span>}
+              </Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    value={form[key]}
+                    onChange={(e) => handlePhoneChange(key, e.target.value)}
+                    placeholder="10 dígitos"
+                    maxLength={10}
+                    inputMode="numeric"
+                    className={phoneErrors[key] ? 'border-red-400' : ''}
+                  />
+                  {phoneErrors[key] && (
+                    <p className="text-xs text-red-500 mt-1">{phoneErrors[key]}</p>
+                  )}
+                </div>
+                {mode === 'admin' && form[key] && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-red-400 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
+                    title="Borrar campo"
+                    onClick={() => handleClear(key)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>
 
         <Button
           onClick={handleSave}
-          disabled={saving || !isComplete}
+          disabled={saving || !isValid()}
           className="w-full mt-2"
         >
           <Save className="w-4 h-4 mr-2" />

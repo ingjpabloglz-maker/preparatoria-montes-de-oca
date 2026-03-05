@@ -9,11 +9,7 @@ export default function Profile() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const loadUser = async () => {
-      const userData = await base44.auth.me();
-      setUser(userData);
-    };
-    loadUser();
+    base44.auth.me().then(setUser);
   }, []);
 
   const handleSaved = async () => {
@@ -25,19 +21,12 @@ export default function Profile() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-2xl mx-auto p-6 space-y-6">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => window.location.href = createPageUrl('Dashboard')}
-          >
+          <Button variant="ghost" size="icon" onClick={() => window.location.href = createPageUrl('Dashboard')}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">Mi Perfil</h1>
         </div>
-
-        {user && (
-          <ProfileForm user={user} onSaved={handleSaved} />
-        )}
+        {user && <ProfileForm user={user} onSaved={handleSaved} />}
       </div>
     </div>
   );
