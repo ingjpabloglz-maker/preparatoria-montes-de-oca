@@ -34,6 +34,8 @@ import { AlertCircle } from "lucide-react";
 
 function AdminDashboardView({ user }) {
   const [studentSearch, setStudentSearch] = useState('');
+  const urlParams = new URLSearchParams(window.location.search);
+  const defaultTab = urlParams.get('tab') || 'overview';
 
   const { data: allUsers = [] } = useQuery({
     queryKey: ['allUsers'],
