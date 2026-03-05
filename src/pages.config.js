@@ -55,6 +55,7 @@ import ManageSubjects from './pages/ManageSubjects';
 import StudentDetail from './pages/StudentDetail';
 import Subject from './pages/Subject';
 import UnlockLevel from './pages/UnlockLevel';
+import Profile from './pages/Profile';
 import __Layout from './Layout.jsx';
 
 
@@ -67,6 +68,7 @@ export const PAGES = {
     "StudentDetail": StudentDetail,
     "Subject": Subject,
     "UnlockLevel": UnlockLevel,
+    "Profile": Profile,
 }
 
 export const pagesConfig = {
