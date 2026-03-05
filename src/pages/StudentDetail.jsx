@@ -25,8 +25,10 @@ import {
   XCircle
 } from "lucide-react";
 import AdminGuard from '../components/auth/AdminGuard';
+import ProfileForm from '../components/profile/ProfileForm';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function StudentDetail() {
   const urlParams = new URLSearchParams(window.location.search);
