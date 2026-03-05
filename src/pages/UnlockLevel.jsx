@@ -47,22 +47,11 @@ export default function UnlockLevel() {
   const canUnlock = levelNum === currentLevel + 1;
   const alreadyUnlocked = levelNum <= currentLevel;
 
-  // Verificar si el nivel anterior está completado
-  const prevLevelSubjects = subjects;
-  const prevLevelProgress = prevLevelSubjects.length > 0
-    ? prevLevelSubjects.reduce((sum, subject) => {
-        const sp = subjectProgress.find(p => p.subject_id === subject.id);
-        return sum + (sp?.progress_percent || 0);
-      }, 0) / prevLevelSubjects.length
-    : 0;
-
-  const testScores = progress?.test_scores || [];
-  const prevLevelTests = testScores.filter(t => t.level === levelNum - 1);
-  const test1Passed = prevLevelTests.find(t => t.test_number === 1 && t.passed);
-  const test2Passed = prevLevelTests.find(t => t.test_number === 2 && t.passed);
-  const allTestsPassed = test1Passed && test2Passed;
-
-  const prevLevelComplete = prevLevelProgress >= 100 && allTestsPassed;
+  // Verificar si todas las materias del nivel anterior están completadas y aprobadas
+  const prevLevelComplete = subjects.length > 0 && subjects.every(subject => {
+    const sp = subjectProgress.find(p => p.subject_id === subject.id);
+    return sp?.completed && sp?.test_passed;
+  });
 
   const handleUnlockSuccess = async () => {
     // Actualizar el nivel del usuario
