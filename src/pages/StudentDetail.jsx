@@ -135,102 +135,37 @@ export default function StudentDetail() {
             onAdminClearField={handleAdminClearField}
           />
 
-          {/* Progress Stats */}
-          <div className="grid md:grid-cols-4 gap-4">
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-4 text-center">
-                <GraduationCap className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                <p className="text-2xl font-bold">Nivel {currentLevel}</p>
-                <p className="text-sm text-gray-500">Nivel Actual</p>
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-4 text-center">
-                <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                <p className="text-2xl font-bold">{completedSubjects}/{subjects.length}</p>
-                <p className="text-sm text-gray-500">Materias Completadas</p>
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-4 text-center">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <span className="text-purple-600 font-bold text-sm">{Math.round(totalProgress)}%</span>
-                </div>
-                <p className="text-2xl font-bold">{Math.round(totalProgress)}%</p>
-                <p className="text-sm text-gray-500">Progreso Total</p>
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-4 text-center">
-                <Clock className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-                <p className="text-2xl font-bold">
-                  {progress?.level_start_date
-                    ? Math.floor((new Date() - new Date(progress.level_start_date)) / (1000 * 60 * 60 * 24))
-                    : 0}
-                </p>
-                <p className="text-sm text-gray-500">Días en Nivel</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Progress by Level */}
+          {/* Pruebas por materia */}
           <Card className="border-0 shadow-sm">
-            <CardHeader><CardTitle>Progreso por Nivel</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Resultados de Pruebas por Materia</CardTitle></CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {[1,2,3,4,5,6].map((level) => {
-                  const levelSubjects = subjects.filter(s => s.level === level);
-                  const levelProgress = levelSubjects.length > 0
-                    ? levelSubjects.reduce((sum, subject) => {
-                        const sp = subjectProgress.find(p => p.subject_id === subject.id);
-                        return sum + (sp?.progress_percent || 0);
-                      }, 0) / levelSubjects.length
-                    : 0;
-                  return (
-                    <div key={level} className="flex items-center gap-4">
-                      <div className="w-20 text-sm font-medium">
-                        Nivel {level}
-                        {level < currentLevel && <CheckCircle2 className="w-4 h-4 text-green-500 inline ml-1" />}
-                      </div>
-                      <div className="flex-1"><Progress value={levelProgress} className="h-3" /></div>
-                      <div className="w-16 text-right text-sm text-gray-500">{Math.round(levelProgress)}%</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Test Scores */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader><CardTitle>Resultados de Pruebas</CardTitle></CardHeader>
-            <CardContent>
-              {testScores.length > 0 ? (
+              {subjectProgress.filter(sp => sp.test_attempts > 0).length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nivel</TableHead>
-                      <TableHead>Prueba</TableHead>
+                      <TableHead>Materia</TableHead>
+                      <TableHead>Intentos</TableHead>
                       <TableHead>Calificación</TableHead>
                       <TableHead>Estado</TableHead>
-                      <TableHead>Fecha</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {testScores.map((test, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell><Badge variant="outline">Nivel {test.level}</Badge></TableCell>
-                        <TableCell>Prueba {test.test_number}</TableCell>
-                        <TableCell className="font-semibold">{test.score}%</TableCell>
-                        <TableCell>
-                          {test.passed
-                            ? <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" />Aprobada</Badge>
-                            : <Badge className="bg-red-100 text-red-800"><XCircle className="w-3 h-3 mr-1" />No Aprobada</Badge>
-                          }
-                        </TableCell>
-                        <TableCell>{test.date && format(new Date(test.date), "dd/MM/yyyy")}</TableCell>
-                      </TableRow>
-                    ))}
+                    {subjectProgress.filter(sp => sp.test_attempts > 0).map((sp) => {
+                      const subject = subjects.find(s => s.id === sp.subject_id);
+                      return (
+                        <TableRow key={sp.id}>
+                          <TableCell className="font-medium">{subject?.name || sp.subject_id}</TableCell>
+                          <TableCell>{sp.test_attempts}/3</TableCell>
+                          <TableCell className="font-semibold">{sp.final_grade != null ? `${sp.final_grade}%` : '—'}</TableCell>
+                          <TableCell>
+                            {sp.test_passed
+                              ? <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="w-3 h-3 mr-1" />Aprobada</Badge>
+                              : <Badge className="bg-red-100 text-red-800"><XCircle className="w-3 h-3 mr-1" />No Aprobada</Badge>
+                            }
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               ) : (
