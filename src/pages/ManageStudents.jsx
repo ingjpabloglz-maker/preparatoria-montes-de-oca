@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Eye, Users } from "lucide-react";
+import AdminGuard from '../components/auth/AdminGuard';
 
 export default function ManageStudents() {
   const [studentSearch, setStudentSearch] = useState('');
