@@ -115,6 +115,7 @@ export default function ManageStudents() {
           </CardContent>
         </Card>
       </div>
-    </div></AdminGuard>
+    </div>
+    </AdminGuard>
   );
 }
