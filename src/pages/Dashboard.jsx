@@ -203,16 +203,16 @@ export default function Dashboard() {
   const { data: userProgress, isLoading: loadingProgress } = useQuery({
     queryKey: ['userProgress', user?.email],
     queryFn: () => base44.entities.UserProgress.filter({ user_email: user?.email }),
-    enabled: !!user?.email,
+    enabled: !loadingUser && !!user?.email,
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });
 
-  const { data: subjectProgress = [] } = useQuery({
+  const { data: subjectProgress = [], isLoading: loadingSubjectProgress } = useQuery({
     queryKey: ['subjectProgress', user?.email],
     queryFn: () => base44.entities.SubjectProgress.filter({ user_email: user?.email }),
-    enabled: !!user?.email,
+    enabled: !loadingUser && !!user?.email,
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
