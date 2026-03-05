@@ -23,8 +23,6 @@ export default function Level() {
   const levelNum = parseInt(urlParams.get('level')) || 1;
   
   const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('subjects');
-  const [takingTest, setTakingTest] = useState(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
