@@ -105,6 +105,38 @@ export default function Subject() {
 
   const currentProgress = progressData?.progress_percent || 0;
   const isCompleted = progressData?.completed || false;
+  const testPassed = progressData?.test_passed || false;
+  const testAttempts = progressData?.test_attempts || 0;
+  const finalGrade = progressData?.final_grade;
+  const attemptsLeft = 3 - testAttempts;
+  const testBlocked = testAttempts >= 3 && !testPassed;
+  const testAvailable = isCompleted && !testPassed && !testBlocked;
+
+  const handleTestComplete = async (score, passed) => {
+    const newAttempts = testAttempts + 1;
+    const updateData = {
+      test_attempts: newAttempts,
+      test_passed: passed,
+      last_activity: new Date().toISOString(),
+    };
+    if (passed) {
+      updateData.final_grade = score;
+      updateData.completed = true;
+    }
+    if (progressData) {
+      await base44.entities.SubjectProgress.update(progressData.id, updateData);
+    } else {
+      await base44.entities.SubjectProgress.create({
+        user_email: user.email,
+        subject_id: subjectId,
+        progress_percent: currentProgress,
+        completed: isCompleted,
+        ...updateData
+      });
+    }
+    setTakingTest(false);
+    queryClient.invalidateQueries(['subjectProgress']);
+  };
 
   if (!subject) {
     return (
