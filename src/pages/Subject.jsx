@@ -12,10 +12,13 @@ import {
   BookOpen,
   CheckCircle2,
   Clock,
-  Play,
-  FileText
+  FileText,
+  Lock,
+  Trophy,
+  AlertCircle
 } from "lucide-react";
 import SubjectAnalyticsCard from '../components/analytics/SubjectAnalyticsCard';
+import SubjectTest from '../components/tests/SubjectTest';
 
 export default function Subject() {
   const urlParams = new URLSearchParams(window.location.search);
