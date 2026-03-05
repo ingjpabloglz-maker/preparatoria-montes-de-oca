@@ -10,14 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   ArrowLeft,
   BookOpen,
-  FileCheck,
-  Clock,
   CheckCircle2,
-  Lock
+  Lock,
+  Trophy
 } from "lucide-react";
 
 import SubjectCard from '../components/dashboard/SubjectCard';
-import LevelTest from '../components/tests/LevelTest';
 import LevelInsights from '../components/analytics/LevelInsights';
 
 export default function Level() {
