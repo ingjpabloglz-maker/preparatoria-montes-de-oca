@@ -243,6 +243,50 @@ export default function Subject() {
           </CardContent>
         </Card>
 
+        {/* Prueba de la materia */}
+        <Card className={`border-0 shadow-lg ${testPassed ? 'border-green-200 bg-green-50/50' : ''}`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Prueba de la Materia
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {testPassed ? (
+              <div className="flex items-center gap-3 text-green-700">
+                <Trophy className="w-8 h-8 text-green-500" />
+                <div>
+                  <p className="font-semibold">¡Materia Aprobada!</p>
+                  <p className="text-sm">Calificación final: <span className="font-bold">{finalGrade}%</span></p>
+                </div>
+              </div>
+            ) : testBlocked ? (
+              <div className="flex items-center gap-3 text-red-700">
+                <AlertCircle className="w-8 h-8 text-red-400" />
+                <div>
+                  <p className="font-semibold">Sin intentos disponibles</p>
+                  <p className="text-sm">Has agotado los 3 intentos. Contacta a tu administrador.</p>
+                </div>
+              </div>
+            ) : !isCompleted ? (
+              <div className="flex items-center gap-3 text-gray-500">
+                <Lock className="w-6 h-6" />
+                <p className="text-sm">Completa el 100% del contenido para desbloquear la prueba.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  La prueba tiene 3 intentos máximo. Necesitas al menos 70% para aprobar.
+                </p>
+                <p className="text-sm text-gray-500">Intentos restantes: <span className="font-semibold">{attemptsLeft}</span></p>
+                <Button className="w-full" onClick={() => setTakingTest(true)}>
+                  Iniciar Prueba
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Analytics */}
         <SubjectAnalyticsCard
           progressData={progressData}
