@@ -19,7 +19,8 @@ import {
   LayoutDashboard,
   ChevronDown,
   Menu,
-  X
+  X,
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
