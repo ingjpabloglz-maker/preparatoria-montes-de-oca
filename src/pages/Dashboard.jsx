@@ -256,10 +256,10 @@ export default function Dashboard() {
 
   const currentLevelConfig = levels.find(l => l.level_number === currentLevel);
   const currentLevelSubjects = subjectsByLevel[currentLevel] || [];
-  const completedSubjectsCount = subjectProgress.filter(p => p.completed).length;
+  const completedSubjectsCount = subjectProgress.filter(p => p.test_passed).length;
   const totalSubjectsCount = subjects.length;
-  const totalProgress = totalSubjectsCount > 0 
-    ? (subjectProgress.reduce((sum, p) => sum + (p.progress_percent || 0), 0) / totalSubjectsCount)
+  const totalProgress = totalSubjectsCount > 0
+    ? Math.min(100, (subjectProgress.reduce((sum, p) => sum + Math.min(100, p.progress_percent || 0), 0) / totalSubjectsCount))
     : 0;
 
   // Vista de administrador
