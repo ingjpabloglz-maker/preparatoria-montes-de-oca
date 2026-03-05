@@ -226,12 +226,16 @@ export default function Dashboard() {
   const getLevelProgress = (levelNum) => {
     const levelSubjects = subjectsByLevel[levelNum] || [];
     if (levelSubjects.length === 0) return 0;
-    
+
+    // Nivel ya completado → 100%
+    if (levelNum < currentLevel) return 100;
+
     const progressSum = levelSubjects.reduce((sum, subject) => {
       const sp = subjectProgress.find(p => p.subject_id === subject.id);
+      if (sp?.completed && sp?.test_passed) return sum + 100;
       return sum + (sp?.progress_percent || 0);
     }, 0);
-    
+
     return progressSum / levelSubjects.length;
   };
 
