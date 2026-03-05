@@ -403,6 +403,10 @@ export default function Dashboard() {
                   subjects={subjectsByLevel[levelNum] || []}
                   daysRemaining={isCurrent ? getDaysRemaining() : undefined}
                   onClick={() => {
+                    if (!profileComplete) {
+                      window.location.href = createPageUrl('Profile');
+                      return;
+                    }
                     if (isCurrent) {
                       window.location.href = createPageUrl(`Level?level=${levelNum}`);
                     } else if (isCompleted) {
