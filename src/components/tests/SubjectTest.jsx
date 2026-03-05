@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, XCircle, ArrowRight, Trophy, RotateCcw } from "lucide-react";
+import { ArrowRight, Trophy, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const sampleQuestions = [
@@ -85,9 +85,7 @@ export default function SubjectTest({ subject, questions = sampleQuestions, onCo
               {passed ? "Aprobado" : "No Aprobado"}
             </Badge>
           </div>
-          <Button onClick={onExit} className="gap-2">
-            Volver a la Materia
-          </Button>
+          <Button onClick={onExit}>Volver a la Materia</Button>
         </CardContent>
       </Card>
     );
