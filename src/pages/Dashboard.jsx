@@ -22,6 +22,7 @@ import {
 import LevelCard from '../components/dashboard/LevelCard';
 import StatsOverview from '../components/dashboard/StatsOverview';
 import SubjectCard from '../components/dashboard/SubjectCard';
+import { AlertCircle } from "lucide-react";
 
 function AdminDashboardView({ user }) {
   const { data: allUsers = [] } = useQuery({
