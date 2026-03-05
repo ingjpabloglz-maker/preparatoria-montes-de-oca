@@ -48,7 +48,7 @@ export default function StudentDetail() {
 
   const { data: subjects = [] } = useQuery({
     queryKey: ['subjects'],
-    queryFn: () => base44.entities.Subject.list('level,order'),
+    queryFn: () => base44.entities.Subject.list('level'),
   });
 
   const { data: payments = [] } = useQuery({
