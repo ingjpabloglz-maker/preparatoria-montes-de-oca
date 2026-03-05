@@ -25,6 +25,7 @@ export default function Subject() {
   const subjectId = urlParams.get('id');
   
   const [user, setUser] = useState(null);
+  const [takingTest, setTakingTest] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
