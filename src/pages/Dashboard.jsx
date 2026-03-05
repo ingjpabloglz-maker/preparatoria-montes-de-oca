@@ -177,9 +177,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     const loadUser = async () => {
-      const userData = await base44.auth.me();
-      setUser(userData);
-      setLoadingUser(false);
+      try {
+        const userData = await base44.auth.me();
+        setUser(userData);
+      } catch (e) {
+        // User not logged in
+      } finally {
+        setLoadingUser(false);
+      }
     };
     loadUser();
   }, []);
