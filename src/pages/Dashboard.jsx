@@ -283,9 +283,31 @@ export default function Dashboard() {
     );
   }
 
+  const profileComplete = user?.nombres && user?.apellido_paterno && user?.telefono_personal && user?.correo_contacto;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto p-6 space-y-8">
+        {/* Alerta perfil incompleto */}
+        {!profileComplete && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-amber-800">Completa tu información personal</p>
+              <p className="text-sm text-amber-700 mt-0.5">
+                Debes llenar tu perfil antes de poder iniciar los niveles.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="bg-amber-500 hover:bg-amber-600 text-white flex-shrink-0"
+              onClick={() => window.location.href = createPageUrl('Profile')}
+            >
+              Ir a Mi Perfil
+            </Button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -296,10 +318,15 @@ export default function Dashboard() {
               Continúa tu aprendizaje en el Nivel {currentLevel}
             </p>
           </div>
-          <Badge variant="outline" className="text-sm py-2 px-4 self-start md:self-auto">
-            <Star className="w-4 h-4 mr-2 text-amber-500" />
-            {Math.round(totalProgress)}% completado
-          </Badge>
+          <div className="flex items-center gap-2 self-start md:self-auto">
+            <Button variant="outline" size="sm" onClick={() => window.location.href = createPageUrl('Profile')}>
+              Mi Perfil
+            </Button>
+            <Badge variant="outline" className="text-sm py-2 px-4">
+              <Star className="w-4 h-4 mr-2 text-amber-500" />
+              {Math.round(totalProgress)}% completado
+            </Badge>
+          </div>
         </div>
 
         {/* Stats Overview */}
