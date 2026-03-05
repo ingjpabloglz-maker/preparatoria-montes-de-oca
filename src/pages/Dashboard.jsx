@@ -199,7 +199,7 @@ export default function Dashboard() {
 
   const { data: subjects = [], isLoading: loadingSubjects } = useQuery({
     queryKey: ['subjects'],
-    queryFn: () => base44.entities.Subject.list('level,order'),
+    queryFn: () => base44.entities.Subject.list('level'),
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
