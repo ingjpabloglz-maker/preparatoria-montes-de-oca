@@ -56,7 +56,7 @@ export default function LevelTest({
     }));
   };
 
-  const nextQuestion = () => {
+  const nextQuestion = async () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(prev => prev + 1);
     } else {
@@ -66,10 +66,11 @@ export default function LevelTest({
         if (answers[idx] === q.correct) correct++;
       });
       const finalScore = Math.round((correct / questions.length) * 100);
+      const didPass = finalScore >= 70;
       setScore(finalScore);
+      // Guardar resultado ANTES de mostrar pantalla de resultados
+      await onComplete?.(finalScore, didPass);
       setShowResults(true);
-      // Guardar resultado
-      onComplete?.(finalScore, finalScore >= 70);
     }
   };
 
