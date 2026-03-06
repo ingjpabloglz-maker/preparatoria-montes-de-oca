@@ -318,6 +318,15 @@ export default function Dashboard() {
     refetchOnWindowFocus: true,
   });
 
+  const { data: level1Payment = [], isLoading: loadingLevel1Payment } = useQuery({
+    queryKey: ['level1Payment', user?.email],
+    queryFn: () => base44.entities.Payment.filter({ user_email: user?.email, level: 1, status: 'used', folio_type: 'level_advance' }),
+    enabled: !loadingUser && !!user?.email,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  });
+
   const progress = userProgress?.[0];
   const currentLevel = progress?.current_level || 1;
 
