@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { base44 } from '@/api/base44Client';
 
-export default function FolioValidator({ levelToUnlock, onSuccess, userEmail }) {
+export default function FolioValidator({ levelToUnlock, onSuccess, userEmail, folioType = 'level_advance' }) {
   const [folio, setFolio] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
