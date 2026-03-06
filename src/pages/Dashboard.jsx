@@ -423,6 +423,32 @@ export default function Dashboard() {
 
   const profileComplete = user?.nombres && user?.apellido_paterno && user?.telefono_personal && user?.correo_contacto;
 
+  // Pantalla de folio requerido para Nivel 1
+  const level1Unlocked = level1Payment.length > 0;
+  if (!level1Unlocked && profileComplete) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center p-6">
+        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-6">
+          <GraduationCap className="w-10 h-10 text-blue-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+          Bienvenido a la Preparatoria
+        </h2>
+        <p className="text-gray-500 mb-8 text-center max-w-md">
+          Para comenzar el Nivel 1 debes ingresar tu folio de pago de inscripción.
+        </p>
+        <div className="w-full max-w-md">
+          <FolioValidator
+            levelToUnlock={1}
+            userEmail={user?.email}
+            folioType="level_advance"
+            onSuccess={() => window.location.reload()}
+          />
+        </div>
+      </div>
+    );
+  }
+
   // Pantalla de bloqueo por tiempo
   if (isBlockedByTime) {
     return (
