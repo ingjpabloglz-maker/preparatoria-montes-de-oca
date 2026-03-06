@@ -30,7 +30,8 @@ import {
 import LevelCard from '../components/dashboard/LevelCard';
 import StatsOverview from '../components/dashboard/StatsOverview';
 import SubjectCard from '../components/dashboard/SubjectCard';
-import { AlertCircle } from "lucide-react";
+import FolioValidator from '../components/payment/FolioValidator';
+import { AlertCircle, Lock } from "lucide-react";
 
 function AdminDashboardView({ user }) {
   const [studentSearch, setStudentSearch] = useState('');
