@@ -46,10 +46,12 @@ export default function ManageFolios() {
     folio: '',
     level: 1,
     amount: 0,
-    student_name: ''
+    student_name: '',
+    folio_type: 'level_advance'
   });
   const [bulkCount, setBulkCount] = useState(10);
   const [bulkLevel, setBulkLevel] = useState(1);
+  const [bulkFolioType, setBulkFolioType] = useState('level_advance');
   
   const queryClient = useQueryClient();
 
@@ -109,7 +111,8 @@ export default function ManageFolios() {
         folio: generateFolio(),
         level: bulkLevel,
         status: 'available',
-        amount: 0
+        amount: 0,
+        folio_type: bulkFolioType
       });
     }
     await base44.entities.Payment.bulkCreate(folios);

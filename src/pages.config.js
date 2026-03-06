@@ -51,12 +51,12 @@ import AdminDashboard from './pages/AdminDashboard';
 import Dashboard from './pages/Dashboard';
 import Level from './pages/Level';
 import ManageFolios from './pages/ManageFolios';
+import ManageStudents from './pages/ManageStudents';
 import ManageSubjects from './pages/ManageSubjects';
 import Profile from './pages/Profile';
 import StudentDetail from './pages/StudentDetail';
 import Subject from './pages/Subject';
 import UnlockLevel from './pages/UnlockLevel';
-import ManageStudents from './pages/ManageStudents';
 import __Layout from './Layout.jsx';
 
 
@@ -65,12 +65,12 @@ export const PAGES = {
     "Dashboard": Dashboard,
     "Level": Level,
     "ManageFolios": ManageFolios,
+    "ManageStudents": ManageStudents,
     "ManageSubjects": ManageSubjects,
     "Profile": Profile,
     "StudentDetail": StudentDetail,
     "Subject": Subject,
     "UnlockLevel": UnlockLevel,
-    "ManageStudents": ManageStudents,
 }
 
 export const pagesConfig = {
