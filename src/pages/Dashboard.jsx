@@ -409,6 +409,32 @@ export default function Dashboard() {
 
   const profileComplete = user?.nombres && user?.apellido_paterno && user?.telefono_personal && user?.correo_contacto;
 
+  // Pantalla de bloqueo por tiempo
+  if (isBlockedByTime) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center p-6">
+        <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+          <Lock className="w-10 h-10 text-red-500" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+          Tiempo del Nivel {currentLevel} Agotado
+        </h2>
+        <p className="text-gray-500 mb-8 text-center max-w-md">
+          El tiempo asignado para el Nivel {currentLevel} ha expirado. 
+          Ingresa un folio de desbloqueo para continuar con tu progreso actual.
+        </p>
+        <div className="w-full max-w-md">
+          <FolioValidator
+            levelToUnlock={currentLevel}
+            userEmail={user?.email}
+            folioType="time_unlock"
+            onSuccess={handleTimeUnlockSuccess}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto p-6 space-y-8">
