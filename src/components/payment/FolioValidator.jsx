@@ -33,7 +33,8 @@ export default function FolioValidator({ levelToUnlock, onSuccess, userEmail, fo
       const payments = await base44.entities.Payment.filter({
         folio: folio.trim().toUpperCase(),
         level: levelToUnlock,
-        status: 'available'
+        status: 'available',
+        folio_type: folioType
       });
 
       if (payments.length === 0) {
