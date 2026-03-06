@@ -118,13 +118,39 @@ export default function StudentDetail() {
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-6xl mx-auto p-6 space-y-6">
           {/* Header */}
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => window.location.href = createPageUrl('AdminDashboard')}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={() => window.location.href = createPageUrl('AdminDashboard')}>
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
               <h1 className="text-2xl font-bold text-gray-900">Detalle del Estudiante</h1>
             </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={deletingStudent}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Eliminar Alumno
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Eliminar a {student?.full_name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción no se puede deshacer. Se eliminarán permanentemente todos los datos del alumno,
+                    incluyendo su progreso, resultados de pruebas y historial de pagos.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteStudent}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Sí, eliminar alumno
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
 
           {/* Info básica */}
