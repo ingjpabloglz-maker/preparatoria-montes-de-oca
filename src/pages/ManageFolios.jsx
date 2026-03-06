@@ -210,6 +210,21 @@ export default function ManageFolios() {
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label>Tipo de Folio</Label>
+                  <Select
+                    value={newFolio.folio_type}
+                    onValueChange={(v) => setNewFolio({ ...newFolio, folio_type: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="level_advance">Avance de Nivel</SelectItem>
+                      <SelectItem value="time_unlock">Desbloqueo por Tiempo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label>Nombre del Estudiante (opcional)</Label>
                   <Input
                     placeholder="Nombre del estudiante"
@@ -256,6 +271,18 @@ export default function ManageFolios() {
                       {[1, 2, 3, 4, 5, 6].map((l) => (
                         <SelectItem key={l} value={l.toString()}>Nivel {l}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Tipo</Label>
+                  <Select value={bulkFolioType} onValueChange={(v) => setBulkFolioType(v)}>
+                    <SelectTrigger className="w-36">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="level_advance">Avance Nivel</SelectItem>
+                      <SelectItem value="time_unlock">Desbloqueo Tiempo</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
