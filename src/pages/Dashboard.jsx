@@ -368,10 +368,13 @@ export default function Dashboard() {
   const isBlockedByTime = daysRemaining !== null && daysRemaining === 0;
 
   const handleTimeUnlockSuccess = async () => {
-    // Resetear el timer del nivel actual sin cambiar el nivel
+    // Dar 30 días extra a partir de hoy: level_start_date = hoy - (time_limit_days - 30)
     if (progress) {
+      const timeLimitDays = currentLevelConfig?.time_limit_days || 60;
+      const newStartDate = new Date();
+      newStartDate.setDate(newStartDate.getDate() - (timeLimitDays - 30));
       await base44.entities.UserProgress.update(progress.id, {
-        level_start_date: new Date().toISOString(),
+        level_start_date: newStartDate.toISOString(),
         blocked_due_to_time: false
       });
     }
