@@ -551,7 +551,7 @@ export default function Dashboard() {
                   isCurrent={isCurrent}
                   progress={getLevelProgress(levelNum)}
                   subjects={subjectsByLevel[levelNum] || []}
-                  daysRemaining={isCurrent ? getDaysRemaining() : undefined}
+                  daysRemaining={isCurrent ? daysRemaining : undefined}
                   onClick={() => {
                     if (!profileComplete) {
                       window.location.href = createPageUrl('Profile');
