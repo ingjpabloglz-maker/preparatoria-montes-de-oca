@@ -33,6 +33,7 @@ export default function StudentDetail() {
   const studentEmail = urlParams.get('email');
 
   const [adminUser, setAdminUser] = useState(null);
+  const [deletingStudent, setDeletingStudent] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
