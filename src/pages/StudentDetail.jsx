@@ -86,6 +86,23 @@ export default function StudentDetail() {
     queryClient.invalidateQueries({ queryKey: ['student', studentEmail] });
   };
 
+  const handleDeleteStudent = async () => {
+    setDeletingStudent(true);
+    // Eliminar todos los datos asociados al alumno
+    const [progressRecords, subjectProgressRecords, paymentRecords] = await Promise.all([
+      base44.entities.UserProgress.filter({ user_email: studentEmail }),
+      base44.entities.SubjectProgress.filter({ user_email: studentEmail }),
+      base44.entities.Payment.filter({ user_email: studentEmail }),
+    ]);
+    await Promise.all([
+      ...progressRecords.map(r => base44.entities.UserProgress.delete(r.id)),
+      ...subjectProgressRecords.map(r => base44.entities.SubjectProgress.delete(r.id)),
+      ...paymentRecords.map(r => base44.entities.Payment.delete(r.id)),
+      base44.entities.User.delete(student.id),
+    ]);
+    window.location.href = createPageUrl('ManageStudents');
+  };
+
   if (!student) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
