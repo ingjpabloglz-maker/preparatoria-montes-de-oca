@@ -421,6 +421,37 @@ export default function Dashboard() {
 
   const profileComplete = user?.nombres && user?.apellido_paterno && user?.telefono_personal && user?.correo_contacto;
 
+  // Verificar si el usuario tiene folio de nivel 1 usado
+  const hasLevel1Folio = userPayments.some(
+    p => p.level === 1 && p.folio_type === 'level_advance' && p.status === 'used'
+  );
+
+  // Pantalla de bloqueo por falta de folio nivel 1 (solo si perfil completo)
+  if (profileComplete && currentLevel === 1 && !hasLevel1Folio) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center p-6">
+        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-6">
+          <Lock className="w-10 h-10 text-blue-500" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
+          Bienvenido al Nivel 1
+        </h2>
+        <p className="text-gray-500 mb-8 text-center max-w-md">
+          Para iniciar tu primer nivel necesitas ingresar un folio de pago. 
+          Comunícate con la administración escolar para obtenerlo.
+        </p>
+        <div className="w-full max-w-md">
+          <FolioValidator
+            levelToUnlock={1}
+            userEmail={user?.email}
+            folioType="level_advance"
+            onSuccess={() => window.location.reload()}
+          />
+        </div>
+      </div>
+    );
+  }
+
   // Pantalla de bloqueo por tiempo
   if (isBlockedByTime) {
     return (
