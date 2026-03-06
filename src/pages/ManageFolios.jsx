@@ -305,6 +305,7 @@ export default function ManageFolios() {
                 <TableRow>
                   <TableHead>Folio</TableHead>
                   <TableHead>Nivel</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Estudiante Asignado</TableHead>
                   <TableHead>Usado Por</TableHead>
@@ -331,6 +332,11 @@ export default function ManageFolios() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">Nivel {payment.level}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={payment.folio_type === 'time_unlock' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}>
+                        {payment.folio_type === 'time_unlock' ? 'Desbloqueo Tiempo' : 'Avance Nivel'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge 
