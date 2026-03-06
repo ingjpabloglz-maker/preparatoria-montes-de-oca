@@ -318,15 +318,6 @@ export default function Dashboard() {
     refetchOnWindowFocus: true,
   });
 
-  const { data: level1Payment = [], isLoading: loadingLevel1Payment } = useQuery({
-    queryKey: ['level1Payment', user?.email],
-    queryFn: () => base44.entities.Payment.filter({ user_email: user?.email, level: 1, status: 'used', folio_type: 'level_advance' }),
-    enabled: !loadingUser && !!user?.email,
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
-  });
-
   const progress = userProgress?.[0];
   const currentLevel = progress?.current_level || 1;
 
@@ -377,15 +368,10 @@ export default function Dashboard() {
   const isBlockedByTime = daysRemaining !== null && daysRemaining === 0;
 
   const handleTimeUnlockSuccess = async () => {
-    // Otorgar 30 días adicionales a partir de hoy, ajustando level_start_date
+    // Resetear el timer del nivel actual sin cambiar el nivel
     if (progress) {
-      const levelConfig = levels.find(l => l.level_number === currentLevel);
-      const timeLimitDays = levelConfig?.time_limit_days || 60;
-      // Para que queden 30 días: level_start_date = hoy - (timeLimitDays - 30) días
-      const newStartDate = new Date();
-      newStartDate.setDate(newStartDate.getDate() - (timeLimitDays - 30));
       await base44.entities.UserProgress.update(progress.id, {
-        level_start_date: newStartDate.toISOString(),
+        level_start_date: new Date().toISOString(),
         blocked_due_to_time: false
       });
     }
@@ -405,7 +391,7 @@ export default function Dashboard() {
     return <AdminDashboardView user={user} />;
   }
 
-  if (loadingUser || loadingLevels || loadingSubjects || loadingProgress || loadingSubjectProgress || loadingLevel1Payment) {
+  if (loadingUser || loadingLevels || loadingSubjects || loadingProgress || loadingSubjectProgress) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
@@ -422,32 +408,6 @@ export default function Dashboard() {
   }
 
   const profileComplete = user?.nombres && user?.apellido_paterno && user?.telefono_personal && user?.correo_contacto;
-
-  // Pantalla de folio requerido para Nivel 1
-  const level1Unlocked = level1Payment.length > 0;
-  if (!level1Unlocked && profileComplete) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center p-6">
-        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-6">
-          <GraduationCap className="w-10 h-10 text-blue-600" />
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">
-          Bienvenido a la Preparatoria
-        </h2>
-        <p className="text-gray-500 mb-8 text-center max-w-md">
-          Para comenzar el Nivel 1 debes ingresar tu folio de pago de inscripción.
-        </p>
-        <div className="w-full max-w-md">
-          <FolioValidator
-            levelToUnlock={1}
-            userEmail={user?.email}
-            folioType="level_advance"
-            onSuccess={() => window.location.reload()}
-          />
-        </div>
-      </div>
-    );
-  }
 
   // Pantalla de bloqueo por tiempo
   if (isBlockedByTime) {

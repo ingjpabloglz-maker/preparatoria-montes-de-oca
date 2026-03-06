@@ -10,19 +10,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { 
-  ArrowLeft, User, Mail, CheckCircle2, XCircle, Trash2
+  ArrowLeft, User, Mail, CheckCircle2, XCircle
 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import AdminGuard from '../components/auth/AdminGuard';
 import ProfileForm from '../components/profile/ProfileForm';
 import { format } from "date-fns";
