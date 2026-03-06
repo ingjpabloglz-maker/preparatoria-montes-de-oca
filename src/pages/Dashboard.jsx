@@ -364,6 +364,20 @@ export default function Dashboard() {
     return Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
   };
 
+  const daysRemaining = getDaysRemaining();
+  const isBlockedByTime = daysRemaining !== null && daysRemaining === 0;
+
+  const handleTimeUnlockSuccess = async () => {
+    // Resetear el timer del nivel actual sin cambiar el nivel
+    if (progress) {
+      await base44.entities.UserProgress.update(progress.id, {
+        level_start_date: new Date().toISOString(),
+        blocked_due_to_time: false
+      });
+    }
+    window.location.reload();
+  };
+
   const currentLevelConfig = levels.find(l => l.level_number === currentLevel);
   const currentLevelSubjects = subjectsByLevel[currentLevel] || [];
   const completedSubjectsCount = subjectProgress.filter(p => p.test_passed).length;
