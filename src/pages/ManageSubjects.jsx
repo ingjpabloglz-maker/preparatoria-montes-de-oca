@@ -112,13 +112,13 @@ export default function ManageSubjects() {
     }
   };
 
-  // Agrupar materias por nivel (convertir a entero para evitar problemas con decimales)
-  const subjectsByLevel = subjects.reduce((acc, subject) => {
-    const lvl = parseInt(subject.level);
-    if (!acc[lvl]) acc[lvl] = [];
-    acc[lvl].push(subject);
-    return acc;
-  }, {});
+  // Agrupar materias por nivel
+  const subjectsByLevel = {};
+  for (let i = 1; i <= 6; i++) subjectsByLevel[i] = [];
+  subjects.forEach((subject) => {
+    const lvl = Math.round(Number(subject.level));
+    if (lvl >= 1 && lvl <= 6) subjectsByLevel[lvl].push(subject);
+  });
 
   return (
     <AdminGuard><div className="min-h-screen bg-gray-50">
