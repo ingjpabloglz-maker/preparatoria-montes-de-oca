@@ -298,6 +298,11 @@ export default function Subject() {
                 <p className="text-sm text-gray-600">
                   La prueba tiene 3 intentos máximo. Necesitas al menos 70% para aprobar.
                 </p>
+                {testAttempts > 0 && finalGrade !== undefined && (
+                  <p className="text-sm text-orange-700 font-medium">
+                    Última calificación obtenida: <span className="font-bold">{finalGrade}%</span> — Intento {testAttempts} de 3
+                  </p>
+                )}
                 <p className="text-sm text-gray-500">Intentos restantes: <span className="font-semibold">{attemptsLeft}</span></p>
                 <Button className="w-full" onClick={() => setTakingTest(true)}>
                   Iniciar Prueba
