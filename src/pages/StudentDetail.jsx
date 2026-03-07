@@ -145,7 +145,7 @@ export default function StudentDetail() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>¿Eliminar a {student?.full_name}?</AlertDialogTitle>
+                  <AlertDialogTitle>¿Eliminar a {student ? formatName(student) : ''}?</AlertDialogTitle>
                   <AlertDialogDescription>
                     Esta acción no se puede deshacer. Se eliminarán permanentemente todos los datos del alumno,
                     incluyendo su progreso, resultados de pruebas y historial de pagos.
@@ -172,7 +172,7 @@ export default function StudentDetail() {
                   <User className="w-8 h-8 text-blue-600" />
                 </div>
                 <div>
-                  <p className="font-semibold text-xl">{student.full_name || 'Sin nombre'}</p>
+                  <p className="font-semibold text-xl">{formatName(student)}</p>
                   <p className="text-gray-500 flex items-center gap-1 text-sm">
                     <Mail className="w-4 h-4" /> {student.email}
                   </p>

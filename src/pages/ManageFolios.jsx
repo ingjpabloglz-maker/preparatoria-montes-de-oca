@@ -124,7 +124,7 @@ export default function ManageFolios() {
 
   const handleSelectStudent = (user) => {
     setBulkStudentEmail(user.email);
-    setBulkStudentName(user.full_name || user.email);
+    setBulkStudentName(formatName(user));
     setStudentSearchQuery('');
   };
 
@@ -296,7 +296,7 @@ export default function ManageFolios() {
                               className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b last:border-0 transition-colors"
                               onClick={() => handleSelectStudent(s)}
                             >
-                              <p className="text-sm font-medium">{s.full_name || s.email}</p>
+                              <p className="text-sm font-medium">{formatName(s)}</p>
                               <p className="text-xs text-gray-500">{s.email}</p>
                             </button>
                           ))

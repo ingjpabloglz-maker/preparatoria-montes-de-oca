@@ -225,7 +225,7 @@ export default function AdminDashboard() {
                         <TableRow key={u.id}>
                           <TableCell>
                             <div>
-                              <p className="font-medium">{u.full_name || 'Sin nombre'}</p>
+                              <p className="font-medium">{formatName(u)}</p>
                               <p className="text-sm text-gray-500">{u.email}</p>
                             </div>
                           </TableCell>
@@ -293,7 +293,7 @@ export default function AdminDashboard() {
                       const prog = getUserProgress(u.email);
                       return (
                         <TableRow key={u.id}>
-                          <TableCell className="font-medium">{u.full_name || 'Sin nombre'}</TableCell>
+                          <TableCell className="font-medium">{formatName(u)}</TableCell>
                           <TableCell>{u.email}</TableCell>
                           <TableCell>
                             <Badge variant="outline">Nivel {prog?.current_level || 1}</Badge>
