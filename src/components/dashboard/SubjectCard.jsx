@@ -66,6 +66,21 @@ export default function SubjectCard({ subject, progress, isCompleted, testStatus
               <p className="text-sm text-gray-500 mt-1 line-clamp-1">{subject.description}</p>
             )}
 
+            {/* Test Status Badge */}
+            {testStatus && (
+              <div className="mt-2">
+                {testStatus === 'aprobado' && (
+                  <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">✓ Prueba aprobada</Badge>
+                )}
+                {testStatus === 'no_aprobado' && (
+                  <Badge className="bg-red-100 text-red-700 border-red-200 text-xs">✗ Prueba no aprobada</Badge>
+                )}
+                {testStatus === 'pendiente' && (
+                  <Badge className="bg-gray-100 text-gray-500 border-gray-200 text-xs">· Prueba pendiente</Badge>
+                )}
+              </div>
+            )}
+
             {/* Progress */}
             <div className="mt-3 space-y-1">
               <div className="flex justify-between text-xs">
