@@ -69,15 +69,15 @@ export default function StudentDetail() {
     enabled: !!studentEmail,
   });
 
+  const student = students[0];
+  const progress = progressData[0];
+  const currentLevel = progress?.current_level || 1;
+
   const { data: levelSubjects = [] } = useQuery({
     queryKey: ['levelSubjects', currentLevel],
     queryFn: () => base44.entities.Subject.filter({ level: currentLevel }),
     enabled: !!currentLevel,
   });
-
-  const student = students[0];
-  const progress = progressData[0];
-  const currentLevel = progress?.current_level || 1;
 
   const completedSubjects = subjectProgress.filter(sp => sp.test_passed).length;
 
