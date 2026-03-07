@@ -37,6 +37,13 @@ export default function ExtraordinaryFolioValidator({ subjectId, userEmail, onUn
       return;
     }
 
+    // Verificar que el folio esté asignado a este alumno
+    if (record.user_email && record.user_email !== userEmail) {
+      setError('Este folio está asignado a otro alumno.');
+      setLoading(false);
+      return;
+    }
+
     // Marcar folio como usado
     await base44.entities.Payment.update(record.id, {
       status: 'used',
