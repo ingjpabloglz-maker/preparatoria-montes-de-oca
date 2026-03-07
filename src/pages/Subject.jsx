@@ -17,7 +17,6 @@ import {
   Trophy,
   AlertCircle
 } from "lucide-react";
-import SubjectAnalyticsCard from '../components/analytics/SubjectAnalyticsCard';
 import SubjectTest from '../components/tests/SubjectTest';
 import ExtraordinaryFolioValidator from '../components/payment/ExtraordinaryFolioValidator';
 

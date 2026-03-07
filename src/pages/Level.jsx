@@ -15,8 +15,6 @@ import {
 } from "lucide-react";
 
 import SubjectCard from '../components/dashboard/SubjectCard';
-import LevelInsights from '../components/analytics/LevelInsights';
-
 export default function Level() {
   const urlParams = new URLSearchParams(window.location.search);
   const levelNum = parseInt(urlParams.get('level')) || 1;
