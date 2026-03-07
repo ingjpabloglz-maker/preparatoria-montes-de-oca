@@ -184,6 +184,57 @@ export default function StudentDetail() {
             </CardContent>
           </Card>
 
+          {/* Progreso del nivel actual */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Nivel Actual: <Badge className="bg-blue-100 text-blue-800 text-base">Nivel {currentLevel}</Badge>
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  — Progreso general: {Math.round(progress?.total_progress_percent || 0)}%
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Progress value={progress?.total_progress_percent || 0} className="h-3 mb-5" />
+              <p className="text-sm font-semibold text-gray-700 mb-3">Materias del Nivel {currentLevel}:</p>
+              {levelSubjects.length === 0 ? (
+                <p className="text-sm text-gray-400">No hay materias configuradas para este nivel.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {levelSubjects.map((subj) => {
+                    const sp = subjectProgress.find(p => p.subject_id === subj.id);
+                    const passed = sp?.test_passed;
+                    const inProgress = sp && !passed && (sp.progress_percent > 0 || sp.test_attempts > 0);
+                    return (
+                      <div
+                        key={subj.id}
+                        className={`flex items-center gap-3 rounded-lg p-3 border ${
+                          passed ? 'bg-green-50 border-green-200' :
+                          inProgress ? 'bg-blue-50 border-blue-200' :
+                          'bg-gray-50 border-gray-200'
+                        }`}
+                      >
+                        {passed
+                          ? <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                          : <XCircle className="w-5 h-5 text-gray-300 flex-shrink-0" />
+                        }
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{subj.name}</p>
+                          {passed
+                            ? <p className="text-xs text-green-600">Aprobada — {sp.final_grade}%</p>
+                            : inProgress
+                              ? <p className="text-xs text-blue-600">En progreso — {sp.progress_percent || 0}%</p>
+                              : <p className="text-xs text-gray-400">Sin iniciar</p>
+                          }
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Información personal editable */}
           <ProfileForm
             user={student}
