@@ -24,6 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import AdminGuard from '../components/auth/AdminGuard';
+import ReportCard from '../components/student/ReportCard';
 
 const formatName = (u) => {
   const parts = [u.apellido_paterno, u.apellido_materno, u.nombres].filter(Boolean);
