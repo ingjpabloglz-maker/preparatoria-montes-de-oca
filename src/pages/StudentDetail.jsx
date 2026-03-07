@@ -241,6 +241,13 @@ export default function StudentDetail() {
             </CardContent>
           </Card>
 
+          {/* Boleta de calificaciones */}
+          <ReportCard
+            subjects={subjects}
+            subjectProgress={subjectProgress}
+            currentLevel={currentLevel}
+          />
+
           {/* Información personal editable */}
           <ProfileForm
             user={student}
