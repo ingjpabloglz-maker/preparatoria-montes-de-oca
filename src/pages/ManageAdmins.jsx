@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ export default function ManageAdmins() {
   const [currentUser, setCurrentUser] = React.useState(null);
   const queryClient = useQueryClient();
 
-  React.useEffect(() => {
+  useEffect(() => {
     base44.auth.me().then(setCurrentUser);
   }, []);
 

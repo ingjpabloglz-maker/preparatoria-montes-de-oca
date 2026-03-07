@@ -96,6 +96,15 @@ export default function Layout({ children, currentPageName }) {
                       Gestión de Alumnos
                     </Button>
                   </Link>
+                  <Link to={createPageUrl('ManageAdmins')}>
+                    <Button 
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Administradores
+                    </Button>
+                  </Link>
                 </>
               )}
             </nav>
