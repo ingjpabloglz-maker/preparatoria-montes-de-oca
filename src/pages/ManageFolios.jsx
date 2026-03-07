@@ -73,7 +73,7 @@ export default function ManageFolios() {
 
   const filteredStudents = studentSearchQuery.trim().length > 0
     ? students.filter(s =>
-        s.full_name?.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+        formatName(s).toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
         s.email?.toLowerCase().includes(studentSearchQuery.toLowerCase())
       )
     : students;
