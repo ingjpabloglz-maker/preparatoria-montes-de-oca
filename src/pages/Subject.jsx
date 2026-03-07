@@ -119,8 +119,8 @@ export default function Subject() {
       test_passed: passed,
       last_activity: new Date().toISOString(),
     };
+    updateData.final_grade = score;
     if (passed) {
-      updateData.final_grade = score;
       updateData.completed = true;
     }
     if (progressData) {
