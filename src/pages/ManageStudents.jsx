@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Eye, Users } from "lucide-react";
 
@@ -104,7 +103,7 @@ export default function ManageStudents() {
                 })}
                 {filteredStudents.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-gray-400 py-8">
+                    <TableCell colSpan={4} className="text-center text-gray-400 py-8">
                       No se encontraron alumnos.
                     </TableCell>
                   </TableRow>
