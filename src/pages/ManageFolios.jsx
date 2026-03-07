@@ -336,8 +336,14 @@ export default function ManageFolios() {
                       <Badge variant="outline">Nivel {payment.level}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className={payment.folio_type === 'time_unlock' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}>
-                        {payment.folio_type === 'time_unlock' ? 'Desbloqueo Tiempo' : 'Avance Nivel'}
+                      <Badge className={
+                        payment.folio_type === 'time_unlock' ? 'bg-purple-100 text-purple-800' :
+                        payment.folio_type === 'extraordinary_test' ? 'bg-orange-100 text-orange-800' :
+                        'bg-blue-100 text-blue-800'
+                      }>
+                        {payment.folio_type === 'time_unlock' ? 'Desbloqueo Tiempo' :
+                         payment.folio_type === 'extraordinary_test' ? 'Prueba Extraordinaria' :
+                         'Avance Nivel'}
                       </Badge>
                     </TableCell>
                     <TableCell>
