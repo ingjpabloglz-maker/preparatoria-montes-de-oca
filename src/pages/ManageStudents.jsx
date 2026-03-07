@@ -76,7 +76,6 @@ export default function ManageStudents() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Nivel</TableHead>
-                  <TableHead>Progreso</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -85,16 +84,10 @@ export default function ManageStudents() {
                   const prog = getProgress(s.email);
                   return (
                     <TableRow key={s.id}>
-                      <TableCell className="font-medium">{s.full_name || 'Sin nombre'}</TableCell>
+                      <TableCell className="font-medium">{formatName(s)}</TableCell>
                       <TableCell className="text-gray-500">{s.email}</TableCell>
                       <TableCell>
                         <Badge variant="outline">Nivel {prog?.current_level || 1}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="w-32">
-                          <Progress value={prog?.total_progress_percent || 0} className="h-2" />
-                          <span className="text-xs text-gray-500">{Math.round(prog?.total_progress_percent || 0)}%</span>
-                        </div>
                       </TableCell>
                       <TableCell>
                         <Button
