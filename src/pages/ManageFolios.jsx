@@ -221,6 +221,7 @@ export default function ManageFolios() {
                     <SelectContent>
                       <SelectItem value="level_advance">Avance de Nivel</SelectItem>
                       <SelectItem value="time_unlock">Desbloqueo por Tiempo</SelectItem>
+                      <SelectItem value="extraordinary_test">Prueba Extraordinaria</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -283,6 +284,7 @@ export default function ManageFolios() {
                     <SelectContent>
                       <SelectItem value="level_advance">Avance Nivel</SelectItem>
                       <SelectItem value="time_unlock">Desbloqueo Tiempo</SelectItem>
+                      <SelectItem value="extraordinary_test">Prueba Extraordinaria</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
