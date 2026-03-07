@@ -9,6 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Eye, Users } from "lucide-react";
+
+const formatName = (s) => {
+  const parts = [s.apellido_paterno, s.apellido_materno, s.nombres].filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : (s.full_name || 'Sin nombre');
+};
 import AdminGuard from '../components/auth/AdminGuard';
 
 export default function ManageStudents() {
