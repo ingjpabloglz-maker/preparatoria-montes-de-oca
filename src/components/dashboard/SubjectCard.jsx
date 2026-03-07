@@ -23,7 +23,7 @@ const subjectIcons = {
   "default": "📖"
 };
 
-export default function SubjectCard({ subject, progress, isCompleted, onClick }) {
+export default function SubjectCard({ subject, progress, isCompleted, testStatus, onClick }) {
   const getIcon = (name) => {
     for (const [key, icon] of Object.entries(subjectIcons)) {
       if (name?.toLowerCase().includes(key.toLowerCase())) {
