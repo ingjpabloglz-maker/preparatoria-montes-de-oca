@@ -554,12 +554,14 @@ export default function Dashboard() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {currentLevelSubjects.map((subject) => {
                 const sp = subjectProgress.find(p => p.subject_id === subject.id);
+                const testStatus = sp?.test_passed ? 'aprobado' : sp?.test_attempts > 0 ? 'no_aprobado' : 'pendiente';
                 return (
                   <SubjectCard
                     key={subject.id}
                     subject={subject}
                     progress={sp?.progress_percent || 0}
                     isCompleted={sp?.completed || false}
+                    testStatus={testStatus}
                     onClick={() => window.location.href = createPageUrl(`Subject?id=${subject.id}`)}
                   />
                 );
