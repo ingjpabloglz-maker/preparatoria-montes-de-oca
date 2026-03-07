@@ -68,7 +68,7 @@ export default function AdminDashboard() {
   });
 
   // Estadísticas
-  const totalStudents = allUsers.filter(u => u.role === 'student').length;
+  const totalStudents = allUsers.filter(u => u.role !== 'admin').length;
   const activeStudents = allProgress.length;
   const usedFolios = allPayments.filter(p => p.status === 'used').length;
   const availableFolios = allPayments.filter(p => p.status === 'available').length;
@@ -79,10 +79,11 @@ export default function AdminDashboard() {
     count: allProgress.filter(p => p.current_level === level).length
   }));
 
-  // Filtrar usuarios
+  // Filtrar usuarios (solo no-admins)
   const filteredUsers = allUsers.filter(u => 
-    u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    u.role !== 'admin' &&
+    (u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getUserProgress = (email) => {
