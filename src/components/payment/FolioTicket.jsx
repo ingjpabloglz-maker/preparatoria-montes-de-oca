@@ -67,7 +67,7 @@ export default function FolioTicket({ payment, open, onClose }) {
           ref={ticketRef}
           className="border-2 border-dashed border-gray-300 rounded-lg p-5 font-mono text-sm space-y-1 bg-white"
         >
-          <div className="title text-center text-base font-bold">PREPARATORIA</div>
+          <div className="title text-center text-base font-bold">PREPARATORIO MONTES DE OCA</div>
           <div className="subtitle text-center text-xs text-gray-500 mb-2">Comprobante de Folio de Pago</div>
           <div className="divider border-t border-dashed border-gray-300 my-2" />
 
