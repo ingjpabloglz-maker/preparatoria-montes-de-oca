@@ -307,11 +307,7 @@ export default function Subject() {
           </CardContent>
         </Card>
 
-        {/* Analytics */}
-        <SubjectAnalyticsCard
-          progressData={progressData}
-          onUpdate={(data) => updateAnalyticsMutation.mutate(data)}
-        />
+
 
         {/* Description */}
         {subject.description && (

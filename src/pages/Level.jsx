@@ -179,7 +179,7 @@ export default function Level() {
               );
             })}
           </div>
-          <LevelInsights subjects={subjects} subjectProgress={subjectProgress} />
+
         </div>
       </div>
     </div>
