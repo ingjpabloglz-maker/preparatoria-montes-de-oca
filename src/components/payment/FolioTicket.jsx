@@ -20,7 +20,7 @@ export default function FolioTicket({ payment, open, onClose }) {
     win.document.write(`
       <html>
         <head>
-          <title>PREPARATORIO MONTES DE OCA</title>
+          <title>PREPARATORIA MONTES DE OCA</title>
           <style>
             body { font-family: 'Courier New', monospace; padding: 24px; color: #111; }
             .ticket { max-width: 340px; margin: 0 auto; border: 2px dashed #999; padding: 20px; }
@@ -67,7 +67,7 @@ export default function FolioTicket({ payment, open, onClose }) {
           ref={ticketRef}
           className="border-2 border-dashed border-gray-300 rounded-lg p-5 font-mono text-sm space-y-1 bg-white"
         >
-          <div className="title text-center text-base font-bold">PREPARATORIO MONTES DE OCA</div>
+          <div className="title text-center text-base font-bold">PREPARATORIA MONTES DE OCA</div>
           <div className="subtitle text-center text-xs text-gray-500 mb-2">Comprobante de Folio de Pago</div>
           <div className="divider border-t border-dashed border-gray-300 my-2" />
 

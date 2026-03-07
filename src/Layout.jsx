@@ -123,6 +123,13 @@ export default function Layout({ children, currentPageName }) {
                         {user.role === 'admin' ? 'Administrador' : 'Estudiante'}
                       </Badge>
                     </div>
+                    <DropdownMenuItem
+                      onClick={() => window.location.href = createPageUrl('Profile')}
+                      className="cursor-pointer"
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      Editar Perfil
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
                       onClick={() => base44.auth.logout()}
