@@ -22,61 +22,56 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { 
   ArrowLeft,
   Plus,
   Trash2,
   Copy,
-  CheckCircle2
+  Printer,
+  Search
 } from "lucide-react";
 import { toast } from "sonner";
 import AdminGuard from '../components/auth/AdminGuard';
+import FolioTicket from '../components/payment/FolioTicket';
+
+const folioTypeLabel = {
+  level_advance: 'Avance de Nivel',
+  time_unlock: 'Desbloqueo por Tiempo',
+  extraordinary_test: 'Prueba Extraordinaria',
+};
 
 export default function ManageFolios() {
-  const [user, setUser] = useState(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newFolio, setNewFolio] = useState({
-    folio: '',
-    level: 1,
-    amount: 0,
-    student_name: '',
-    folio_type: 'level_advance'
-  });
-  const [bulkCount, setBulkCount] = useState(10);
+  const [bulkCount, setBulkCount] = useState(1);
   const [bulkLevel, setBulkLevel] = useState(1);
   const [bulkFolioType, setBulkFolioType] = useState('level_advance');
-  
-  const queryClient = useQueryClient();
+  const [bulkStudentEmail, setBulkStudentEmail] = useState('');
+  const [bulkStudentName, setBulkStudentName] = useState('');
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
 
-  useEffect(() => {
-    const loadUser = async () => {
-      const userData = await base44.auth.me();
-      setUser(userData);
-    };
-    loadUser();
-  }, []);
+  const [ticketPayment, setTicketPayment] = useState(null);
+  const [ticketOpen, setTicketOpen] = useState(false);
+
+  const queryClient = useQueryClient();
 
   const { data: payments = [] } = useQuery({
     queryKey: ['payments'],
     queryFn: () => base44.entities.Payment.list('-created_date'),
   });
 
-  const createFolioMutation = useMutation({
-    mutationFn: (data) => base44.entities.Payment.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['payments']);
-      setIsDialogOpen(false);
-      setNewFolio({ folio: '', level: 1, amount: 0, student_name: '' });
-      toast.success('Folio creado exitosamente');
-    },
+  // Cargar todos los alumnos para el selector
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['allUsers'],
+    queryFn: () => base44.entities.User.list(),
   });
+
+  const students = allUsers.filter(u => u.role !== 'admin');
+
+  const filteredStudents = studentSearchQuery.trim().length > 0
+    ? students.filter(s =>
+        s.full_name?.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+        s.email?.toLowerCase().includes(studentSearchQuery.toLowerCase())
+      )
+    : students;
 
   const deleteFolioMutation = useMutation({
     mutationFn: (id) => base44.entities.Payment.delete(id),
@@ -96,29 +91,36 @@ export default function ManageFolios() {
     return result;
   };
 
-  const handleCreateSingle = () => {
-    const folio = newFolio.folio || generateFolio(newFolio.folio_type);
-    createFolioMutation.mutate({
-      ...newFolio,
-      folio,
-      status: 'available'
-    });
-  };
+  const handleGenerate = async () => {
+    if (!bulkStudentEmail) {
+      toast.error('Debes seleccionar un alumno');
+      return;
+    }
 
-  const handleBulkCreate = async () => {
+    const needsLevel = bulkFolioType !== 'extraordinary_test';
+
     const folios = [];
     for (let i = 0; i < bulkCount; i++) {
       folios.push({
         folio: generateFolio(bulkFolioType),
-        level: bulkLevel,
+        level: needsLevel ? bulkLevel : null,
         status: 'available',
         amount: 0,
-        folio_type: bulkFolioType
+        folio_type: bulkFolioType,
+        user_email: bulkStudentEmail,
+        student_name: bulkStudentName,
       });
     }
+
     await base44.entities.Payment.bulkCreate(folios);
     queryClient.invalidateQueries(['payments']);
-    toast.success(`${bulkCount} folios creados`);
+    toast.success(`${bulkCount} folio${bulkCount > 1 ? 's' : ''} generado${bulkCount > 1 ? 's' : ''} y asignado${bulkCount > 1 ? 's' : ''} a ${bulkStudentName}`);
+  };
+
+  const handleSelectStudent = (user) => {
+    setBulkStudentEmail(user.email);
+    setBulkStudentName(user.full_name || user.email);
+    setStudentSearchQuery('');
   };
 
   const copyToClipboard = (text) => {
@@ -126,96 +128,75 @@ export default function ManageFolios() {
     toast.success('Folio copiado');
   };
 
+  const openTicket = (payment) => {
+    setTicketPayment(payment);
+    setTicketOpen(true);
+  };
+
+  const needsLevel = bulkFolioType !== 'extraordinary_test';
+
   return (
-    <AdminGuard><div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={() => window.location.href = createPageUrl('AdminDashboard')}
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold text-gray-900">Gestión de Folios</h1>
-            <p className="text-gray-500">Crea y administra folios de pago</p>
+    <AdminGuard>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-6xl mx-auto p-6 space-y-6">
+
+          {/* Header */}
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => window.location.href = createPageUrl('AdminDashboard')}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-gray-900">Gestión de Folios</h1>
+              <p className="text-gray-500">Genera y asigna folios de pago a alumnos</p>
+            </div>
           </div>
-        </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-green-600">
-                {payments.filter(p => p.status === 'available').length}
-              </p>
-              <p className="text-sm text-gray-500">Disponibles</p>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-gray-600">
-                {payments.filter(p => p.status === 'used').length}
-              </p>
-              <p className="text-sm text-gray-500">Usados</p>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-blue-600">
-                {payments.length}
-              </p>
-              <p className="text-sm text-gray-500">Total</p>
-            </CardContent>
-          </Card>
-        </div>
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4">
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-4 text-center">
+                <p className="text-3xl font-bold text-green-600">
+                  {payments.filter(p => p.status === 'available').length}
+                </p>
+                <p className="text-sm text-gray-500">Disponibles</p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-4 text-center">
+                <p className="text-3xl font-bold text-gray-600">
+                  {payments.filter(p => p.status === 'used').length}
+                </p>
+                <p className="text-sm text-gray-500">Usados</p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-4 text-center">
+                <p className="text-3xl font-bold text-blue-600">
+                  {payments.length}
+                </p>
+                <p className="text-sm text-gray-500">Total</p>
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Actions */}
-        <div className="flex gap-4">
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" />
-                Crear Folio Individual
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Crear Nuevo Folio</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Folio (opcional, se genera automáticamente)</Label>
-                  <Input
-                    placeholder="PAY-XXXXXXXX"
-                    value={newFolio.folio}
-                    onChange={(e) => setNewFolio({ ...newFolio, folio: e.target.value.toUpperCase() })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Nivel</Label>
-                  <Select
-                    value={newFolio.level.toString()}
-                    onValueChange={(v) => setNewFolio({ ...newFolio, level: parseInt(v) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6].map((l) => (
-                        <SelectItem key={l} value={l.toString()}>Nivel {l}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Tipo de Folio</Label>
-                  <Select
-                    value={newFolio.folio_type}
-                    onValueChange={(v) => setNewFolio({ ...newFolio, folio_type: v })}
-                  >
+          {/* Generador */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Plus className="w-4 h-4" /> Generar Folio
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+
+                {/* Tipo */}
+                <div className="space-y-1">
+                  <Label className="text-xs">Tipo de Folio</Label>
+                  <Select value={bulkFolioType} onValueChange={(v) => setBulkFolioType(v)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -226,160 +207,209 @@ export default function ManageFolios() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Nombre del Estudiante (opcional)</Label>
-                  <Input
-                    placeholder="Nombre del estudiante"
-                    value={newFolio.student_name}
-                    onChange={(e) => setNewFolio({ ...newFolio, student_name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Monto (opcional)</Label>
+
+                {/* Nivel (condicional) */}
+                {needsLevel ? (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nivel</Label>
+                    <Select value={bulkLevel.toString()} onValueChange={(v) => setBulkLevel(parseInt(v))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6].map((l) => (
+                          <SelectItem key={l} value={l.toString()}>Nivel {l}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nivel</Label>
+                    <div className="h-9 flex items-center px-3 rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-400">
+                      General (todos los niveles)
+                    </div>
+                  </div>
+                )}
+
+                {/* Cantidad */}
+                <div className="space-y-1">
+                  <Label className="text-xs">Cantidad de Folios</Label>
                   <Input
                     type="number"
-                    placeholder="0"
-                    value={newFolio.amount}
-                    onChange={(e) => setNewFolio({ ...newFolio, amount: parseFloat(e.target.value) || 0 })}
+                    min={1}
+                    max={100}
+                    value={bulkCount}
+                    onChange={(e) => setBulkCount(Math.max(1, parseInt(e.target.value) || 1))}
                   />
                 </div>
-                <Button className="w-full" onClick={handleCreateSingle}>
-                  Crear Folio
+
+                {/* Botón generar */}
+                <Button onClick={handleGenerate} className="h-9">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Generar {bulkCount > 1 ? `${bulkCount} Folios` : 'Folio'}
                 </Button>
               </div>
-            </DialogContent>
-          </Dialog>
 
-          {/* Bulk Create */}
-          <Card className="flex-1 border-0 shadow-sm">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="flex-1 flex items-center gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs">Cantidad</Label>
-                  <Input
-                    type="number"
-                    value={bulkCount}
-                    onChange={(e) => setBulkCount(parseInt(e.target.value) || 1)}
-                    className="w-20"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Nivel</Label>
-                  <Select value={bulkLevel.toString()} onValueChange={(v) => setBulkLevel(parseInt(v))}>
-                    <SelectTrigger className="w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6].map((l) => (
-                        <SelectItem key={l} value={l.toString()}>Nivel {l}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Tipo</Label>
-                  <Select value={bulkFolioType} onValueChange={(v) => setBulkFolioType(v)}>
-                    <SelectTrigger className="w-36">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="level_advance">Avance Nivel</SelectItem>
-                      <SelectItem value="time_unlock">Desbloqueo Tiempo</SelectItem>
-                      <SelectItem value="extraordinary_test">Prueba Extraordinaria</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              {/* Asignación al alumno */}
+              <div className="mt-4 space-y-2">
+                <Label className="text-xs">Asignar a Alumno <span className="text-red-500">*</span></Label>
+                {bulkStudentEmail ? (
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium text-sm text-blue-900">{bulkStudentName}</p>
+                      <p className="text-xs text-blue-600">{bulkStudentEmail}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-600 hover:text-blue-800"
+                      onClick={() => { setBulkStudentEmail(''); setBulkStudentName(''); }}
+                    >
+                      Cambiar
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                      <Input
+                        placeholder="Buscar alumno por nombre o correo..."
+                        value={studentSearchQuery}
+                        onChange={(e) => setStudentSearchQuery(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    {studentSearchQuery.trim().length > 0 && (
+                      <div className="border rounded-lg overflow-hidden max-h-48 overflow-y-auto bg-white shadow-sm">
+                        {filteredStudents.length === 0 ? (
+                          <p className="text-sm text-gray-400 text-center py-4">Sin resultados</p>
+                        ) : (
+                          filteredStudents.map((s) => (
+                            <button
+                              key={s.id}
+                              className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b last:border-0 transition-colors"
+                              onClick={() => handleSelectStudent(s)}
+                            >
+                              <p className="text-sm font-medium">{s.full_name || s.email}</p>
+                              <p className="text-xs text-gray-500">{s.email}</p>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <Button variant="outline" onClick={handleBulkCreate}>
-                Crear {bulkCount} Folios
-              </Button>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Table */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle>Lista de Folios</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Folio</TableHead>
-                  <TableHead>Nivel</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Estudiante Asignado</TableHead>
-                  <TableHead>Usado Por</TableHead>
-                  <TableHead>Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <code className="font-mono bg-gray-100 px-2 py-1 rounded text-sm">
-                          {payment.folio}
-                        </code>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => copyToClipboard(payment.folio)}
-                        >
-                          <Copy className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">Nivel {payment.level}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={
-                        payment.folio_type === 'time_unlock' ? 'bg-purple-100 text-purple-800' :
-                        payment.folio_type === 'extraordinary_test' ? 'bg-orange-100 text-orange-800' :
-                        'bg-blue-100 text-blue-800'
-                      }>
-                        {payment.folio_type === 'time_unlock' ? 'Desbloqueo Tiempo' :
-                         payment.folio_type === 'extraordinary_test' ? 'Prueba Extraordinaria' :
-                         'Avance Nivel'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        className={
+          {/* Tabla de folios */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle>Lista de Folios</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Folio</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Nivel</TableHead>
+                    <TableHead>Alumno Asignado</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {payments.map((payment) => (
+                    <TableRow key={payment.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <code className="font-mono bg-gray-100 px-2 py-1 rounded text-sm">
+                            {payment.folio}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => copyToClipboard(payment.folio)}
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={
+                          payment.folio_type === 'time_unlock' ? 'bg-purple-100 text-purple-800' :
+                          payment.folio_type === 'extraordinary_test' ? 'bg-orange-100 text-orange-800' :
+                          'bg-blue-100 text-blue-800'
+                        }>
+                          {folioTypeLabel[payment.folio_type] || payment.folio_type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {payment.folio_type === 'extraordinary_test'
+                          ? <span className="text-xs text-gray-400">General</span>
+                          : <Badge variant="outline">Nivel {payment.level}</Badge>
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {payment.student_name ? (
+                          <div>
+                            <p className="text-sm font-medium">{payment.student_name}</p>
+                            <p className="text-xs text-gray-400">{payment.user_email}</p>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={
                           payment.status === 'available' ? 'bg-green-100 text-green-800' :
                           payment.status === 'used' ? 'bg-gray-100 text-gray-800' :
                           'bg-red-100 text-red-800'
-                        }
-                      >
-                        {payment.status === 'available' ? 'Disponible' :
-                         payment.status === 'used' ? 'Usado' : 'Expirado'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{payment.student_name || '-'}</TableCell>
-                    <TableCell>{payment.user_email || '-'}</TableCell>
-                    <TableCell>
-                      {payment.status === 'available' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-500 hover:text-red-700"
-                          onClick={() => deleteFolioMutation.mutate(payment.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                        }>
+                          {payment.status === 'available' ? 'Disponible' :
+                           payment.status === 'used' ? 'Usado' : 'Expirado'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-blue-500 hover:text-blue-700"
+                            onClick={() => openTicket(payment)}
+                          >
+                            <Printer className="w-4 h-4" />
+                          </Button>
+                          {payment.status === 'available' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-500 hover:text-red-700"
+                              onClick={() => deleteFolioMutation.mutate(payment.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div></AdminGuard>
+
+      <FolioTicket
+        payment={ticketPayment}
+        open={ticketOpen}
+        onClose={() => setTicketOpen(false)}
+      />
+    </AdminGuard>
   );
 }
