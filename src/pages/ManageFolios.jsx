@@ -97,7 +97,7 @@ export default function ManageFolios() {
   };
 
   const handleCreateSingle = () => {
-    const folio = newFolio.folio || generateFolio();
+    const folio = newFolio.folio || generateFolio(newFolio.folio_type);
     createFolioMutation.mutate({
       ...newFolio,
       folio,
@@ -109,7 +109,7 @@ export default function ManageFolios() {
     const folios = [];
     for (let i = 0; i < bulkCount; i++) {
       folios.push({
-        folio: generateFolio(),
+        folio: generateFolio(bulkFolioType),
         level: bulkLevel,
         status: 'available',
         amount: 0,
