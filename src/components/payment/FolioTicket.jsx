@@ -20,7 +20,7 @@ export default function FolioTicket({ payment, open, onClose }) {
     win.document.write(`
       <html>
         <head>
-          <title>Ticket de Folio</title>
+          <title>PREPARATORIO MONTES DE OCA</title>
           <style>
             body { font-family: 'Courier New', monospace; padding: 24px; color: #111; }
             .ticket { max-width: 340px; margin: 0 auto; border: 2px dashed #999; padding: 20px; }
