@@ -103,7 +103,7 @@ export default function ManageFolios() {
     for (let i = 0; i < bulkCount; i++) {
       folios.push({
         folio: generateFolio(bulkFolioType),
-        level: needsLevel ? bulkLevel : null,
+        level: needsLevel ? bulkLevel : 0,
         status: 'available',
         amount: 0,
         folio_type: bulkFolioType,
