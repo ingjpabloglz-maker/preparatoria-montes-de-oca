@@ -45,6 +45,13 @@ export default function FolioValidator({ levelToUnlock, onSuccess, userEmail, fo
 
       const payment = payments[0];
 
+      // Verificar que el folio esté asignado a este alumno
+      if (payment.user_email && payment.user_email !== userEmail) {
+        setError('Este folio está asignado a otro alumno');
+        setLoading(false);
+        return;
+      }
+
       // Marcar el folio como usado
       await base44.entities.Payment.update(payment.id, {
         status: 'used',
