@@ -139,6 +139,19 @@ export default function Subject() {
     queryClient.invalidateQueries(['subjectProgress']);
   };
 
+  const handleExtraordinaryUnlocked = async () => {
+    // Reiniciar conteo de intentos para dar 3 nuevos intentos
+    const extraUsed = (progressData?.extraordinary_attempts_used || 0) + 1;
+    if (progressData) {
+      await base44.entities.SubjectProgress.update(progressData.id, {
+        test_attempts: 0,
+        extraordinary_attempts_used: extraUsed,
+        last_activity: new Date().toISOString(),
+      });
+    }
+    queryClient.invalidateQueries(['subjectProgress']);
+  };
+
   if (!subject) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
