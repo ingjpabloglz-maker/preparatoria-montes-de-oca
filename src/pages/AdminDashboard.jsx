@@ -29,6 +29,11 @@ import {
 } from "lucide-react";
 import AdminGuard from '../components/auth/AdminGuard';
 
+const formatName = (u) => {
+  const parts = [u.apellido_paterno, u.apellido_materno, u.nombres].filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : (u.full_name || 'Sin nombre');
+};
+
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');

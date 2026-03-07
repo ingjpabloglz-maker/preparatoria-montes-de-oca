@@ -34,6 +34,11 @@ import { toast } from "sonner";
 import AdminGuard from '../components/auth/AdminGuard';
 import FolioTicket from '../components/payment/FolioTicket';
 
+const formatName = (u) => {
+  const parts = [u.apellido_paterno, u.apellido_materno, u.nombres].filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : (u.full_name || u.email || 'Sin nombre');
+};
+
 const folioTypeLabel = {
   level_advance: 'Avance de Nivel',
   time_unlock: 'Desbloqueo por Tiempo',

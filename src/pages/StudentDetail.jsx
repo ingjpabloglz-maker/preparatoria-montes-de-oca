@@ -24,6 +24,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import AdminGuard from '../components/auth/AdminGuard';
+
+const formatName = (u) => {
+  const parts = [u.apellido_paterno, u.apellido_materno, u.nombres].filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : (u.full_name || 'Sin nombre');
+};
 import ProfileForm from '../components/profile/ProfileForm';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
