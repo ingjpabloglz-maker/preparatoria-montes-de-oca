@@ -275,12 +275,19 @@ export default function Subject() {
                 </div>
               </div>
             ) : testBlocked ? (
-              <div className="flex items-center gap-3 text-red-700">
-                <AlertCircle className="w-8 h-8 text-red-400" />
-                <div>
-                  <p className="font-semibold">Sin intentos disponibles</p>
-                  <p className="text-sm">Has agotado los 3 intentos. Contacta a tu administrador.</p>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 text-red-700 bg-red-50 rounded-lg p-4">
+                  <AlertCircle className="w-8 h-8 text-red-400 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold">Prueba Bloqueada</p>
+                    <p className="text-sm">Has agotado los 3 intentos. Para presentarla de nuevo necesitas un folio de prueba extraordinaria.</p>
+                  </div>
                 </div>
+                <ExtraordinaryFolioValidator
+                  subjectId={subjectId}
+                  userEmail={user?.email}
+                  onUnlocked={handleExtraordinaryUnlocked}
+                />
               </div>
             ) : !isCompleted ? (
               <div className="flex items-center gap-3 text-gray-500">
