@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import SubjectTest from '../components/tests/SubjectTest';
 import ExtraordinaryFolioValidator from '../components/payment/ExtraordinaryFolioValidator';
+import { Map } from "lucide-react";
 
 export default function Subject() {
   const urlParams = new URLSearchParams(window.location.search);
