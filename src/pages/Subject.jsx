@@ -236,24 +236,30 @@ export default function Subject() {
           </CardContent>
         </Card>
 
-        {/* Content Placeholder */}
-        <Card className="border-0 shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5" />
-              Contenido del Curso
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-12 text-gray-500">
-              <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-medium mb-2">Temario Próximamente</h3>
-              <p className="text-sm">
-                El contenido de esta materia se agregará próximamente.
-                <br />
-                Por ahora, puedes registrar tu avance manualmente.
-              </p>
+        {/* Course Content */}
+        <Card className="border-0 shadow-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-violet-600 p-5 text-white">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <Map className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-bold">Ruta de aprendizaje</h3>
+                <p className="text-blue-100 text-xs">Unidades • Módulos • Lecciones</p>
+              </div>
             </div>
+            <p className="text-blue-100 text-sm">
+              Aprende a tu ritmo siguiendo lecciones cortas tipo Duolingo. Completa todas las lecciones y aprueba las mini evaluaciones para desbloquear el examen final.
+            </p>
+          </div>
+          <CardContent className="p-4">
+            <Button
+              className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:opacity-90 text-white font-semibold"
+              onClick={() => window.location.href = createPageUrl(`CourseMap?id=${subjectId}`)}
+            >
+              <BookOpen className="w-4 h-4 mr-2" />
+              Ver ruta de aprendizaje
+            </Button>
           </CardContent>
         </Card>
 
