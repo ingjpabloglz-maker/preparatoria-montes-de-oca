@@ -50,29 +50,39 @@ export default function StudentDetail() {
     queryKey: ['student', studentEmail],
     queryFn: () => base44.entities.User.filter({ email: studentEmail }),
     enabled: !!studentEmail,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: progressData = [] } = useQuery({
     queryKey: ['studentProgress', studentEmail],
     queryFn: () => base44.entities.UserProgress.filter({ user_email: studentEmail }),
     enabled: !!studentEmail,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: subjectProgress = [] } = useQuery({
     queryKey: ['studentSubjectProgress', studentEmail],
     queryFn: () => base44.entities.SubjectProgress.filter({ user_email: studentEmail }),
     enabled: !!studentEmail,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: subjects = [] } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => base44.entities.Subject.list('level'),
+    staleTime: 30 * 60 * 1000, // estático
+    refetchOnWindowFocus: false,
   });
 
   const { data: payments = [] } = useQuery({
     queryKey: ['studentPayments', studentEmail],
     queryFn: () => base44.entities.Payment.filter({ user_email: studentEmail }),
     enabled: !!studentEmail,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const student = students[0];
