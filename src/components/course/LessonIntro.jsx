@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
-import { BookOpen, ClipboardList, CheckCircle2, Star, Zap, Info } from "lucide-react";
+import { BookOpen, ClipboardList, CheckCircle2, Star, Zap, Info, Loader2 } from "lucide-react";
 
 // Ayudas visuales por tema de la lección
 const VISUAL_HINTS = {
