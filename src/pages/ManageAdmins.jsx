@@ -29,7 +29,9 @@ export default function ManageAdmins() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allUsers'] }),
   });
 
-  const admins = allUsers.filter(u => u.role === 'admin');
+  const PROTECTED_EMAIL = 'inj.jpablo.glz@gmail.com';
+
+  const admins = allUsers.filter(u => u.role === 'admin' && u.email !== PROTECTED_EMAIL);
 
   const filteredAdmins = admins.filter(a =>
     a.full_name?.toLowerCase().includes(search.toLowerCase()) ||

@@ -104,10 +104,7 @@ export default function AdminDashboard() {
               <CreditCard className="w-4 h-4 mr-2" />
               Gestionar Folios
             </Button>
-            <Button variant="outline" onClick={() => window.location.href = createPageUrl('ManageSubjects')}>
-              <GraduationCap className="w-4 h-4 mr-2" />
-              Materias
-            </Button>
+
           </div>
         </div>
 
