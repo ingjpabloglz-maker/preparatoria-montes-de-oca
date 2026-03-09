@@ -100,15 +100,27 @@ export default function StudentDetail() {
 
   const handleDeleteStudent = async () => {
     setDeletingStudent(true);
-    const [progressRecords, subjectProgressRecords, paymentRecords] = await Promise.all([
+    const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+
+    const [progressRecords, subjectProgressRecords, paymentRecords, lessonProgressRecords] = await Promise.all([
       base44.entities.UserProgress.filter({ user_email: studentEmail }),
       base44.entities.SubjectProgress.filter({ user_email: studentEmail }),
       base44.entities.Payment.filter({ user_email: studentEmail }),
+      base44.entities.LessonProgress.filter({ user_email: studentEmail }),
     ]);
-    // Eliminar secuencialmente para evitar saturar el rate limit
-    for (const r of progressRecords) await base44.entities.UserProgress.delete(r.id);
-    for (const r of subjectProgressRecords) await base44.entities.SubjectProgress.delete(r.id);
-    for (const r of paymentRecords) await base44.entities.Payment.delete(r.id);
+
+    const allDeletes = [
+      ...progressRecords.map(r => () => base44.entities.UserProgress.delete(r.id)),
+      ...subjectProgressRecords.map(r => () => base44.entities.SubjectProgress.delete(r.id)),
+      ...paymentRecords.map(r => () => base44.entities.Payment.delete(r.id)),
+      ...lessonProgressRecords.map(r => () => base44.entities.LessonProgress.delete(r.id)),
+    ];
+
+    for (const fn of allDeletes) {
+      await fn();
+      await sleep(150);
+    }
+
     await base44.entities.User.delete(student.id);
     window.location.href = createPageUrl('ManageStudents');
   };
