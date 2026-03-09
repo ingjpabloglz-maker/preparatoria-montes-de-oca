@@ -216,12 +216,12 @@ export default function StudentDetail() {
               <CardTitle className="flex items-center gap-2">
                 Nivel Actual: <Badge className="bg-blue-100 text-blue-800 text-base">Nivel {currentLevel}</Badge>
                 <span className="ml-2 text-sm font-normal text-gray-500">
-                  — Progreso general: {Math.round(progress?.total_progress_percent || 0)}%
+                  — Progreso general: {computedProgress}%
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Progress value={progress?.total_progress_percent || 0} className="h-3 mb-5" />
+              <Progress value={computedProgress} className="h-3 mb-5" />
               <p className="text-sm font-semibold text-gray-700 mb-3">Materias del Nivel {currentLevel}:</p>
               {levelSubjects.length === 0 ? (
                 <p className="text-sm text-gray-400">No hay materias configuradas para este nivel.</p>
