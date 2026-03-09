@@ -55,7 +55,6 @@ import Level from './pages/Level';
 import ManageAdmins from './pages/ManageAdmins';
 import ManageFolios from './pages/ManageFolios';
 import ManageStudents from './pages/ManageStudents';
-import ManageSubjects from './pages/ManageSubjects';
 import Profile from './pages/Profile';
 import StudentDetail from './pages/StudentDetail';
 import Subject from './pages/Subject';
@@ -72,7 +71,6 @@ export const PAGES = {
     "ManageAdmins": ManageAdmins,
     "ManageFolios": ManageFolios,
     "ManageStudents": ManageStudents,
-    "ManageSubjects": ManageSubjects,
     "Profile": Profile,
     "StudentDetail": StudentDetail,
     "Subject": Subject,
