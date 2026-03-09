@@ -332,7 +332,16 @@ Responde SOLO con el texto de la explicación ampliada, sin títulos ni listas.`
             <Zap className="w-4 h-4 text-yellow-400" />
             <span className="text-xs font-semibold text-white/60 uppercase tracking-wide">Explicación</span>
           </div>
-          <p className="text-white/85 text-sm leading-relaxed">{lesson.explanation}</p>
+          {loadingExplanation ? (
+            <div className="flex items-center gap-2 text-white/50 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Preparando explicación...</span>
+            </div>
+          ) : (
+            <p className="text-white/85 text-sm leading-relaxed">
+              {enrichedExplanation || lesson.explanation}
+            </p>
+          )}
         </div>
       )}
 
