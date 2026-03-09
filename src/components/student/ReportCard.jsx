@@ -44,8 +44,12 @@ export function gradeLabel(grade) {
 }
 
 export default function ReportCard({ subjects, subjectProgress, currentLevel }) {
-  // Agrupar materias por nivel
   const levelNumbers = [...new Set(subjects.map(s => s.level))].sort((a, b) => a - b);
+  const [openLevels, setOpenLevels] = useState({ [currentLevel]: true });
+
+  const toggleLevel = (levelNum) => {
+    setOpenLevels(prev => ({ ...prev, [levelNum]: !prev[levelNum] }));
+  };
 
   const getLevelRows = (levelNum) => {
     const levelSubjs = subjects.filter(s => s.level === levelNum);
