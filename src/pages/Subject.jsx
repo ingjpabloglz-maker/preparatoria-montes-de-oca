@@ -249,7 +249,7 @@ export default function Subject() {
               </div>
             </div>
             <p className="text-blue-100 text-sm">
-              Aprende a tu ritmo siguiendo lecciones cortas tipo Duolingo. Completa todas las lecciones y aprueba las mini evaluaciones para desbloquear el examen final.
+              Aprende a tu ritmo siguiendo lecciones cortas interactivas. Completa todas las lecciones y aprueba las mini evaluaciones para desbloquear el examen final.
             </p>
           </div>
           <CardContent className="p-4">
