@@ -276,6 +276,22 @@ function VisualHint({ hint }) {
 
 export default function LessonIntro({ lesson, activitiesCount, isMiniEval, alreadyCompleted, previousScore, onStart }) {
   const visualHint = getVisualHint(lesson?.title);
+  const [enrichedExplanation, setEnrichedExplanation] = useState(null);
+  const [loadingExplanation, setLoadingExplanation] = useState(false);
+
+  useEffect(() => {
+    if (!lesson?.explanation || isMiniEval) return;
+    setLoadingExplanation(true);
+    base44.integrations.Core.InvokeLLM({
+      prompt: `Eres un tutor de matemáticas de preparatoria. La siguiente es la explicación corta de una lección llamada "${lesson.title}": "${lesson.explanation}". 
+Amplía esta explicación en 3-4 oraciones claras y didácticas para un estudiante de preparatoria. Incluye un ejemplo concreto si aplica. 
+Responde SOLO con el texto de la explicación ampliada, sin títulos ni listas.`
+    }).then(result => {
+      setEnrichedExplanation(result);
+    }).finally(() => {
+      setLoadingExplanation(false);
+    });
+  }, [lesson?.id]);
 
   return (
     <div className="flex flex-col items-center text-center py-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
