@@ -89,6 +89,15 @@ export default function Layout({ children, currentPageName }) {
                       Administración
                     </Button>
                   </Link>
+                  <Link to={createPageUrl('ManageFolios')}>
+                    <Button 
+                      variant={currentPageName === 'ManageFolios' ? 'secondary' : 'ghost'}
+                      size="sm"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Gestionar Folios
+                    </Button>
+                  </Link>
                   <Link to={createPageUrl('ManageStudents')}>
                     <Button 
                       variant="ghost"
