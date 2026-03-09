@@ -100,18 +100,16 @@ export default function StudentDetail() {
 
   const handleDeleteStudent = async () => {
     setDeletingStudent(true);
-    // Eliminar todos los datos asociados al alumno
     const [progressRecords, subjectProgressRecords, paymentRecords] = await Promise.all([
       base44.entities.UserProgress.filter({ user_email: studentEmail }),
       base44.entities.SubjectProgress.filter({ user_email: studentEmail }),
       base44.entities.Payment.filter({ user_email: studentEmail }),
     ]);
-    await Promise.all([
-      ...progressRecords.map(r => base44.entities.UserProgress.delete(r.id)),
-      ...subjectProgressRecords.map(r => base44.entities.SubjectProgress.delete(r.id)),
-      ...paymentRecords.map(r => base44.entities.Payment.delete(r.id)),
-      base44.entities.User.delete(student.id),
-    ]);
+    // Eliminar secuencialmente para evitar saturar el rate limit
+    for (const r of progressRecords) await base44.entities.UserProgress.delete(r.id);
+    for (const r of subjectProgressRecords) await base44.entities.SubjectProgress.delete(r.id);
+    for (const r of paymentRecords) await base44.entities.Payment.delete(r.id);
+    await base44.entities.User.delete(student.id);
     window.location.href = createPageUrl('ManageStudents');
   };
 
