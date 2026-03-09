@@ -21,7 +21,8 @@ import {
   Menu,
   X,
   Users,
-  FileText
+  FileText,
+  BarChart2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -114,6 +115,15 @@ export default function Layout({ children, currentPageName }) {
                     >
                       <Settings className="w-4 h-4 mr-2" />
                       Administradores
+                    </Button>
+                  </Link>
+                  <Link to={createPageUrl('StudentStatistics')}>
+                    <Button 
+                      variant={currentPageName === 'StudentStatistics' ? 'secondary' : 'ghost'}
+                      size="sm"
+                    >
+                      <BarChart2 className="w-4 h-4 mr-2" />
+                      Estadísticas
                     </Button>
                   </Link>
                 </>
