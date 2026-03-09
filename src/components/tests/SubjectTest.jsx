@@ -174,7 +174,7 @@ export default function SubjectTest({ subject, onComplete, onExit }) {
         <Progress value={progress} className="h-2" />
       </CardHeader>
       <CardContent className="p-6">
-        <h3 className="text-lg font-semibold mb-6">{currentQ.question}</h3>
+        <h3 className="text-lg font-semibold mb-6"><MathText text={currentQ.question} /></h3>
         <RadioGroup
           value={answers[currentQuestion]?.toString()}
           onValueChange={handleAnswer}
@@ -192,7 +192,7 @@ export default function SubjectTest({ subject, onComplete, onExit }) {
               onClick={() => handleAnswer(idx.toString())}
             >
               <RadioGroupItem value={idx.toString()} id={`option-${idx}`} />
-              <Label htmlFor={`option-${idx}`} className="cursor-pointer flex-1">{option}</Label>
+              <Label htmlFor={`option-${idx}`} className="cursor-pointer flex-1"><MathText text={option} /></Label>
             </div>
           ))}
         </RadioGroup>

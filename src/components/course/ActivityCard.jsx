@@ -162,7 +162,7 @@ function MultipleChoice({ options, selected, submitted, correct, onSelect }) {
               }`}>
                 {String.fromCharCode(65 + i)}
               </span>
-              {option}
+              <MathText text={option} />
             </span>
           </button>
         );
