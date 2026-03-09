@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, GraduationCap } from "lucide-react";
+import { CheckCircle2, XCircle, GraduationCap, ChevronDown, ChevronUp } from "lucide-react";
 
 /**
  * Convierte un porcentaje (0-100) a calificación decimal con redondeo a .0 o .5
