@@ -562,7 +562,17 @@ export default function Dashboard() {
                     progress={sp?.progress_percent || 0}
                     isCompleted={sp?.completed || false}
                     testStatus={testStatus}
-                    onClick={() => window.location.href = createPageUrl(`Subject?id=${subject.id}`)}
+                    onClick={() => {
+                      if (!profileComplete) {
+                        window.location.href = createPageUrl('Profile');
+                        return;
+                      }
+                      if (currentLevel === 1 && !hasLevel1Folio) {
+                        window.location.href = createPageUrl('UnlockLevel?level=1');
+                        return;
+                      }
+                      window.location.href = createPageUrl(`Subject?id=${subject.id}`);
+                    }}
                   />
                 );
               })}
