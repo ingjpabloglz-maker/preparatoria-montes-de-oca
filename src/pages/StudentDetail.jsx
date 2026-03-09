@@ -87,6 +87,16 @@ export default function StudentDetail() {
 
   const completedSubjects = subjectProgress.filter(sp => sp.test_passed).length;
 
+  // Calcular progreso general real desde SubjectProgress del nivel actual
+  const computedProgress = (() => {
+    if (levelSubjects.length === 0) return 0;
+    const total = levelSubjects.reduce((acc, subj) => {
+      const sp = subjectProgress.find(p => p.subject_id === subj.id);
+      return acc + (sp?.progress_percent || 0);
+    }, 0);
+    return Math.round(total / levelSubjects.length);
+  })();
+
   const handleAdminUpdate = async (data) => {
     await base44.entities.User.update(student.id, data);
     queryClient.invalidateQueries({ queryKey: ['student', studentEmail] });
