@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, ArrowRight } from "lucide-react";
+import MathText from '../math/MathText';
 
 export default function ActivityCard({ activity, activityNumber, totalActivities, onAnswer, onNext }) {
   const [selectedAnswer, setSelectedAnswer] = useState(null);
