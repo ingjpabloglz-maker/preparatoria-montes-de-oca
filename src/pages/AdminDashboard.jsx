@@ -256,7 +256,6 @@ export default function AdminDashboard() {
                       <TableHead>Estudiante</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Nivel</TableHead>
-                      <TableHead>Progreso</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -269,11 +268,6 @@ export default function AdminDashboard() {
                           <TableCell>{u.email}</TableCell>
                           <TableCell>
                             <Badge variant="outline">Nivel {prog?.current_level || 1}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="w-32">
-                              <Progress value={prog?.total_progress_percent || 0} className="h-2" />
-                            </div>
                           </TableCell>
                           <TableCell>
                             <Button 
