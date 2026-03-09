@@ -174,30 +174,6 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Level Distribution */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle>Distribución por Nivel</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-6 gap-4">
-              {levelDistribution.map(({ level, count }) => (
-                <div key={level} className="text-center">
-                  <div className="w-full bg-gray-100 rounded-lg h-24 flex items-end justify-center p-2 mb-2">
-                    <div 
-                      className="w-full bg-blue-500 rounded-md transition-all"
-                      style={{ 
-                        height: `${Math.max(10, (count / Math.max(1, activeStudents)) * 100)}%` 
-                      }}
-                    />
-                  </div>
-                  <p className="text-sm font-medium">Nivel {level}</p>
-                  <p className="text-xs text-gray-500">{count} estudiantes</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -219,7 +195,6 @@ export default function AdminDashboard() {
                     <TableRow>
                       <TableHead>Estudiante</TableHead>
                       <TableHead>Nivel</TableHead>
-                      <TableHead>Progreso</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -238,14 +213,6 @@ export default function AdminDashboard() {
                             <Badge variant="outline">
                               Nivel {prog?.current_level || 1}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="w-32">
-                              <Progress value={prog?.total_progress_percent || 0} className="h-2" />
-                              <span className="text-xs text-gray-500">
-                                {Math.round(prog?.total_progress_percent || 0)}%
-                              </span>
-                            </div>
                           </TableCell>
                           <TableCell>
                             <Button 
