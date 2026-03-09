@@ -50,7 +50,9 @@ export default function ActivityCard({ activity, activityNumber, totalActivities
 
       {/* Question */}
       <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 mb-5 border border-white/10">
-        <p className="text-white text-base sm:text-lg font-medium leading-relaxed">{activity.question}</p>
+        <p className="text-white text-base sm:text-lg font-medium leading-relaxed">
+          <MathText text={activity.question} />
+        </p>
       </div>
 
       {/* Answer Area */}
@@ -99,12 +101,12 @@ export default function ActivityCard({ activity, activityNumber, totalActivities
             </span>
             {!isCorrect && (
               <span className="text-white/60 text-xs ml-1">
-                Respuesta: <span className="text-white/90 font-medium">{activity.correct_answer}</span>
+                Respuesta: <span className="text-white/90 font-medium"><MathText text={activity.correct_answer} /></span>
               </span>
             )}
           </div>
           {activity.explanation && (
-            <p className="text-white/70 text-xs leading-relaxed">{activity.explanation}</p>
+            <p className="text-white/70 text-xs leading-relaxed"><MathText text={activity.explanation} /></p>
           )}
         </div>
       )}
