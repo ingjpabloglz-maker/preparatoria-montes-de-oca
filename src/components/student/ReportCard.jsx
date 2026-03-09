@@ -87,14 +87,19 @@ export default function ReportCard({ subjects, subjectProgress, currentLevel }) 
           const isCurrentLvl = levelNum === currentLevel;
           const allPassed = rows.length > 0 && rows.every(r => r.passed);
 
+          const isOpen = !!openLevels[levelNum];
+
           return (
             <div key={levelNum} className="rounded-xl border overflow-hidden">
-              {/* Header del nivel */}
-              <div className={`flex items-center justify-between px-4 py-3 ${
-                isCurrentLvl ? 'bg-blue-600 text-white' :
-                allPassed ? 'bg-green-600 text-white' :
-                'bg-gray-100 text-gray-700'
-              }`}>
+              {/* Header del nivel — clickeable */}
+              <button
+                onClick={() => toggleLevel(levelNum)}
+                className={`w-full flex items-center justify-between px-4 py-3 text-left ${
+                  isCurrentLvl ? 'bg-blue-600 text-white' :
+                  allPassed ? 'bg-green-600 text-white' :
+                  'bg-gray-100 text-gray-700'
+                }`}
+              >
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-sm">Nivel {levelNum}</span>
                   {isCurrentLvl && (
@@ -104,52 +109,60 @@ export default function ReportCard({ subjects, subjectProgress, currentLevel }) 
                     <Badge className="bg-white/20 text-white border-0 text-xs">Completado</Badge>
                   )}
                 </div>
-                <div className="text-right">
-                  <p className="text-xs opacity-75">Promedio del nivel</p>
-                  <p className={`text-xl font-bold ${avg != null && avg >= 7 ? '' : avg != null ? 'text-red-200' : 'opacity-50'}`}>
-                    {avg != null ? avg.toFixed(1) : '—'}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-xs opacity-75">Promedio del nivel</p>
+                    <p className={`text-xl font-bold ${avg != null && avg >= 7 ? '' : avg != null ? 'text-red-200' : 'opacity-50'}`}>
+                      {avg != null ? avg.toFixed(1) : '—'}
+                    </p>
+                  </div>
+                  {isOpen
+                    ? <ChevronUp className="w-4 h-4 opacity-70 flex-shrink-0" />
+                    : <ChevronDown className="w-4 h-4 opacity-70 flex-shrink-0" />
+                  }
                 </div>
-              </div>
+              </button>
 
-              {/* Filas de materias */}
-              <div className="divide-y">
-                {rows.length === 0 ? (
-                  <p className="text-sm text-gray-400 px-4 py-3">Sin materias configuradas</p>
-                ) : (
-                  rows.map(({ subj, grade, passed, attempted }) => (
-                    <div key={subj.id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {passed
-                          ? <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                          : <XCircle className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                        }
-                        <p className="text-sm font-medium text-gray-800 truncate">{subj.name}</p>
+              {/* Filas de materias — colapsables */}
+              {isOpen && (
+                <div className="divide-y">
+                  {rows.length === 0 ? (
+                    <p className="text-sm text-gray-400 px-4 py-3">Sin materias configuradas</p>
+                  ) : (
+                    rows.map(({ subj, grade, passed, attempted }) => (
+                      <div key={subj.id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {passed
+                            ? <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                            : <XCircle className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                          }
+                          <p className="text-sm font-medium text-gray-800 truncate">{subj.name}</p>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          {grade != null ? (
+                            <>
+                              <span className={`text-lg font-bold tabular-nums ${
+                                grade >= 7 ? 'text-green-700' : 'text-red-500'
+                              }`}>
+                                {grade.toFixed(1)}
+                              </span>
+                              <Badge className={`text-xs ${
+                                passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {passed ? 'Aprobada' : 'No Aprobada'}
+                              </Badge>
+                            </>
+                          ) : attempted ? (
+                            <span className="text-sm text-gray-400">Sin calificación</span>
+                          ) : (
+                            <span className="text-sm text-gray-300">Pendiente</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        {grade != null ? (
-                          <>
-                            <span className={`text-lg font-bold tabular-nums ${
-                              grade >= 7 ? 'text-green-700' : 'text-red-500'
-                            }`}>
-                              {grade.toFixed(1)}
-                            </span>
-                            <Badge className={`text-xs ${
-                              passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                            }`}>
-                              {passed ? 'Aprobada' : 'No Aprobada'}
-                            </Badge>
-                          </>
-                        ) : attempted ? (
-                          <span className="text-sm text-gray-400">Sin calificación</span>
-                        ) : (
-                          <span className="text-sm text-gray-300">Pendiente</span>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
