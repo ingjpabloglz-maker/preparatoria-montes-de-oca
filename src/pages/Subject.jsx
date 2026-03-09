@@ -219,17 +219,18 @@ export default function Subject() {
             
             <div className="bg-gray-50 rounded-lg p-4">
               <p className="text-sm text-gray-500 mb-3">Actualiza tu avance manualmente:</p>
-              <Slider
-                value={[currentProgress]}
-                max={100}
-                step={5}
-                onValueChange={(value) => updateProgressMutation.mutate(value[0])}
-                className="mb-2"
-              />
-              <div className="flex justify-between text-xs text-gray-400">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
+              <div className="flex gap-2">
+                {[0, 50, 100].map((val) => (
+                  <Button
+                    key={val}
+                    variant={Math.round(currentProgress) === val ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => updateProgressMutation.mutate(val)}
+                  >
+                    {val}%
+                  </Button>
+                ))}
               </div>
             </div>
           </CardContent>
