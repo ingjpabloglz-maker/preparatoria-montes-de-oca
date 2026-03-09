@@ -129,9 +129,14 @@ export default function FolioValidator({ levelToUnlock, onSuccess, userEmail, fo
               )}
             </Button>
 
-            <p className="text-xs text-center text-gray-400">
-              El folio se obtiene al realizar el pago en la administración escolar
-            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+              <p className="text-sm text-blue-800 font-medium">
+                📋 ¿Cómo obtener tu folio?
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                Acude presencialmente a la administración escolar del plantel, realiza tu pago y te será entregado tu folio de acceso.
+              </p>
+            </div>
           </>
         )}
       </CardContent>

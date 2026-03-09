@@ -88,6 +88,14 @@ export default function ExtraordinaryFolioValidator({ subjectId, userEmail, onUn
             <span>{error}</span>
           </div>
         )}
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
+          <p className="text-sm text-orange-800 font-medium">
+            📋 ¿Cómo obtener tu folio extraordinario?
+          </p>
+          <p className="text-xs text-orange-700 mt-1">
+            Acude presencialmente a la administración escolar del plantel, realiza tu pago y te será entregado tu folio extraordinario.
+          </p>
+        </div>
         <Button className="w-full bg-orange-600 hover:bg-orange-700" onClick={handleValidate} disabled={loading || !folio.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
           Validar Folio Extraordinario
