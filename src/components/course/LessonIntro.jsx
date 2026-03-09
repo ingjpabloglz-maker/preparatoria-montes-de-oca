@@ -281,6 +281,14 @@ export default function LessonIntro({ lesson, activitiesCount, isMiniEval, alrea
 
   useEffect(() => {
     if (!lesson?.explanation || isMiniEval) return;
+
+    // Si ya existe una explicación cacheada en la entidad, usarla directamente
+    if (lesson.ai_explanation) {
+      setEnrichedExplanation(lesson.ai_explanation);
+      return;
+    }
+
+    // Si no existe, generarla con IA y guardarla en la entidad para todos los usuarios
     setLoadingExplanation(true);
     base44.integrations.Core.InvokeLLM({
       prompt: `Eres un tutor de matemáticas de preparatoria. La siguiente es la explicación corta de una lección llamada "${lesson.title}": "${lesson.explanation}". 
@@ -288,6 +296,8 @@ Amplía esta explicación en 3-4 oraciones claras y didácticas para un estudian
 Responde SOLO con el texto de la explicación ampliada, sin títulos ni listas.`
     }).then(result => {
       setEnrichedExplanation(result);
+      // Guardar en la entidad para que otros usuarios no tengan que regenerarla
+      base44.entities.CourseLesson.update(lesson.id, { ai_explanation: result });
     }).finally(() => {
       setLoadingExplanation(false);
     });
