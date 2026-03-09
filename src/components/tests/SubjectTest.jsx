@@ -1,39 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, Trophy, XCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowRight, Trophy, XCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const sampleQuestions = [
-  {
-    id: 1,
-    question: "Pregunta de evaluación 1",
-    options: ["Opción A", "Opción B", "Opción C", "Opción D"],
-    correct: 0
-  },
-  {
-    id: 2,
-    question: "Pregunta de evaluación 2",
-    options: ["Opción A", "Opción B", "Opción C", "Opción D"],
-    correct: 1
-  },
-  {
-    id: 3,
-    question: "Pregunta de evaluación 3",
-    options: ["Opción A", "Opción B", "Opción C", "Opción D"],
-    correct: 2
-  }
-];
+function shuffleAndPick(arr, n) {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, n);
+}
 
-export default function SubjectTest({ subject, questions = sampleQuestions, onComplete, onExit }) {
+function normalizeAnswer(str) {
+  return str?.toString().trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+export default function SubjectTest({ subject, onComplete, onExit }) {
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
+  const [textAnswer, setTextAnswer] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
+
+  useEffect(() => {
+    const loadQuestions = async () => {
+      if (!subject?.id) return;
+      setLoading(true);
+      // Obtener mini-evaluaciones de la materia
+      const miniEvals = await base44.entities.CourseLesson.filter({
+        subject_id: subject.id,
+        is_mini_eval: true
+      });
+
+      if (miniEvals.length === 0) {
+        setQuestions([]);
+        setLoading(false);
+        return;
+      }
+
+      // Obtener actividades de todas las mini-evaluaciones en paralelo
+      const activityArrays = await Promise.all(
+        miniEvals.map(lesson =>
+          base44.entities.CourseActivity.filter({ lesson_id: lesson.id })
+        )
+      );
+
+      // Filtrar solo opción múltiple y verdadero/falso (con opciones)
+      const allActivities = activityArrays
+        .flat()
+        .filter(a => a.options && a.options.length > 0);
+
+      // Seleccionar entre 15 y 20 preguntas aleatoriamente
+      const targetCount = Math.min(allActivities.length, 18);
+      const selected = shuffleAndPick(allActivities, targetCount);
+
+      // Formatear para el componente
+      const formatted = selected.map(a => {
+        const correctIdx = a.options.indexOf(a.correct_answer);
+        return {
+          id: a.id,
+          question: a.question,
+          options: a.options,
+          correct: correctIdx >= 0 ? correctIdx : 0,
+          correct_answer: a.correct_answer,
+          explanation: a.explanation,
+          type: a.type,
+        };
+      });
+
+      setQuestions(formatted);
+      setLoading(false);
+    };
+
+    loadQuestions();
+  }, [subject?.id]);
 
   const handleAnswer = (value) => {
     setAnswers(prev => ({ ...prev, [currentQuestion]: parseInt(value) }));
@@ -42,6 +89,7 @@ export default function SubjectTest({ subject, questions = sampleQuestions, onCo
   const nextQuestion = async () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(prev => prev + 1);
+      setTextAnswer('');
     } else {
       let correct = 0;
       questions.forEach((q, idx) => {
@@ -55,8 +103,30 @@ export default function SubjectTest({ subject, questions = sampleQuestions, onCo
     }
   };
 
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
+  const progress = questions.length > 0 ? ((currentQuestion + 1) / questions.length) * 100 : 0;
   const passed = score >= 70;
+
+  if (loading) {
+    return (
+      <Card className="max-w-2xl mx-auto">
+        <CardContent className="p-12 flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <p className="text-gray-500">Preparando tu prueba...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <Card className="max-w-2xl mx-auto">
+        <CardContent className="p-8 text-center">
+          <p className="text-gray-500">No hay preguntas disponibles para esta prueba aún.</p>
+          <Button className="mt-4" onClick={onExit}>Volver</Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (showResults) {
     return (
@@ -97,7 +167,7 @@ export default function SubjectTest({ subject, questions = sampleQuestions, onCo
     <Card className="max-w-2xl mx-auto">
       <CardHeader>
         <div className="flex items-center justify-between mb-4">
-          <Badge variant="outline">{subject?.name} — Prueba</Badge>
+          <Badge variant="outline">{subject?.name} — Prueba Final</Badge>
           <Badge variant="secondary">{currentQuestion + 1} de {questions.length}</Badge>
         </div>
         <Progress value={progress} className="h-2" />
@@ -118,6 +188,7 @@ export default function SubjectTest({ subject, questions = sampleQuestions, onCo
                   ? "border-blue-500 bg-blue-50"
                   : "border-gray-200 hover:border-gray-300"
               )}
+              onClick={() => handleAnswer(idx.toString())}
             >
               <RadioGroupItem value={idx.toString()} id={`option-${idx}`} />
               <Label htmlFor={`option-${idx}`} className="cursor-pointer flex-1">{option}</Label>
