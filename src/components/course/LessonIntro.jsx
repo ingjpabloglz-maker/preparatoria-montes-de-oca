@@ -350,7 +350,7 @@ Responde SOLO con el texto de la explicación ampliada, sin títulos ni listas.`
             </div>
           ) : (
             <p className="text-white/85 text-sm leading-relaxed">
-              {enrichedExplanation || lesson.explanation}
+              <MathText text={enrichedExplanation || lesson.explanation} />
             </p>
           )}
         </div>
