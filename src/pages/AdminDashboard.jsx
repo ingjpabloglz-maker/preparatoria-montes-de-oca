@@ -50,21 +50,29 @@ export default function AdminDashboard() {
   const { data: allUsers = [] } = useQuery({
     queryKey: ['allUsers'],
     queryFn: () => base44.entities.User.list(),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: allProgress = [] } = useQuery({
     queryKey: ['allProgress'],
     queryFn: () => base44.entities.UserProgress.list(),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: allPayments = [] } = useQuery({
     queryKey: ['allPayments'],
     queryFn: () => base44.entities.Payment.list('-created_date'),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: subjects = [] } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => base44.entities.Subject.list(),
+    staleTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Estadísticas

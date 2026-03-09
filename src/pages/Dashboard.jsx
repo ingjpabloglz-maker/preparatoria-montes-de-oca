@@ -41,18 +41,26 @@ function AdminDashboardView({ user }) {
   const { data: allUsers = [] } = useQuery({
     queryKey: ['allUsers'],
     queryFn: () => base44.entities.User.list(),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
   const { data: allProgress = [] } = useQuery({
     queryKey: ['allProgress'],
     queryFn: () => base44.entities.UserProgress.list(),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
   const { data: payments = [] } = useQuery({
     queryKey: ['payments'],
     queryFn: () => base44.entities.Payment.list(),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
   const { data: subjects = [] } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => base44.entities.Subject.list(),
+    staleTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const students = allUsers.filter(u => u.role !== 'admin');
@@ -287,44 +295,39 @@ export default function Dashboard() {
   const { data: levels = [], isLoading: loadingLevels } = useQuery({
     queryKey: ['levels'],
     queryFn: () => base44.entities.LevelConfig.list('level_number'),
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
+    staleTime: 30 * 60 * 1000, // 30 min — datos casi estáticos
+    refetchOnWindowFocus: false,
   });
 
   const { data: subjects = [], isLoading: loadingSubjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => base44.entities.Subject.list('level'),
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
+    staleTime: 30 * 60 * 1000, // 30 min — datos casi estáticos
+    refetchOnWindowFocus: false,
   });
 
   const { data: userProgress, isLoading: loadingProgress } = useQuery({
     queryKey: ['userProgress', user?.email],
     queryFn: () => base44.entities.UserProgress.filter({ user_email: user?.email }),
     enabled: !loadingUser && !!user?.email,
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
+    staleTime: 2 * 60 * 1000, // 2 min — progreso del usuario
+    refetchOnWindowFocus: false,
   });
 
   const { data: subjectProgress = [], isLoading: loadingSubjectProgress } = useQuery({
     queryKey: ['subjectProgress', user?.email],
     queryFn: () => base44.entities.SubjectProgress.filter({ user_email: user?.email }),
     enabled: !loadingUser && !!user?.email,
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
+    staleTime: 2 * 60 * 1000, // 2 min — progreso del usuario
+    refetchOnWindowFocus: false,
   });
 
   const { data: userPayments = [], isLoading: loadingPayments } = useQuery({
     queryKey: ['userPayments', user?.email],
     queryFn: () => base44.entities.Payment.filter({ user_email: user?.email }),
     enabled: !loadingUser && !!user?.email,
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000, // 5 min — pagos cambian poco
+    refetchOnWindowFocus: false,
   });
 
   const progress = userProgress?.[0];

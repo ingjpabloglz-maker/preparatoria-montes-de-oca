@@ -30,31 +30,40 @@ export default function CourseMap() {
       return subjects[0];
     },
     enabled: !!subjectId,
+    staleTime: 30 * 60 * 1000, // estático
+    refetchOnWindowFocus: false,
   });
 
   const { data: units = [] } = useQuery({
     queryKey: ['courseUnits', subjectId],
     queryFn: () => base44.entities.CourseUnit.filter({ subject_id: subjectId }, 'order'),
     enabled: !!subjectId,
+    staleTime: 30 * 60 * 1000, // estático
+    refetchOnWindowFocus: false,
   });
 
   const { data: modules = [] } = useQuery({
     queryKey: ['courseModules', subjectId],
     queryFn: () => base44.entities.CourseModule.filter({ subject_id: subjectId }, 'order'),
     enabled: !!subjectId,
+    staleTime: 30 * 60 * 1000, // estático
+    refetchOnWindowFocus: false,
   });
 
   const { data: lessons = [] } = useQuery({
     queryKey: ['courseLessons', subjectId],
     queryFn: () => base44.entities.CourseLesson.filter({ subject_id: subjectId }, 'order'),
     enabled: !!subjectId,
+    staleTime: 30 * 60 * 1000, // estático
+    refetchOnWindowFocus: false,
   });
 
   const { data: lessonProgressList = [] } = useQuery({
     queryKey: ['lessonProgress', user?.email, subjectId],
     queryFn: () => base44.entities.LessonProgress.filter({ user_email: user?.email, subject_id: subjectId }),
     enabled: !!user?.email && !!subjectId,
-    staleTime: 0,
+    staleTime: 60 * 1000, // 1 min — progreso de lección actualiza frecuente
+    refetchOnWindowFocus: false,
   });
 
   // Calcular progreso general

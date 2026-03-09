@@ -21,11 +21,15 @@ export default function ManageStudents() {
   const { data: allUsers = [] } = useQuery({
     queryKey: ['allUsers'],
     queryFn: () => base44.entities.User.list(),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: allProgress = [] } = useQuery({
     queryKey: ['allProgress'],
     queryFn: () => base44.entities.UserProgress.list(),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const students = allUsers.filter(u => u.role !== 'admin');

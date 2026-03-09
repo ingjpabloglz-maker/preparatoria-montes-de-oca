@@ -34,12 +34,16 @@ export default function Lesson() {
       return lessons[0];
     },
     enabled: !!lessonId,
+    staleTime: 30 * 60 * 1000, // lección es estática
+    refetchOnWindowFocus: false,
   });
 
   const { data: activities = [] } = useQuery({
     queryKey: ['lessonActivities', lessonId],
     queryFn: () => base44.entities.CourseActivity.filter({ lesson_id: lessonId }, 'order'),
     enabled: !!lessonId,
+    staleTime: 30 * 60 * 1000, // actividades son estáticas
+    refetchOnWindowFocus: false,
   });
 
   const { data: existingProgress } = useQuery({
@@ -49,6 +53,8 @@ export default function Lesson() {
       return prog[0] || null;
     },
     enabled: !!user?.email && !!lessonId,
+    staleTime: 60 * 1000, // 1 min
+    refetchOnWindowFocus: false,
   });
 
   const saveProgressMutation = useMutation({
