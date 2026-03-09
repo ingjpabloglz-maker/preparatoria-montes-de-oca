@@ -89,11 +89,8 @@ export default function StudentDetail() {
   const progress = progressData[0];
   const currentLevel = progress?.current_level || 1;
 
-  const { data: levelSubjects = [] } = useQuery({
-    queryKey: ['levelSubjects', currentLevel],
-    queryFn: () => base44.entities.Subject.filter({ level: currentLevel }),
-    enabled: !!currentLevel,
-  });
+  // Filtrar materias del nivel actual desde el caché de subjects (evita consulta extra)
+  const levelSubjects = subjects.filter(s => s.level === currentLevel);
 
   const completedSubjects = subjectProgress.filter(sp => sp.test_passed).length;
 
