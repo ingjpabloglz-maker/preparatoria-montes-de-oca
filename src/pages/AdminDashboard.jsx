@@ -24,7 +24,8 @@ import {
   Clock,
   ChevronRight,
   Plus,
-  Eye
+  Eye,
+  BarChart2
 } from "lucide-react";
 import AdminGuard from '../components/auth/AdminGuard';
 
@@ -107,11 +108,14 @@ export default function AdminDashboard() {
             <p className="text-gray-500">Gestiona estudiantes, pagos y progreso</p>
           </div>
           <div className="flex gap-3">
+            <Button variant="outline" onClick={() => window.location.href = createPageUrl('StudentStatistics')}>
+              <BarChart2 className="w-4 h-4 mr-2" />
+              Estadísticas
+            </Button>
             <Button onClick={() => window.location.href = createPageUrl('ManageFolios')}>
               <CreditCard className="w-4 h-4 mr-2" />
               Gestionar Folios
             </Button>
-
           </div>
         </div>
 
