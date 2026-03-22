@@ -63,13 +63,18 @@ Deno.serve(async (req) => {
   let gam = gamArr[0] || null;
   const today = new Date().toISOString().split('T')[0];
 
+  // Para surprise_exam_completed, el score viene en event_data
+  // XP = score * 0.5, water = floor(score / 20), como calculaba submitSurpriseExam
+  const score = event_data.score || 0;
+  const isSurpriseExam = event_type === 'surprise_exam_completed';
+
   // Puntos base por evento
   const XP_MAP = {
     lesson_completed: 20,
     mini_eval_passed: 40,
     subject_test_passed: 100,
     activity_submitted: 5,
-    surprise_exam_completed: 0, // XP ya lo suma submitSurpriseExam, aquí solo actualizamos streak y logros
+    surprise_exam_completed: Math.round(score * 0.5),
   };
   const STARS_MAP = {
     lesson_completed: 1,
@@ -81,7 +86,7 @@ Deno.serve(async (req) => {
     lesson_completed: 1,
     mini_eval_passed: 2,
     subject_test_passed: 5,
-    surprise_exam_completed: 0,
+    surprise_exam_completed: Math.floor(score / 20),
   };
 
   const baseXP = XP_MAP[event_type] || 5;
