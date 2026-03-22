@@ -24,6 +24,8 @@ import {
   FileText,
   BarChart2
 } from "lucide-react";
+import GamificationHUD from "@/components/gamification/GamificationHUD";
+import AchievementToast from "@/components/gamification/AchievementToast";
 import { cn } from "@/lib/utils";
 
 export default function Layout({ children, currentPageName }) {
