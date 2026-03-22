@@ -25,6 +25,7 @@ export default function SurpriseExam() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
+    base44.auth.me().then(setUser);
     loadExam();
   }, []);
 
