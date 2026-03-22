@@ -80,9 +80,33 @@ export default function Lesson() {
         await base44.entities.LessonProgress.create(data);
       }
     },
-    onSuccess: () => {
+    onSuccess: async (_, vars) => {
       queryClient.invalidateQueries(['lessonProgress']);
       queryClient.invalidateQueries(['lessonProgressItem']);
+      queryClient.invalidateQueries(['gamificationProfile']);
+
+      // Disparar evento de gamificación
+      const eventType = lesson?.is_mini_eval
+        ? (vars.passed ? 'mini_eval_passed' : 'activity_submitted')
+        : 'lesson_completed';
+
+      const result = await dispatchUserEvent(eventType, {
+        lesson_id: lessonId,
+        score: vars.score,
+        passed: vars.passed,
+        activity_duration_seconds: 30, // mínimo válido
+      });
+
+      // Feedback visual
+      if (result?.leveled_up) {
+        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        toast.success(`¡Subiste al Nivel ${result.level}! 🎉`, { duration: 4000 });
+      } else if (result?.streak_days > 1) {
+        toast(`🔥 Racha de ${result.streak_days} días — x${result.multiplier?.toFixed(1)} XP`, { duration: 3000 });
+      }
+      if (result?.newly_unlocked_achievements?.length > 0) {
+        confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+      }
     },
   });
 
