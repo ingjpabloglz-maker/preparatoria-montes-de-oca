@@ -40,6 +40,46 @@ export default function Profile() {
           <h1 className="text-2xl font-bold text-gray-900">Mi Perfil</h1>
         </div>
         {user && <ProfileForm user={user} onSaved={handleSaved} />}
+
+        {/* Preferencias */}
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-6 space-y-4">
+            <h2 className="font-semibold text-gray-800 text-base">Preferencias</h2>
+
+            {/* Sonidos */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Volume2 className="w-4 h-4 text-gray-500" />
+                <div>
+                  <Label className="text-sm font-medium">Sonidos del juego</Label>
+                  <p className="text-xs text-gray-400">Retroalimentación auditiva al responder</p>
+                </div>
+              </div>
+              <Switch checked={isSoundEnabled} onCheckedChange={toggleSound} />
+            </div>
+
+            {/* Notificaciones por email */}
+            {gamProfile && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-gray-500" />
+                  <div>
+                    <Label className="text-sm font-medium">Notificaciones por email</Label>
+                    <p className="text-xs text-gray-400">Recordatorios de estudio y actividad</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={gamProfile.email_notifications_enabled !== false}
+                  onCheckedChange={async (val) => {
+                    const updated = { ...gamProfile, email_notifications_enabled: val };
+                    setGamProfile(updated);
+                    await base44.entities.GamificationProfile.update(gamProfile.id, { email_notifications_enabled: val });
+                  }}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
