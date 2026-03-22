@@ -80,6 +80,13 @@ export default function SurpriseExam() {
       if (res.data) {
         setResults(res.data);
         setPhase('results');
+        // Invalidar queries de gamificación para reflejar XP y estrellas ganadas
+        if (user?.email) {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['gamificationProfile', user.email], exact: true }),
+            queryClient.invalidateQueries({ queryKey: ['userAchievements', user.email], exact: true }),
+          ]);
+        }
         if (res.data.score >= 80) {
           confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
           playSound('achievement_unlocked');
