@@ -84,9 +84,8 @@ export default function Lesson() {
     onSuccess: async (_, vars) => {
       queryClient.invalidateQueries(['lessonProgress']);
       queryClient.invalidateQueries(['lessonProgressItem']);
-      queryClient.invalidateQueries(['gamificationProfile']);
 
-      // Disparar evento de gamificación
+      // Disparar evento de gamificación (useUserEvent ya invalida gamificationProfile y userAchievements)
       const eventType = lesson?.is_mini_eval
         ? (vars.passed ? 'mini_eval_passed' : 'activity_submitted')
         : 'lesson_completed';
