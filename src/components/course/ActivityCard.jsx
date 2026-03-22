@@ -23,6 +23,7 @@ export default function ActivityCard({ activity, activityNumber, totalActivities
     setIsCorrect(correct);
     setSubmitted(true);
     onAnswer(activity.id, correct, activity.points || 10);
+    playSound(correct ? 'correct_answer' : 'incorrect_answer');
   };
 
   const handleNext = () => {
