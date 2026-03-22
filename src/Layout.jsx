@@ -50,6 +50,10 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Achievement Toast monitor (solo estudiantes) */}
+      {user && user.role !== 'admin' && (
+        <AchievementToast userEmail={user.email} />
+      )}
       {/* Header */}
       <header className={`bg-white border-b sticky top-0 z-50 ${isImmersivePage ? 'hidden' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
