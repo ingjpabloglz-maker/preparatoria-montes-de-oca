@@ -14,6 +14,7 @@ export default function SurpriseExam() {
   const { playSound } = useSound();
   const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
+  const { dispatchUserEvent } = useUserEvent(user?.email);
   const [phase, setPhase] = useState('loading'); // loading | ready | question | results | error
   const [questions, setQuestions] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
