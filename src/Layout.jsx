@@ -132,6 +132,11 @@ export default function Layout({ children, currentPageName }) {
               )}
             </nav>
 
+            {/* Gamification HUD (solo estudiantes) */}
+            {user && user.role !== 'admin' && (
+              <GamificationHUD userEmail={user.email} />
+            )}
+
             {/* User Menu */}
             <div className="flex items-center gap-3">
               {user && (
