@@ -144,7 +144,7 @@ export default function Rewards() {
                   <p className="text-xs text-gray-500">{xp} XP totales</p>
                 </div>
               </div>
-              <p className="text-xs text-gray-400">Próx. nivel: {xpForNextLevel} XP</p>
+              <p className="text-xs text-gray-400">{Math.max(0, xpInLevel)} / {xpNeeded} XP</p>
             </div>
             <Progress value={xpProgress} className="h-3" />
             <p className="text-xs text-gray-400 mt-1">{xpProgress}% hacia el Nivel {level + 1}</p>
