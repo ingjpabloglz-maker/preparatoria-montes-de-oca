@@ -53,14 +53,16 @@ export default function Rewards() {
 
   const unlockedCount = userAchievements.filter(ua => ua.is_unlocked).length;
 
-  // Nivel y XP
+  // Curva de XP tipo RPG (igual que backend)
+  const getXpForLevel = (lvl) => Math.floor(50 * Math.pow(lvl, 1.5));
+
   const xp = profile?.xp_points || 0;
   const level = profile?.level || 1;
-  const xpForCurrentLevel = level > 1 ? Math.pow(level - 1, 2) * 10 : 0;
-  const xpForNextLevel = Math.pow(level, 2) * 10;
-  const xpProgress = xpForNextLevel > xpForCurrentLevel
-    ? Math.round(((xp - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100)
-    : 100;
+  const xpForCurrentLevel = getXpForLevel(level);
+  const xpForNextLevel = getXpForLevel(level + 1);
+  const xpInLevel = xp - xpForCurrentLevel;
+  const xpNeeded = xpForNextLevel - xpForCurrentLevel;
+  const xpProgress = Math.max(0, Math.min(100, Math.round((xpInLevel / xpNeeded) * 100)));
 
   const today = new Date().toISOString().split('T')[0];
   const canDoExam = profile?.last_surprise_exam_date_normalized !== today;

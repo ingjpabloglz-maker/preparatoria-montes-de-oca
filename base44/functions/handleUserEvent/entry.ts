@@ -139,8 +139,18 @@ Deno.serve(async (req) => {
   const newWater = (gam?.water_tokens || 0) + baseWater;
   const newMaxStreak = Math.max(gam?.max_streak || 0, newStreakDays);
 
-  // Nivel con curva progresiva
-  const newLevel = Math.max(1, Math.floor(Math.sqrt(newXP / 10)));
+  // Curva de XP tipo RPG: XP requerido por nivel = 50 * level^1.5
+  const getXpForLevel = (lvl) => Math.floor(50 * Math.pow(lvl, 1.5));
+
+  // Calcular nivel actual en base al XP total (auto-avanzar niveles)
+  let newLevel = gam?.level || 1;
+  // Subir niveles mientras el XP supere el umbral del siguiente
+  while (newXP >= getXpForLevel(newLevel + 1)) {
+    newLevel++;
+  }
+  // También asegurar que no retroceda si perdiera XP (no debería, pero por seguridad)
+  newLevel = Math.max(1, newLevel);
+
   const leveledUp = newLevel > (gam?.level || 1);
 
   // Actualizar answered_surprise_questions_ids si es examen sorpresa
