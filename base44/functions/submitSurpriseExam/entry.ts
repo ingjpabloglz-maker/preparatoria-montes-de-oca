@@ -95,5 +95,6 @@ Deno.serve(async (req) => {
     water_earned: waterEarned,
     xp_earned: xpEarned,
     results,
+    newly_unlocked_achievements: newlyUnlocked,
   });
 });
