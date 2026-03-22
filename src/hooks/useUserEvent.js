@@ -17,12 +17,23 @@ export function useUserEvent(userEmail) {
         event_data: eventData,
       });
 
+      const data = response.data;
+
+      // Actualización optimista inmediata del cache con los datos devueltos por el backend
+      if (data?.gamificationProfile) {
+        queryClient.setQueryData(['gamificationProfile', userEmail], (old) => ({
+          ...(old || {}),
+          ...data.gamificationProfile,
+        }));
+      }
+
+      // Luego invalidar para asegurar consistencia con el servidor
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['gamificationProfile', userEmail], exact: true }),
         queryClient.invalidateQueries({ queryKey: ['userAchievements', userEmail], exact: true }),
       ]);
 
-      return response.data;
+      return data;
 
     } catch (error) {
       console.error('Error en dispatchUserEvent:', error);
