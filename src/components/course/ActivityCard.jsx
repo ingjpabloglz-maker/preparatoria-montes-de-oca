@@ -9,6 +9,7 @@ export default function ActivityCard({ activity, activityNumber, totalActivities
   const [submitted, setSubmitted] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [fillValue, setFillValue] = useState('');
+  const { playSound } = useSound();
 
   const handleSubmit = () => {
     if (submitted) return;
