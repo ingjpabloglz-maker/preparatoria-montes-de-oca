@@ -175,7 +175,15 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.GamificationProfile.create(gamUpdate);
   }
 
-  // ─── 6. EVALUAR LOGROS ──────────────────────────────────────────────────────
+  // Sincronizar UserProgress si hubo level up (en el nivel gamification, no en current_level del curso)
+  if (leveledUp && userProgressRecord) {
+    await base44.asServiceRole.entities.UserProgress.update(userProgressRecord.id, {
+      current_level: newLevel,
+      level_start_date: nowIso,
+    });
+  }
+
+  // ─── 7. EVALUAR LOGROS ──────────────────────────────────────────────────────
   // Determinar todos los event_keys aplicables en este evento
   const applicableKeys = [event_type];
 
@@ -243,7 +251,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ─── 7. ACTUALIZAR MÉTRICAS ─────────────────────────────────────────────────
+  // ─── 8. ACTUALIZAR MÉTRICAS ─────────────────────────────────────────────────
   const eventsThisMinute = metrics?.last_event_minute === currentMinute
     ? (metrics.events_this_minute || 0) + 1
     : 1;
@@ -267,7 +275,7 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.UserMetrics.create(metricUpdate);
   }
 
-  // ─── 8. REGISTRAR EVENTO ────────────────────────────────────────────────────
+  // ─── 9. REGISTRAR EVENTO ────────────────────────────────────────────────────
   await base44.asServiceRole.entities.ProcessedEvent.create({
     event_id, user_email, event_type, processed_at: nowIso
   });
