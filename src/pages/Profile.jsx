@@ -11,10 +11,19 @@ import { useSound } from '@/contexts/SoundContext';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
+  const [gamProfile, setGamProfile] = useState(null);
+  const { isSoundEnabled, toggleSound } = useSound();
 
   useEffect(() => {
     base44.auth.me().then(setUser);
   }, []);
+
+  useEffect(() => {
+    if (!user?.email) return;
+    base44.entities.GamificationProfile.filter({ user_email: user.email }).then(arr => {
+      setGamProfile(arr[0] || null);
+    });
+  }, [user]);
 
   const handleSaved = async () => {
     const userData = await base44.auth.me();
