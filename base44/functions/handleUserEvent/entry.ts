@@ -130,9 +130,15 @@ Deno.serve(async (req) => {
   const newLevel = Math.max(1, Math.floor(Math.sqrt(newXP / 10)));
   const leveledUp = newLevel > (gam?.level || 1);
 
-  // Limpiar answered_surprise_questions_ids (máx 100)
+  // Actualizar answered_surprise_questions_ids si es examen sorpresa
   let surpriseIds = gam?.answered_surprise_questions_ids || [];
-  if (surpriseIds.length > 100) {
+  let lastSurpriseExamDate = gam?.last_surprise_exam_date_normalized || null;
+
+  if (isSurpriseExam && event_data.question_ids?.length) {
+    surpriseIds = [...surpriseIds, ...event_data.question_ids];
+    if (surpriseIds.length > 100) surpriseIds = surpriseIds.slice(-100);
+    lastSurpriseExamDate = today;
+  } else if (surpriseIds.length > 100) {
     surpriseIds = surpriseIds.slice(-100);
   }
 
@@ -147,7 +153,7 @@ Deno.serve(async (req) => {
     level: newLevel,
     answered_surprise_questions_ids: surpriseIds,
     email_notifications_enabled: gam?.email_notifications_enabled !== false,
-    last_surprise_exam_date_normalized: gam?.last_surprise_exam_date_normalized || null,
+    last_surprise_exam_date_normalized: lastSurpriseExamDate,
   };
 
   if (gam) {
