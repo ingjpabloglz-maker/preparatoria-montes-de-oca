@@ -8,6 +8,9 @@ import { ArrowLeft, BookOpen } from "lucide-react";
 import ActivityCard from '../components/course/ActivityCard';
 import LessonResults from '../components/course/LessonResults';
 import LessonIntro from '../components/course/LessonIntro';
+import { dispatchUserEvent } from '@/hooks/useGamification';
+import { toast } from 'sonner';
+import confetti from 'canvas-confetti';
 
 export default function Lesson() {
   const urlParams = new URLSearchParams(window.location.search);
