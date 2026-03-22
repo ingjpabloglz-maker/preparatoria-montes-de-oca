@@ -82,10 +82,12 @@ export default function SurpriseExam() {
       if (res.data) {
         setResults(res.data);
         setPhase('results');
-        // Disparar evento de gamificación (invalida gamificationProfile y userAchievements via useUserEvent)
+        // handleUserEvent es la única fuente de verdad para XP, water, streak, logros e ids
         if (user?.email) {
           const result = await dispatchUserEvent('surprise_exam_completed', {
             score: res.data.score,
+            question_ids,
+            correct_answers: res.data.correct_count,
             activity_duration_seconds: 60,
           });
           if (result?.leveled_up) {
