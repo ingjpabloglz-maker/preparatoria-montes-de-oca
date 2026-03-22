@@ -44,7 +44,6 @@ Deno.serve(async (req) => {
 
   if (gam) {
     let updatedIds = [...(gam.answered_surprise_questions_ids || []), ...question_ids];
-    // Limitar a 100
     if (updatedIds.length > 100) updatedIds = updatedIds.slice(-100);
 
     await base44.asServiceRole.entities.GamificationProfile.update(gam.id, {
@@ -53,6 +52,40 @@ Deno.serve(async (req) => {
       water_tokens: (gam.water_tokens || 0) + waterEarned,
       xp_points: (gam.xp_points || 0) + xpEarned,
     });
+  }
+
+  // Disparar logros de surprise_exam_completed
+  const allAchievements = await base44.asServiceRole.entities.Achievement.filter({ condition_key: 'surprise_exam_completed' });
+  const userAchs = await base44.asServiceRole.entities.UserAchievement.filter({ user_email });
+  const unlockedIds = userAchs.filter(u => u.is_unlocked).map(u => u.achievement_id);
+  const nowIso = new Date().toISOString();
+  const newlyUnlocked = [];
+
+  for (const ach of allAchievements) {
+    if (unlockedIds.includes(ach.id)) continue;
+    const existing_ua = userAchs.find(u => u.achievement_id === ach.id);
+    const currentProgress = (existing_ua?.progress_current || 0) + 1;
+    const target = ach.condition_value || 1;
+    const shouldUnlock = currentProgress >= target;
+
+    if (existing_ua) {
+      await base44.asServiceRole.entities.UserAchievement.update(existing_ua.id, {
+        progress_current: currentProgress,
+        progress_target: target,
+        is_unlocked: shouldUnlock,
+        unlocked_date: shouldUnlock ? nowIso : existing_ua.unlocked_date,
+      });
+    } else {
+      await base44.asServiceRole.entities.UserAchievement.create({
+        user_email,
+        achievement_id: ach.id,
+        progress_current: currentProgress,
+        progress_target: target,
+        is_unlocked: shouldUnlock,
+        unlocked_date: shouldUnlock ? nowIso : undefined,
+      });
+    }
+    if (shouldUnlock) newlyUnlocked.push({ name: ach.name, icon_name: ach.icon_name, rarity: ach.rarity });
   }
 
   return Response.json({
