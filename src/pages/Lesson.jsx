@@ -21,6 +21,7 @@ export default function Lesson() {
   const [currentActivityIndex, setCurrentActivityIndex] = useState(0);
   const [answers, setAnswers] = useState([]); // { activityId, correct, points }
   const queryClient = useQueryClient();
+  const { dispatchUserEvent } = useUserEvent(user?.email);
 
   useEffect(() => {
     const loadUser = async () => {
