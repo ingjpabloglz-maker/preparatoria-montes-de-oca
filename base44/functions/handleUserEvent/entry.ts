@@ -148,31 +148,57 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.GamificationProfile.create(gamUpdate);
   }
 
-  // ─── 6. EVALUAR LOGROS (filtrado por condition_key) ─────────────────────────
-  const achievements = await base44.asServiceRole.entities.Achievement.filter({
-    condition_key: event_type
-  });
+  // ─── 6. EVALUAR LOGROS ──────────────────────────────────────────────────────
+  // Determinar todos los event_keys aplicables en este evento
+  const applicableKeys = [event_type];
+
+  // Logros de racha por hito
+  const streakMilestones = [3, 7, 14, 30];
+  for (const milestone of streakMilestones) {
+    if (newStreakDays >= milestone) applicableKeys.push(`streak_${milestone}`);
+  }
+
+  // Logros de estrellas por hito
+  const starMilestones = [10, 50, 100];
+  for (const milestone of starMilestones) {
+    if (newStars >= milestone) applicableKeys.push(`stars_${milestone}`);
+  }
+
+  // Obtener todos los logros aplicables (por condition_key)
+  const allAchievements = await base44.asServiceRole.entities.Achievement.list();
+  const applicableAchs = allAchievements.filter(a => applicableKeys.includes(a.condition_key));
 
   const userAchievements = await base44.asServiceRole.entities.UserAchievement.filter({ user_email });
   const unlockedIds = userAchievements.filter(u => u.is_unlocked).map(u => u.achievement_id);
 
   const newlyUnlocked = [];
 
-  for (const ach of achievements) {
+  for (const ach of applicableAchs) {
     if (unlockedIds.includes(ach.id)) continue;
 
     const existing_ua = userAchievements.find(u => u.achievement_id === ach.id);
-    const currentProgress = (existing_ua?.progress_current || 0) + 1;
-    const target = ach.condition_value || 1;
 
-    const shouldUnlock = currentProgress >= target;
+    // Logros de hito (streak_X, stars_X, surprise_exam_completed) se desbloquean directo cuando se cumple la condición
+    const isThresholdType = ach.condition_key.startsWith('streak_') || ach.condition_key.startsWith('stars_');
+    let currentProgress, shouldUnlock;
+
+    if (isThresholdType) {
+      currentProgress = 1;
+      shouldUnlock = true;
+    } else {
+      currentProgress = (existing_ua?.progress_current || 0) + 1;
+      const target = ach.condition_value || 1;
+      shouldUnlock = currentProgress >= target;
+    }
+
+    const target = ach.condition_value || 1;
 
     if (existing_ua) {
       await base44.asServiceRole.entities.UserAchievement.update(existing_ua.id, {
         progress_current: currentProgress,
         progress_target: target,
         is_unlocked: shouldUnlock,
-        unlocked_date: shouldUnlock ? nowIso : undefined,
+        unlocked_date: shouldUnlock ? nowIso : existing_ua.unlocked_date,
       });
     } else {
       await base44.asServiceRole.entities.UserAchievement.create({
