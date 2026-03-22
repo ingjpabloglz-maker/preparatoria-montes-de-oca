@@ -1,11 +1,22 @@
 import React from 'react';
-import { Flame, Star, Zap } from 'lucide-react';
+import { Flame, Star, Zap, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useGamificationProfile } from '@/hooks/useGamification';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function GamificationHUD({ userEmail }) {
-  const { data: profile } = useGamificationProfile(userEmail);
+  const { data: profile, isLoading, isFetching } = useGamificationProfile(userEmail);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-7 w-14 rounded-full" />
+        <Skeleton className="h-7 w-14 rounded-full" />
+        <Skeleton className="h-7 w-16 rounded-full" />
+      </div>
+    );
+  }
 
   if (!profile) return null;
 
