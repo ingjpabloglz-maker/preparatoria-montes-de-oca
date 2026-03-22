@@ -270,5 +270,9 @@ Deno.serve(async (req) => {
     leveled_up: leveledUp,
     newly_unlocked_achievements: newlyUnlocked,
     multiplier,
+    // Perfil completo actualizado para actualización optimista del cache
+    gamificationProfile: {
+      ...gamUpdate,
+    },
   });
 });
