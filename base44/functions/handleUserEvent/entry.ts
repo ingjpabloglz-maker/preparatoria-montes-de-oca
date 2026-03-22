@@ -69,16 +69,19 @@ Deno.serve(async (req) => {
     mini_eval_passed: 40,
     subject_test_passed: 100,
     activity_submitted: 5,
+    surprise_exam_completed: 0, // XP ya lo suma submitSurpriseExam, aquí solo actualizamos streak y logros
   };
   const STARS_MAP = {
     lesson_completed: 1,
     mini_eval_passed: 2,
     subject_test_passed: 3,
+    surprise_exam_completed: 0,
   };
   const WATER_MAP = {
     lesson_completed: 1,
     mini_eval_passed: 2,
     subject_test_passed: 5,
+    surprise_exam_completed: 0,
   };
 
   const baseXP = XP_MAP[event_type] || 5;
