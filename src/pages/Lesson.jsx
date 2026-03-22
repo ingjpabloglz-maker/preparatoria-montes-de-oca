@@ -10,7 +10,6 @@ import LessonResults from '../components/course/LessonResults';
 import LessonIntro from '../components/course/LessonIntro';
 import { useUserEvent } from '@/hooks/useUserEvent';
 import { toast } from 'sonner';
-
 import confetti from 'canvas-confetti';
 
 export default function Lesson() {
