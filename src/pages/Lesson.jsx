@@ -8,7 +8,7 @@ import { ArrowLeft, BookOpen } from "lucide-react";
 import ActivityCard from '../components/course/ActivityCard';
 import LessonResults from '../components/course/LessonResults';
 import LessonIntro from '../components/course/LessonIntro';
-import { dispatchUserEvent } from '@/hooks/useGamification';
+import { useUserEvent } from '@/hooks/useUserEvent';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 
