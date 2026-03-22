@@ -21,7 +21,7 @@ export default function GamificationHUD({ userEmail }) {
   if (!profile) return null;
 
   return (
-    <Link to="/Rewards" className="flex items-center gap-3">
+    <Link to="/Rewards" className="flex items-center gap-3 relative">
       {/* Racha */}
       <div className={cn(
         "flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-bold transition-colors",

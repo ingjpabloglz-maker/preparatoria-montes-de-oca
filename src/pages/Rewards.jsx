@@ -42,8 +42,8 @@ export default function Rewards() {
     queryKey: ['userAchievements', user?.email],
     queryFn: () => base44.entities.UserAchievement.filter({ user_email: user?.email }),
     enabled: !!user?.email,
-    staleTime: 30 * 1000,
-    refetchInterval: document.visibilityState === 'visible' ? 15000 : false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const unlockedMap = {};
