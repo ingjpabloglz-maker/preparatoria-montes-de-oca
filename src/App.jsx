@@ -61,6 +61,8 @@ const AuthenticatedApp = () => {
           }
         />
       ))}
+      <Route path="/Rewards" element={<LayoutWrapper currentPageName="Rewards"><Rewards /></LayoutWrapper>} />
+      <Route path="/SurpriseExam" element={<LayoutWrapper currentPageName="SurpriseExam"><SurpriseExam /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
