@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Volume2, Bell } from "lucide-react";
 import ProfileForm from '../components/profile/ProfileForm';
+import { useSound } from '@/contexts/SoundContext';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
