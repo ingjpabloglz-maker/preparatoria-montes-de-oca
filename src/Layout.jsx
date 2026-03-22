@@ -74,15 +74,26 @@ export default function Layout({ children, currentPageName }) {
             {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-1">
               {!isAdmin && (
-                <Link to={createPageUrl('Dashboard')}>
-                  <Button 
-                    variant={currentPageName === 'Dashboard' ? 'secondary' : 'ghost'}
-                    size="sm"
-                  >
-                    <LayoutDashboard className="w-4 h-4 mr-2" />
-                    Mi Progreso
-                  </Button>
-                </Link>
+                <>
+                  <Link to={createPageUrl('Dashboard')}>
+                    <Button 
+                      variant={currentPageName === 'Dashboard' ? 'secondary' : 'ghost'}
+                      size="sm"
+                    >
+                      <LayoutDashboard className="w-4 h-4 mr-2" />
+                      Mi Progreso
+                    </Button>
+                  </Link>
+                  <Link to="/Rewards">
+                    <Button
+                      variant={currentPageName === 'Rewards' ? 'secondary' : 'ghost'}
+                      size="sm"
+                    >
+                      <span className="mr-1.5">🏆</span>
+                      Recompensas
+                    </Button>
+                  </Link>
+                </>
               )}
               
               {isAdmin && (
