@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle2, XCircle, Swords, Star, Droplets, ArrowLeft, Loader2, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSound } from '@/contexts/SoundContext';
+import { useUserEvent } from '@/hooks/useUserEvent';
 import confetti from 'canvas-confetti';
 
 export default function SurpriseExam() {
