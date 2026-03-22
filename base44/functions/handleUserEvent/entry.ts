@@ -58,7 +58,20 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ─── 5. ACTUALIZAR GAMIFICATION ─────────────────────────────────────────────
+  // ─── 5. CREAR/OBTENER UserProgress ─────────────────────────────────────────
+  const upArr = await base44.asServiceRole.entities.UserProgress.filter({ user_email });
+  let userProgressRecord = upArr[0] || null;
+
+  if (!userProgressRecord) {
+    userProgressRecord = await base44.asServiceRole.entities.UserProgress.create({
+      user_email,
+      current_level: 1,
+      level_start_date: nowIso,
+      blocked_due_to_time: false,
+    });
+  }
+
+  // ─── 6. ACTUALIZAR GAMIFICATION ─────────────────────────────────────────────
   const gamArr = await base44.asServiceRole.entities.GamificationProfile.filter({ user_email });
   let gam = gamArr[0] || null;
   const today = new Date().toISOString().split('T')[0];

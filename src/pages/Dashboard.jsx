@@ -359,7 +359,7 @@ export default function Dashboard() {
 
   // Calcular días restantes
   const getDaysRemaining = () => {
-    if (!progress?.level_start_date) return null;
+    if (!progress || !progress.level_start_date) return null;
     const levelConfig = levels.find(l => l.level_number === currentLevel);
     if (!levelConfig) return null;
     
