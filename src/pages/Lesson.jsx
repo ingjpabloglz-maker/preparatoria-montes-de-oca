@@ -118,6 +118,14 @@ export default function Lesson() {
       } else if (result?.streak_days > 1) {
         toast(`🔥 Racha de ${result.streak_days} días — x${result.multiplier?.toFixed(1)} XP`, { duration: 3000 });
       }
+      if (result?.tree_level_up) {
+        const STAGE_NAMES = ['Semilla','Brote','Planta joven','Árbol pequeño','Árbol mediano','Árbol frondoso'];
+        toast.success(`🌳 ¡Tu árbol creció! ${STAGE_NAMES[result.new_tree_stage]}`, { duration: 3500 });
+      }
+      if (result?.weekly_goal_completed) {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.5 } });
+        toast.success('🎯 ¡Meta semanal completada! +50 XP bonus', { duration: 4000 });
+      }
       if (result?.newly_unlocked_achievements?.length > 0) {
         confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
       }
