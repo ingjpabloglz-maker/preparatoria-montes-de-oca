@@ -169,7 +169,7 @@ Pregunta del alumno: ${userMsg.content}`;
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSend()}
                   placeholder="Escribe tu pregunta..."
-                  className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-violet-400"
+                  className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-violet-400 text-gray-900 placeholder-gray-500 bg-white"
                   disabled={loading}
                 />
                 <button
