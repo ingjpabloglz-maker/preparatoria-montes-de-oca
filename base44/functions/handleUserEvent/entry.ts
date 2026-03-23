@@ -341,6 +341,11 @@ Deno.serve(async (req) => {
     event_id, user_email, event_type, processed_at: nowIso
   });
 
+  const { minXP: finalMinXP, nextLevelXP: finalNextXP } = getLevelXPRange(finalLevel);
+  const xpIntoLevel = finalXP - finalMinXP;
+  const xpNeededForNext = finalNextXP - finalMinXP;
+  const progressPercent = Math.max(0, Math.min(100, Math.round((xpIntoLevel / xpNeededForNext) * 100)));
+
   return Response.json({
     status: 'ok',
     streak_days: newStreakDays,
@@ -355,6 +360,9 @@ Deno.serve(async (req) => {
     tree_level_up: treeLevelUp,
     new_tree_stage: newTreeStage,
     weekly_goal_completed: weeklyGoalJustCompleted,
+    xp_into_level: xpIntoLevel,
+    xp_needed_for_next_level: xpNeededForNext,
+    progress_percent: progressPercent,
     gamificationProfile: {
       ...gamUpdate,
     },

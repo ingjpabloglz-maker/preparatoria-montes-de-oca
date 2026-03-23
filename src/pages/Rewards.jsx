@@ -54,15 +54,12 @@ export default function Rewards() {
 
   const unlockedCount = userAchievements.filter(ua => ua.is_unlocked).length;
 
-  // Curva de XP tipo RPG (igual que backend)
-  const getXpForLevel = (lvl) => Math.floor(50 * Math.pow(lvl, 1.5));
-
   const xp = profile?.xp_points || 0;
-  const level = profile?.level || 1;
-  const xpForCurrentLevel = getXpForLevel(level);
-  const xpForNextLevel = getXpForLevel(level + 1);
-  const xpInLevel = xp - xpForCurrentLevel;
-  const xpNeeded = xpForNextLevel - xpForCurrentLevel;
+  const level = Math.max(1, Math.floor(Math.sqrt(xp / 10)));
+  const minXP = Math.pow(level, 2) * 10;
+  const nextLevelXP = Math.pow(level + 1, 2) * 10;
+  const xpInLevel = xp - minXP;
+  const xpNeeded = nextLevelXP - minXP;
   const xpProgress = Math.max(0, Math.min(100, Math.round((xpInLevel / xpNeeded) * 100)));
 
   const today = new Date().toISOString().split('T')[0];
