@@ -237,8 +237,8 @@ export default function Lesson() {
           />
         )}
 
-        {/* Tutor IA (solo materias difíciles, solo en fase de actividad) */}
-        {showAiTutor && phase === 'activity' && user && (
+        {/* Tutor IA (solo materias difíciles, solo en fase de explicación) */}
+        {showAiTutor && phase === 'intro' && user && (
           <AiTutorChat lesson={lesson} userEmail={user.email} />
         )}
 
