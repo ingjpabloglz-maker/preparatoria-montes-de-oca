@@ -31,6 +31,8 @@ import LevelCard from '../components/dashboard/LevelCard';
 import StatsOverview from '../components/dashboard/StatsOverview';
 import SubjectCard from '../components/dashboard/SubjectCard';
 import FolioValidator from '../components/payment/FolioValidator';
+import WeeklyGoal from '../components/gamification/WeeklyGoal';
+import { useGamificationProfile } from '@/hooks/useGamification';
 import { AlertCircle, Lock } from "lucide-react";
 
 function AdminDashboardView({ user }) {
@@ -333,6 +335,8 @@ export default function Dashboard() {
   const progress = userProgress?.[0];
   const currentLevel = progress?.current_level || 1;
 
+  const { data: gamProfile } = useGamificationProfile(user?.email);
+
   // Agrupar materias por nivel
   const subjectsByLevel = subjects.reduce((acc, subject) => {
     if (!acc[subject.level]) acc[subject.level] = [];
@@ -524,6 +528,15 @@ export default function Dashboard() {
             </Badge>
           </div>
         </div>
+
+        {/* Meta Semanal */}
+        {gamProfile && (
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-5">
+              <WeeklyGoal profile={gamProfile} />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Overview */}
         <StatsOverview 
