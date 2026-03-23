@@ -177,16 +177,16 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Curva de XP tipo RPG: XP requerido por nivel = 50 * level^1.5
-  const getXpForLevel = (lvl) => Math.floor(50 * Math.pow(lvl, 1.5));
+  // Fórmula de nivel: level = floor(sqrt(xp / 10)), mínimo 1
+  const getLevelFromXP = (xp) => Math.max(1, Math.floor(Math.sqrt(xp / 10)));
+  const getLevelXPRange = (lvl) => {
+    const minXP = Math.pow(lvl, 2) * 10;
+    const nextLevelXP = Math.pow(lvl + 1, 2) * 10;
+    return { minXP, nextLevelXP };
+  };
 
-  // Calcular nivel actual en base al XP total (auto-avanzar niveles)
-  let newLevel = gam?.level || 1;
-  // Subir niveles mientras el XP supere el umbral del siguiente
-  while (newXP >= getXpForLevel(newLevel + 1)) {
-    newLevel++;
-  }
-  // También asegurar que no retroceda si perdiera XP (no debería, pero por seguridad)
+  // Calcular nivel actual en base al XP total
+  let newLevel = getLevelFromXP(newXP);
   newLevel = Math.max(1, newLevel);
 
   const leveledUp = newLevel > (gam?.level || 1);
@@ -208,8 +208,7 @@ Deno.serve(async (req) => {
   const finalXP = newXP + weeklyBonusXP;
 
   // Recalcular nivel con XP bonus
-  let finalLevel = newLevel;
-  while (finalXP >= getXpForLevel(finalLevel + 1)) { finalLevel++; }
+  let finalLevel = getLevelFromXP(finalXP);
   finalLevel = Math.max(1, finalLevel);
 
   const gamUpdate = {
