@@ -11,6 +11,7 @@ import LessonIntro from '../components/course/LessonIntro';
 import { useUserEvent } from '@/hooks/useUserEvent';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
+import AiTutorChat from '../components/ai/AiTutorChat';
 
 export default function Lesson() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -49,6 +50,19 @@ export default function Lesson() {
     staleTime: 30 * 60 * 1000, // actividades son estáticas
     refetchOnWindowFocus: false,
   });
+
+  const DIFFICULT_SUBJECT_KEYWORDS = ['matemática', 'matematica', 'cálculo', 'calculo', 'álgebra', 'algebra', 'química', 'quimica', 'física', 'fisica', 'trigonometría', 'trigonometria', 'estadística', 'estadistica', 'probabilidad'];
+
+  const { data: lessonSubject } = useQuery({
+    queryKey: ['subject', lesson?.subject_id],
+    queryFn: () => base44.entities.Subject.filter({ id: lesson.subject_id }).then(r => r[0]),
+    enabled: !!lesson?.subject_id,
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const showAiTutor = lessonSubject
+    ? DIFFICULT_SUBJECT_KEYWORDS.some(kw => lessonSubject.name?.toLowerCase().includes(kw))
+    : false;
 
   const { data: existingProgress } = useQuery({
     queryKey: ['lessonProgressItem', user?.email, lessonId],
@@ -213,6 +227,11 @@ export default function Lesson() {
             onAnswer={handleActivityAnswer}
             onNext={handleNextActivity}
           />
+        )}
+
+        {/* Tutor IA (solo materias difíciles, solo en fase de actividad) */}
+        {showAiTutor && phase === 'activity' && user && (
+          <AiTutorChat lesson={lesson} userEmail={user.email} />
         )}
 
         {phase === 'results' && (
