@@ -9,6 +9,7 @@ import { Trophy, Star, Flame, Zap, Swords, Target, BookOpen, Award, Lock, Drople
 import { Link } from 'react-router-dom';
 import { useGamificationProfile } from '@/hooks/useGamification';
 import confetti from 'canvas-confetti';
+import TreeVisualization from '@/components/gamification/TreeVisualization';
 
 const ICON_MAP = {
   Trophy, Star, Flame, Zap, Swords, Target, BookOpen, Award, Sparkles, CalendarDays,
@@ -130,6 +131,18 @@ export default function Rewards() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Árbol del Conocimiento */}
+        <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              🌳 Árbol del Conocimiento
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-5 pt-0">
+            <TreeVisualization profile={profile} />
+          </CardContent>
+        </Card>
 
         {/* Nivel y Progreso XP */}
         <Card className="border-0 shadow-md">
