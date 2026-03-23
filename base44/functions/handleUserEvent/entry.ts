@@ -139,6 +139,44 @@ Deno.serve(async (req) => {
   const newWater = (gam?.water_tokens || 0) + baseWater;
   const newMaxStreak = Math.max(gam?.max_streak || 0, newStreakDays);
 
+  // ─── ÁRBOL DEL CONOCIMIENTO ──────────────────────────────────────────────────
+  const TREE_THRESHOLDS = [0, 5, 15, 30, 60, 100];
+  const prevTreeStage = gam?.tree_stage ?? 0;
+  let newTreeStage = prevTreeStage;
+  for (let i = TREE_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (newWater >= TREE_THRESHOLDS[i]) { newTreeStage = i; break; }
+  }
+  const treeLevelUp = newTreeStage > prevTreeStage;
+
+  // ─── META SEMANAL ─────────────────────────────────────────────────────────────
+  // Obtener inicio de semana actual (lunes)
+  const nowDate = new Date();
+  const dayOfWeek = nowDate.getDay(); // 0=Dom, 1=Lun ... 6=Sab
+  const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+  const thisMonday = new Date(nowDate);
+  thisMonday.setDate(nowDate.getDate() + diffToMonday);
+  const thisMondayStr = thisMonday.toISOString().split('T')[0];
+
+  let weeklyProgress = gam?.weekly_goal_progress ?? 0;
+  const weeklyTarget = gam?.weekly_goal_target ?? 10;
+  const prevWeeklyStart = gam?.weekly_goal_start_date ?? null;
+  let weeklyStartDate = prevWeeklyStart ?? thisMondayStr;
+  let weeklyGoalJustCompleted = false;
+
+  // Resetear si es una nueva semana
+  if (prevWeeklyStart !== thisMondayStr) {
+    weeklyProgress = 0;
+    weeklyStartDate = thisMondayStr;
+  }
+
+  if (event_type === 'lesson_completed') {
+    weeklyProgress += 1;
+    if (weeklyProgress === weeklyTarget) {
+      weeklyGoalJustCompleted = true;
+      // Bonus XP por completar meta semanal (ya se suma al newXP si modificamos earnedXP antes, pero aquí lo hacemos via gamUpdate)
+    }
+  }
+
   // Curva de XP tipo RPG: XP requerido por nivel = 50 * level^1.5
   const getXpForLevel = (lvl) => Math.floor(50 * Math.pow(lvl, 1.5));
 
@@ -165,6 +203,15 @@ Deno.serve(async (req) => {
     surpriseIds = surpriseIds.slice(-100);
   }
 
+  // XP bonus por meta semanal completada
+  const weeklyBonusXP = weeklyGoalJustCompleted ? 50 : 0;
+  const finalXP = newXP + weeklyBonusXP;
+
+  // Recalcular nivel con XP bonus
+  let finalLevel = newLevel;
+  while (finalXP >= getXpForLevel(finalLevel + 1)) { finalLevel++; }
+  finalLevel = Math.max(1, finalLevel);
+
   const gamUpdate = {
     user_email,
     streak_days: newStreakDays,
@@ -172,11 +219,16 @@ Deno.serve(async (req) => {
     max_streak: newMaxStreak,
     total_stars: newStars,
     water_tokens: newWater,
-    xp_points: newXP,
-    level: newLevel,
+    xp_points: finalXP,
+    level: finalLevel,
     answered_surprise_questions_ids: surpriseIds,
     email_notifications_enabled: gam?.email_notifications_enabled !== false,
     last_surprise_exam_date_normalized: lastSurpriseExamDate,
+    tree_stage: newTreeStage,
+    last_tree_update: nowIso,
+    weekly_goal_progress: weeklyProgress,
+    weekly_goal_target: weeklyTarget,
+    weekly_goal_start_date: weeklyStartDate,
   };
 
   if (gam) {
@@ -294,14 +346,16 @@ Deno.serve(async (req) => {
     status: 'ok',
     streak_days: newStreakDays,
     streak_broke: streakBroke,
-    xp_earned: earnedXP,
-    total_xp: newXP,
+    xp_earned: earnedXP + weeklyBonusXP,
+    total_xp: finalXP,
     total_stars: newStars,
-    level: newLevel,
-    leveled_up: leveledUp,
+    level: finalLevel,
+    leveled_up: finalLevel > (gam?.level || 1),
     newly_unlocked_achievements: newlyUnlocked,
     multiplier,
-    // Perfil completo actualizado para actualización optimista del cache
+    tree_level_up: treeLevelUp,
+    new_tree_stage: newTreeStage,
+    weekly_goal_completed: weeklyGoalJustCompleted,
     gamificationProfile: {
       ...gamUpdate,
     },
