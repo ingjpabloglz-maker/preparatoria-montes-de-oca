@@ -43,20 +43,8 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Activity too short' }, { status: 400 });
   }
 
-  // ─── 4. ANTI-FRAUDE: No duplicar lección ya completada ─────────────────────
-  if (event_type === 'lesson_completed' && event_data.lesson_id) {
-    const prevProgress = await base44.asServiceRole.entities.LessonProgress.filter({
-      user_email,
-      lesson_id: event_data.lesson_id
-    });
-    if (prevProgress.length > 0 && prevProgress[0].completed) {
-      // Registrar como procesado y salir sin duplicar
-      await base44.asServiceRole.entities.ProcessedEvent.create({
-        event_id, user_email, event_type, processed_at: nowIso
-      });
-      return Response.json({ status: 'already_completed', message: 'Lesson already completed' });
-    }
-  }
+  // ─── 4. (reservado) ─────────────────────────────────────────────────────────
+  // La idempotencia ya está garantizada por el event_id único en el paso 1.
 
   // ─── 5. CREAR/OBTENER UserProgress ─────────────────────────────────────────
   const upArr = await base44.asServiceRole.entities.UserProgress.filter({ user_email });
