@@ -383,9 +383,11 @@ LONGITUD: Completo pero conciso. No excedas 300 palabras.`
               <span>Preparando explicación...</span>
             </div>
           ) : (
-            <p className="text-white/85 text-sm leading-relaxed">
-              <MathText text={enrichedExplanation || lesson.explanation} />
-            </p>
+            <div className="text-white/85 text-sm leading-relaxed prose prose-sm prose-invert max-w-none [&_h2]:text-white [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0.5 [&_.katex]:text-white">
+              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                {enrichedExplanation || lesson.explanation}
+              </ReactMarkdown>
+            </div>
           )}
         </div>
       )}
