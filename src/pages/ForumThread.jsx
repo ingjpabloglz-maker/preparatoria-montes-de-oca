@@ -202,6 +202,7 @@ export default function ForumThread() {
                   canMarkSolution={canManage}
                   onMarkSolution={(postId) => solutionMutation.mutate(postId)}
                   threadStatus={thread.status}
+                  currentUserEmail={user?.email}
                 />
               ))}
             </div>
@@ -216,6 +217,7 @@ export default function ForumThread() {
               <NewPostForm
                 onSubmit={(content) => replyMutation.mutate(content)}
                 isSubmitting={replyMutation.isPending}
+                userEmail={user?.email}
               />
             </CardContent>
           </Card>
