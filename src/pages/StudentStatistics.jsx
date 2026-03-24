@@ -1,42 +1,64 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import {
-  Users, TrendingUp, CreditCard, GraduationCap, Download, BarChart2, BookOpen, Clock
+  Users, TrendingUp, AlertTriangle, XCircle, Download,
+  Flame, Star, Zap, BookOpen
 } from "lucide-react";
 import AdminGuard from '@/components/auth/AdminGuard';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  LineChart, Line, CartesianGrid, Cell
+} from 'recharts';
 
 const formatName = (u) => {
   const parts = [u.apellido_paterno, u.apellido_materno, u.nombres].filter(Boolean);
   return parts.length > 0 ? parts.join(' ') : (u.full_name || 'Sin nombre');
 };
 
+const LEVEL_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'];
+
+// Calcula días transcurridos desde una fecha ISO
+const daysSince = (isoDate) => {
+  if (!isoDate) return 999;
+  const diff = Date.now() - new Date(isoDate).getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+};
+
 export default function StudentStatistics() {
   const { data: allUsers = [] } = useQuery({
     queryKey: ['allUsers'],
     queryFn: () => base44.entities.User.list(),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const { data: allProgress = [] } = useQuery({
     queryKey: ['allProgress'],
     queryFn: () => base44.entities.UserProgress.list(),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
-  const { data: allPayments = [] } = useQuery({
-    queryKey: ['allPayments'],
-    queryFn: () => base44.entities.Payment.list('-created_date'),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+  const { data: allGamification = [] } = useQuery({
+    queryKey: ['allGamification'],
+    queryFn: () => base44.entities.GamificationProfile.list(),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+
+  const { data: allSubjectProgress = [] } = useQuery({
+    queryKey: ['allSubjectProgress'],
+    queryFn: () => base44.entities.SubjectProgress.list(),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const { data: subjects = [] } = useQuery({
@@ -46,104 +68,121 @@ export default function StudentStatistics() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: subjectProgressAll = [] } = useQuery({
-    queryKey: ['allSubjectProgress'],
-    queryFn: () => base44.entities.SubjectProgress.list(),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
+  // ─── getAdminStats ───────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const students = allUsers.filter(u => u.role !== 'admin');
+    const total_students = students.length;
 
-  const students = allUsers.filter(u => u.role !== 'admin');
-  const totalStudents = students.length;
-  const activeStudents = allProgress.length;
-  const inactiveStudents = totalStudents - activeStudents;
-  const usedFolios = allPayments.filter(p => p.status === 'used').length;
-  const availableFolios = allPayments.filter(p => p.status === 'available').length;
+    const enriched = students.map(u => {
+      const prog = allProgress.find(p => p.user_email === u.email);
+      const gam = allGamification.find(g => g.user_email === u.email);
+      const lastStudy = gam?.last_study_date_normalized;
+      const days = daysSince(lastStudy);
+      return {
+        ...u,
+        name: formatName(u),
+        level: prog?.current_level || 1,
+        progress: Math.round(prog?.total_progress_percent || 0),
+        blocked: prog?.blocked_due_to_time || false,
+        xp: gam?.xp_points || 0,
+        streak: gam?.streak_days || 0,
+        completedSubjects: (prog?.completed_subjects || []).length,
+        lastStudy,
+        daysSinceActivity: days,
+      };
+    });
 
-  const levelDistribution = [1, 2, 3, 4, 5, 6].map(level => {
-    const inLevel = allProgress.filter(p => p.current_level === level);
-    const blocked = inLevel.filter(p => p.blocked_due_to_time).length;
-    return { level, count: inLevel.length, blocked };
-  });
+    const active_today = enriched.filter(s => s.daysSinceActivity <= 1).length;
+    const at_risk = enriched.filter(s => s.daysSinceActivity >= 2 && s.daysSinceActivity <= 5).length;
+    const inactive = enriched.filter(s => s.daysSinceActivity >= 6).length;
 
-  // Promedio de progreso por nivel
-  const levelAvgProgress = [1, 2, 3, 4, 5, 6].map(level => {
-    const inLevel = allProgress.filter(p => p.current_level === level);
-    if (inLevel.length === 0) return { level, avg: 0 };
-    const avg = inLevel.reduce((acc, p) => acc + (p.total_progress_percent || 0), 0) / inLevel.length;
-    return { level, avg: Math.round(avg) };
-  });
+    const avg_xp = total_students > 0
+      ? Math.round(enriched.reduce((a, s) => a + s.xp, 0) / total_students)
+      : 0;
+    const avg_streak = total_students > 0
+      ? Math.round(enriched.reduce((a, s) => a + s.streak, 0) / total_students)
+      : 0;
 
-  // Materias más completadas
-  const subjectCompletions = subjects.map(s => ({
-    name: s.name,
-    level: s.level,
-    completions: subjectProgressAll.filter(sp => sp.subject_id === s.id && sp.test_passed).length,
-  })).sort((a, b) => b.completions - a.completions);
+    // Distribución por nivel (solo niveles con alumnos)
+    const levelDist = [1, 2, 3, 4, 5, 6].map(lvl => {
+      const inLevel = allProgress.filter(p => p.current_level === lvl);
+      const avgProg = inLevel.length > 0
+        ? Math.round(inLevel.reduce((a, p) => a + (p.total_progress_percent || 0), 0) / inLevel.length)
+        : 0;
+      return { level: `N${lvl}`, alumnos: inLevel.length, progreso: avgProg };
+    }).filter(d => d.alumnos > 0);
 
-  // Tabla de estudiantes con nivel actual
-  const studentsTable = students.map(u => {
-    const prog = allProgress.find(p => p.user_email === u.email);
+    // Alumnos en riesgo (2–5 días) ordenados por mayor inactividad
+    const atRiskList = enriched
+      .filter(s => s.daysSinceActivity >= 2)
+      .sort((a, b) => b.daysSinceActivity - a.daysSinceActivity)
+      .slice(0, 15);
+
+    // Top 10 por XP
+    const topByXP = [...enriched].sort((a, b) => b.xp - a.xp).slice(0, 10);
+
+    // Top 10 por racha
+    const topByStreak = [...enriched].sort((a, b) => b.streak - a.streak).slice(0, 10);
+
+    // Materias completadas (solo las que tienen > 0)
+    const subjectCompletions = subjects.map(s => ({
+      name: s.name,
+      level: s.level,
+      completions: allSubjectProgress.filter(sp => sp.subject_id === s.id && sp.test_passed).length,
+    })).filter(s => s.completions > 0).sort((a, b) => b.completions - a.completions);
+
+    // Actividad "semanal" simulada desde last_study_date (últimos 7 días)
+    const weekActivity = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      const label = d.toLocaleDateString('es-MX', { weekday: 'short' });
+      const count = enriched.filter(s => s.daysSinceActivity === (6 - i)).length;
+      return { day: label, activos: count };
+    });
+
     return {
-      name: formatName(u),
-      email: u.email,
-      level: prog?.current_level || 1,
-      progress: Math.round(prog?.total_progress_percent || 0),
-      blocked: prog?.blocked_due_to_time ? 'Sí' : 'No',
-      completedSubjects: (prog?.completed_subjects || []).length,
+      total_students, active_today, at_risk, inactive,
+      avg_xp, avg_streak,
+      levelDist, atRiskList, topByXP, topByStreak,
+      subjectCompletions, weekActivity,
     };
-  });
+  }, [allUsers, allProgress, allGamification, allSubjectProgress, subjects]);
 
-  // ---- Exportar Excel ----
-  const exportToExcel = () => {
-    const rows = [];
-
-    // Hoja 1: Resumen General
-    rows.push(['=== RESUMEN GENERAL ===']);
-    rows.push(['Total de Estudiantes', totalStudents]);
-    rows.push(['Estudiantes Activos', activeStudents]);
-    rows.push(['Estudiantes Sin Progreso', inactiveStudents]);
-    rows.push(['Folios Usados', usedFolios]);
-    rows.push(['Folios Disponibles', availableFolios]);
-    rows.push(['Total de Materias', subjects.length]);
-    rows.push([]);
-
-    rows.push(['=== DISTRIBUCIÓN POR NIVEL ===']);
-    rows.push(['Nivel', 'Estudiantes', 'Bloqueados por Tiempo', 'Progreso Promedio (%)']);
-    levelDistribution.forEach(({ level, count, blocked }) => {
-      const avg = levelAvgProgress.find(l => l.level === level)?.avg || 0;
-      rows.push([`Nivel ${level}`, count, blocked, avg]);
+  // ─── Export CSV ───────────────────────────────────────────────────
+  const exportCSV = () => {
+    const rows = [
+      ['Nombre', 'Email', 'Nivel', 'Progreso (%)', 'XP', 'Racha', 'Días sin actividad', 'Bloqueado'],
+    ];
+    const students = allUsers.filter(u => u.role !== 'admin').map(u => {
+      const prog = allProgress.find(p => p.user_email === u.email);
+      const gam = allGamification.find(g => g.user_email === u.email);
+      return [
+        formatName(u), u.email,
+        prog?.current_level || 1,
+        Math.round(prog?.total_progress_percent || 0),
+        gam?.xp_points || 0,
+        gam?.streak_days || 0,
+        daysSince(gam?.last_study_date_normalized),
+        prog?.blocked_due_to_time ? 'Sí' : 'No',
+      ];
     });
-    rows.push([]);
-
-    rows.push(['=== MATERIAS MÁS COMPLETADAS ===']);
-    rows.push(['Materia', 'Nivel', 'Completaciones']);
-    subjectCompletions.forEach(s => {
-      rows.push([s.name, `Nivel ${s.level}`, s.completions]);
-    });
-    rows.push([]);
-
-    rows.push(['=== DETALLE DE ESTUDIANTES ===']);
-    rows.push(['Nombre', 'Email', 'Nivel Actual', 'Progreso (%)', 'Bloqueado', 'Materias Completadas']);
-    studentsTable.forEach(s => {
-      rows.push([s.name, s.email, `Nivel ${s.level}`, s.progress, s.blocked, s.completedSubjects]);
-    });
-
-    // Convertir a CSV (compatible con Excel)
-    const csvContent = rows.map(row =>
-      Array.isArray(row) ? row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',') : `"${row}"`
-    ).join('\n');
-
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const csv = [...rows, ...students]
+      .map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `estadisticas_alumnos_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `estadisticas_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
     URL.revokeObjectURL(url);
   };
 
-  const maxCount = Math.max(1, ...levelDistribution.map(l => l.count));
+  const riskColor = (days) => {
+    if (days <= 1) return 'bg-green-100 text-green-800';
+    if (days <= 5) return 'bg-amber-100 text-amber-800';
+    return 'bg-red-100 text-red-800';
+  };
 
   return (
     <AdminGuard>
@@ -154,214 +193,201 @@ export default function StudentStatistics() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Estadísticas de Alumnos</h1>
-              <p className="text-gray-500">Vista general del rendimiento y distribución de estudiantes</p>
+              <p className="text-gray-500 text-sm">Datos en tiempo real • {stats.total_students} alumnos</p>
             </div>
-            <Button onClick={exportToExcel} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={exportCSV} variant="outline" size="sm">
               <Download className="w-4 h-4 mr-2" />
-              Exportar Reporte Excel
+              Exportar CSV
             </Button>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            {[
+              { label: 'Total', value: stats.total_students, icon: Users, color: 'blue' },
+              { label: 'Activos hoy', value: stats.active_today, icon: TrendingUp, color: 'green' },
+              { label: 'En riesgo', value: stats.at_risk, icon: AlertTriangle, color: 'amber' },
+              { label: 'Inactivos', value: stats.inactive, icon: XCircle, color: 'red' },
+              { label: 'XP promedio', value: stats.avg_xp, icon: Zap, color: 'purple' },
+              { label: 'Racha prom.', value: `${stats.avg_streak}d`, icon: Flame, color: 'orange' },
+            ].map(({ label, value, icon: Icon, color }) => (
+              <Card key={label} className="border-0 shadow-sm">
+                <CardContent className="p-4">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 bg-${color}-100`}>
+                    <Icon className={`w-4 h-4 text-${color}-600`} />
+                  </div>
+                  <p className="text-2xl font-bold">{value}</p>
+                  <p className="text-xs text-gray-500">{label}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Gráficas */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Actividad semanal */}
             <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <Users className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold">{totalStudents}</p>
-                    <p className="text-sm text-gray-500">Total Estudiantes</p>
-                  </div>
-                </div>
+              <CardHeader>
+                <CardTitle className="text-base">Actividad Semanal</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={stats.weekActivity}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="day" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      formatter={(v) => [v, 'Alumnos activos']}
+                      contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+                    />
+                    <Line type="monotone" dataKey="activos" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 
+            {/* Distribución por nivel */}
             <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold">{activeStudents}</p>
-                    <p className="text-sm text-gray-500">Activos</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
-                    <Clock className="w-6 h-6 text-red-500" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold">{allProgress.filter(p => p.blocked_due_to_time).length}</p>
-                    <p className="text-sm text-gray-500">Bloqueados</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
-                    <GraduationCap className="w-6 h-6 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold">{subjects.length}</p>
-                    <p className="text-sm text-gray-500">Materias</p>
-                  </div>
-                </div>
+              <CardHeader>
+                <CardTitle className="text-base">Progreso Promedio por Nivel</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats.levelDist.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-8">Sin datos de progreso</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={stats.levelDist} barSize={28}>
+                      <XAxis dataKey="level" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} unit="%" />
+                      <Tooltip
+                        formatter={(v, name) => [name === 'progreso' ? `${v}%` : v, name === 'progreso' ? 'Progreso' : 'Alumnos']}
+                        contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+                      />
+                      <Bar dataKey="progreso" radius={[6, 6, 0, 0]}>
+                        {stats.levelDist.map((_, i) => (
+                          <Cell key={i} fill={LEVEL_COLORS[i % LEVEL_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Distribución por Nivel */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="border-0 shadow-sm">
+          {/* Alumnos en riesgo */}
+          {stats.atRiskList.length > 0 && (
+            <Card className="border-0 shadow-sm border-l-4 border-l-amber-400">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart2 className="w-5 h-5 text-blue-600" />
-                  Distribución por Nivel
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                  Alumnos en Riesgo de Abandono
+                  <Badge className="bg-amber-100 text-amber-800 ml-2">{stats.atRiskList.length}</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-6 gap-3">
-                  {levelDistribution.map(({ level, count, blocked }) => (
-                    <div key={level} className="text-center">
-                      <div className="w-full bg-gray-100 rounded-lg h-24 flex items-end justify-center p-2 mb-2 relative group">
-                        <div
-                          className="w-full bg-blue-500 rounded-md transition-all"
-                          style={{ height: `${Math.max(8, (count / maxCount) * 100)}%` }}
-                        />
-                        {blocked > 0 && (
-                          <div
-                            className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[calc(100%-16px)] bg-red-400 rounded-md opacity-70"
-                            style={{ height: `${Math.max(4, (blocked / maxCount) * 100)}%` }}
-                          />
-                        )}
-                      </div>
-                      <p className="text-xs font-semibold">Nivel {level}</p>
-                      <p className="text-xs text-gray-500">{count} alumnos</p>
-                      {blocked > 0 && <p className="text-xs text-red-500">{blocked} bloq.</p>}
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Nivel</TableHead>
+                      <TableHead>Días sin actividad</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats.atRiskList.map((s, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{s.name}</TableCell>
+                        <TableCell className="text-gray-500 text-sm">{s.email}</TableCell>
+                        <TableCell><Badge variant="outline">Nivel {s.level}</Badge></TableCell>
+                        <TableCell>
+                          <Badge className={riskColor(s.daysSinceActivity)}>
+                            {s.daysSinceActivity >= 999 ? 'Sin registro' : `${s.daysSinceActivity} días`}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top estudiantes */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-purple-500" />
+                  Top 10 por XP
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {stats.topByXP.filter(s => s.xp > 0).slice(0, 10).map((s, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{s.name}</p>
                     </div>
-                  ))}
-                </div>
-                <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500 inline-block" /> Activos</span>
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-400 inline-block" /> Bloqueados</span>
-                </div>
+                    <Badge className="bg-purple-100 text-purple-800">{s.xp.toLocaleString()} XP</Badge>
+                  </div>
+                ))}
+                {stats.topByXP.filter(s => s.xp > 0).length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-4">Sin datos de XP aún</p>
+                )}
               </CardContent>
             </Card>
 
-            {/* Progreso promedio por nivel */}
             <Card className="border-0 shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
-                  Progreso Promedio por Nivel
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-orange-500" />
+                  Top 10 por Racha
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {levelAvgProgress.map(({ level, avg }) => (
-                  <div key={level} className="flex items-center gap-3">
-                    <span className="text-sm font-medium w-16 shrink-0">Nivel {level}</span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-3">
-                      <div
-                        className="bg-green-500 h-3 rounded-full transition-all"
-                        style={{ width: `${avg}%` }}
-                      />
+              <CardContent className="space-y-2">
+                {stats.topByStreak.filter(s => s.streak > 0).slice(0, 10).map((s, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{s.name}</p>
                     </div>
-                    <span className="text-sm text-gray-600 w-10 text-right">{avg}%</span>
+                    <Badge className="bg-orange-100 text-orange-800">{s.streak} días 🔥</Badge>
                   </div>
                 ))}
+                {stats.topByStreak.filter(s => s.streak > 0).length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-4">Sin datos de racha aún</p>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Materias más completadas */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-purple-600" />
-                Materias Completadas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Materia</TableHead>
-                    <TableHead>Nivel</TableHead>
-                    <TableHead>Completaciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {subjectCompletions.map((s, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{s.name}</TableCell>
-                      <TableCell><Badge variant="outline">Nivel {s.level}</Badge></TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 bg-gray-100 rounded-full h-2">
-                            <div
-                              className="bg-purple-500 h-2 rounded-full"
-                              style={{ width: `${Math.min(100, (s.completions / Math.max(1, totalStudents)) * 100)}%` }}
-                            />
-                          </div>
-                          <span className="text-sm text-gray-600">{s.completions}</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+          {/* Materias completadas (solo las que tienen > 0) */}
+          {stats.subjectCompletions.length > 0 && (
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-emerald-600" />
+                  Materias Aprobadas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {stats.subjectCompletions.map((s, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Badge variant="outline" className="text-xs w-14 text-center">N{s.level}</Badge>
+                      <p className="text-sm flex-1 truncate">{s.name}</p>
+                      <div className="w-32">
+                        <Progress value={Math.min(100, (s.completions / Math.max(1, stats.total_students)) * 100)} className="h-2" />
+                      </div>
+                      <span className="text-sm text-gray-600 w-6 text-right">{s.completions}</span>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          {/* Detalle de todos los estudiantes */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-blue-600" />
-                Detalle de Estudiantes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Nivel</TableHead>
-                    <TableHead>Materias Completadas</TableHead>
-                    <TableHead>Estado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {studentsTable.map((s, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{s.name}</TableCell>
-                      <TableCell className="text-gray-500">{s.email}</TableCell>
-                      <TableCell><Badge variant="outline">Nivel {s.level}</Badge></TableCell>
-                      <TableCell>{s.completedSubjects}</TableCell>
-                      <TableCell>
-                        {s.blocked === 'Sí'
-                          ? <Badge className="bg-red-100 text-red-700">Bloqueado</Badge>
-                          : <Badge className="bg-green-100 text-green-700">Activo</Badge>
-                        }
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
         </div>
       </div>
