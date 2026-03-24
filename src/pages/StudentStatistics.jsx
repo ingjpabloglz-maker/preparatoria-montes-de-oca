@@ -204,17 +204,17 @@ export default function StudentStatistics() {
           {/* KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
             {[
-              { label: 'Total', value: stats.total_students, icon: Users, color: 'blue' },
-              { label: 'Activos hoy', value: stats.active_today, icon: TrendingUp, color: 'green' },
-              { label: 'En riesgo', value: stats.at_risk, icon: AlertTriangle, color: 'amber' },
-              { label: 'Inactivos', value: stats.inactive, icon: XCircle, color: 'red' },
-              { label: 'XP promedio', value: stats.avg_xp, icon: Zap, color: 'purple' },
-              { label: 'Racha prom.', value: `${stats.avg_streak}d`, icon: Flame, color: 'orange' },
-            ].map(({ label, value, icon: Icon, color }) => (
+              { label: 'Total', value: stats.total_students, icon: Users, bg: 'bg-blue-100', text: 'text-blue-600' },
+              { label: 'Activos hoy', value: stats.active_today, icon: TrendingUp, bg: 'bg-green-100', text: 'text-green-600' },
+              { label: 'En riesgo', value: stats.at_risk, icon: AlertTriangle, bg: 'bg-amber-100', text: 'text-amber-600' },
+              { label: 'Inactivos', value: stats.inactive, icon: XCircle, bg: 'bg-red-100', text: 'text-red-600' },
+              { label: 'XP promedio', value: stats.avg_xp, icon: Zap, bg: 'bg-purple-100', text: 'text-purple-600' },
+              { label: 'Racha prom.', value: `${stats.avg_streak}d`, icon: Flame, bg: 'bg-orange-100', text: 'text-orange-600' },
+            ].map(({ label, value, icon: Icon, bg, text }) => (
               <Card key={label} className="border-0 shadow-sm">
                 <CardContent className="p-4">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 bg-${color}-100`}>
-                    <Icon className={`w-4 h-4 text-${color}-600`} />
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${bg}`}>
+                    <Icon className={`w-4 h-4 ${text}`} />
                   </div>
                   <p className="text-2xl font-bold">{value}</p>
                   <p className="text-xs text-gray-500">{label}</p>
