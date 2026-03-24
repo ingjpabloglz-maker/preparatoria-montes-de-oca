@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle2, XCircle, Swords, Star, Droplets, ArrowLeft, Loader2, Zap } from 'lucide-react';
+import RichContentRenderer from '@/components/common/RichContentRenderer';
 import { Link } from 'react-router-dom';
 import { useSound } from '@/contexts/SoundContext';
 import { useUserEvent } from '@/hooks/useUserEvent';
-import RichContentRenderer from '@/components/common/RichContentRenderer';
 import confetti from 'canvas-confetti';
 
 export default function SurpriseExam() {
@@ -218,7 +218,7 @@ export default function SurpriseExam() {
           {/* Pregunta */}
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 mb-5 border border-white/10">
             <div className="text-white text-base sm:text-lg font-medium leading-relaxed prose prose-sm prose-invert max-w-none [&_.katex]:text-white [&_p]:my-0">
-              <RichContentRenderer content={q.question} inline />
+              <RichContentRenderer content={q.question} />
             </div>
           </div>
 
