@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, MessageCircle } from "lucide-react";
+import { Plus, Search, MessageCircle, ShieldOff } from "lucide-react";
 import ThreadCard from "@/components/forum/ThreadCard";
 import NewThreadForm from "@/components/forum/NewThreadForm";
 import { useUserEvent } from "@/hooks/useUserEvent";
@@ -15,14 +15,22 @@ export default function Forum() {
   const [showNewThread, setShowNewThread] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("recent");
+  const [penalty, setPenalty] = useState(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     const load = async () => {
       const u = await base44.auth.me();
       setUser(u);
-      const prog = await base44.entities.UserProgress.filter({ user_email: u.email });
+      const [prog, penalties] = await Promise.all([
+        base44.entities.UserProgress.filter({ user_email: u.email }),
+        base44.entities.ForumPenalty.filter({ user_email: u.email }),
+      ]);
       setUserLevel(prog?.[0]?.current_level || 1);
+      const p = penalties?.[0];
+      if (p?.banned_until && new Date(p.banned_until) > new Date()) {
+        setPenalty(p);
+      }
     };
     load();
   }, []);
@@ -81,7 +89,7 @@ export default function Forum() {
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">Pregunta, responde y aprende con tus compañeros</p>
           </div>
-          {!showNewThread && (
+          {!showNewThread && !penalty && (
             <Button onClick={() => setShowNewThread(true)} className="self-start sm:self-auto">
               <Plus className="w-4 h-4 mr-2" />
               Nuevo hilo
@@ -89,12 +97,26 @@ export default function Forum() {
           )}
         </div>
 
-        {showNewThread && (
+        {penalty && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex gap-3">
+            <ShieldOff className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-800">Acceso al foro suspendido temporalmente</p>
+              <p className="text-sm text-red-600 mt-1">
+                No puedes publicar hasta el <strong>{new Date(penalty.banned_until).toLocaleDateString('es-MX', { dateStyle: 'long' })}</strong>.
+              </p>
+              <p className="text-xs text-red-500 mt-1">Razón: {penalty.last_incident_reason}</p>
+            </div>
+          </div>
+        )}
+
+        {showNewThread && !penalty && (
           <NewThreadForm
             onSubmit={(data) => createMutation.mutate(data)}
             onCancel={() => setShowNewThread(false)}
             userLevel={userLevel}
             isSubmitting={createMutation.isPending}
+            userEmail={user?.email}
           />
         )}
 
