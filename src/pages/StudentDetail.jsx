@@ -117,28 +117,7 @@ export default function StudentDetail() {
 
   const handleDeleteStudent = async () => {
     setDeletingStudent(true);
-    const sleep = (ms) => new Promise(res => setTimeout(res, ms));
-
-    const [progressRecords, subjectProgressRecords, paymentRecords, lessonProgressRecords] = await Promise.all([
-      base44.entities.UserProgress.filter({ user_email: studentEmail }),
-      base44.entities.SubjectProgress.filter({ user_email: studentEmail }),
-      base44.entities.Payment.filter({ user_email: studentEmail }),
-      base44.entities.LessonProgress.filter({ user_email: studentEmail }),
-    ]);
-
-    const allDeletes = [
-      ...progressRecords.map(r => () => base44.entities.UserProgress.delete(r.id)),
-      ...subjectProgressRecords.map(r => () => base44.entities.SubjectProgress.delete(r.id)),
-      ...paymentRecords.map(r => () => base44.entities.Payment.delete(r.id)),
-      ...lessonProgressRecords.map(r => () => base44.entities.LessonProgress.delete(r.id)),
-    ];
-
-    for (const fn of allDeletes) {
-      await fn();
-      await sleep(150);
-    }
-
-    await base44.entities.User.delete(student.id);
+    await base44.functions.invoke('deleteUserCompletely', { user_email: studentEmail });
     window.location.href = createPageUrl('ManageStudents');
   };
 
