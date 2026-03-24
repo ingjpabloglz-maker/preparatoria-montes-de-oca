@@ -48,6 +48,7 @@
  * The mainPage value must match a key in the PAGES object exactly.
  */
 import AdminDashboard from './pages/AdminDashboard';
+import RoleRedirect from './components/common/RoleRedirect';
 import CourseMap from './pages/CourseMap';
 import Dashboard from './pages/Dashboard';
 import Lesson from './pages/Lesson';
