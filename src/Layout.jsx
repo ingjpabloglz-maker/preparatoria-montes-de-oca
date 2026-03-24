@@ -22,7 +22,8 @@ import {
   X,
   Users,
   FileText,
-  BarChart2
+  BarChart2,
+  MessageCircle
 } from "lucide-react";
 import GamificationHUD from "@/components/gamification/GamificationHUD";
 import AchievementToast from "@/components/gamification/AchievementToast";
@@ -91,6 +92,15 @@ export default function Layout({ children, currentPageName }) {
                     >
                       <span className="mr-1.5">🏆</span>
                       Recompensas
+                    </Button>
+                  </Link>
+                  <Link to="/Forum">
+                    <Button
+                      variant={currentPageName === 'Forum' || currentPageName === 'ForumThread' ? 'secondary' : 'ghost'}
+                      size="sm"
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Foro
                     </Button>
                   </Link>
                 </>
