@@ -178,12 +178,14 @@ function MultipleChoice({ options, selected, submitted, correct, onSelect }) {
         return (
           <button key={i} className={btnClass} onClick={() => !submitted && onSelect(option)} disabled={submitted}>
             <span className="flex items-center gap-3">
-              <span className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                isSelected && !submitted ? 'bg-blue-500 border-blue-500 text-white' : 'border-white/20 text-white/40'
-              }`}>
-                {String.fromCharCode(65 + i)}
-              </span>
-              <MathText text={option} />
+            <span className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+              isSelected && !submitted ? 'bg-blue-500 border-blue-500 text-white' : 'border-white/20 text-white/40'
+            }`}>
+              {String.fromCharCode(65 + i)}
+            </span>
+            <span className="prose prose-sm prose-invert max-w-none [&_.katex]:text-inherit [&_p]:my-0">
+              <MdMath>{option}</MdMath>
+            </span>
             </span>
           </button>
         );
