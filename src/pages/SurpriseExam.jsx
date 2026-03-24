@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle2, XCircle, Swords, Star, Droplets, ArrowLeft, Loader2, Zap } from 'lucide-react';
-import RichContentRenderer from '@/components/common/RichContentRenderer';
 import { Link } from 'react-router-dom';
 import { useSound } from '@/contexts/SoundContext';
 import { useUserEvent } from '@/hooks/useUserEvent';
+import RichContentRenderer from '@/components/common/RichContentRenderer';
 import confetti from 'canvas-confetti';
 
 export default function SurpriseExam() {
@@ -235,7 +235,9 @@ export default function SurpriseExam() {
                     : 'bg-white/5 border-white/10 text-white/40'
                 }`}
               >
-                {opt}
+                <span className="prose prose-sm prose-invert max-w-none [&_.katex]:text-inherit [&_p]:my-0">
+                  <RichContentRenderer content={opt} inline />
+                </span>
               </button>
             ))}
             {q.type === 'true_false' && ['Verdadero', 'Falso'].map((opt) => (
