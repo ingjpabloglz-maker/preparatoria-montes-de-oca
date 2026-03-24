@@ -7,12 +7,22 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  const body_params = await req.json().catch(() => ({}));
+  const testMode = body_params.testMode === true;
+
+  console.log("TEST MODE:", testMode);
+
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
   const MAX_EMAILS_PER_WEEK = 2;
 
-  const allProfiles = await base44.asServiceRole.entities.GamificationProfile.filter({});
-  const activeProfiles = allProfiles.filter(p => p.email_notifications_enabled !== false);
+  let allProfiles = await base44.asServiceRole.entities.GamificationProfile.filter({});
+  let activeProfiles = allProfiles.filter(p => p.email_notifications_enabled !== false);
+
+  // En modo test, filtrar solo el usuario de prueba
+  if (testMode) {
+    activeProfiles = activeProfiles.filter(u => u.user_email === "j1996ing@gmail.com");
+  }
 
   const templates = await base44.asServiceRole.entities.NotificationTemplate.filter({ active: true });
 
@@ -21,29 +31,44 @@ Deno.serve(async (req) => {
 
   for (const profile of activeProfiles) {
     const { user_email, last_study_date_normalized } = profile;
-    if (!last_study_date_normalized) continue;
+
+    console.log("Usuario evaluado:", user_email);
+
+    if (!last_study_date_normalized && !testMode) continue;
 
     // Calcular días inactivo
-    const lastDate = new Date(last_study_date_normalized);
+    const lastDate = last_study_date_normalized ? new Date(last_study_date_normalized) : new Date();
     const diffMs = today - lastDate;
-    const daysInactive = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const realDaysInactive = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    // En modo test forzar 3 días de inactividad
+    const daysInactive = testMode ? 3 : realDaysInactive;
+
+    console.log("Días inactivo:", daysInactive);
 
     // Solo enviar si inactivo 3+ días (primer día → notificación interna, no email)
     if (daysInactive < 3) { skipped++; continue; }
 
-    // Verificar cooldown y límite semanal
+    // Verificar cooldown y límite semanal (omitir en testMode)
     const recentLogs = await base44.asServiceRole.entities.NotificationLog.filter({ user_email });
     const lastLog = recentLogs.sort((a, b) => new Date(b.sent_date) - new Date(a.sent_date))[0];
 
-    if (lastLog?.cooldown_end_date && new Date(lastLog.cooldown_end_date) > today) {
-      skipped++; continue;
+    if (!testMode) {
+      if (lastLog?.cooldown_end_date && new Date(lastLog.cooldown_end_date) > today) {
+        skipped++; continue;
+      }
+
+      // Calcular emails enviados esta semana
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const emailsThisWeek = recentLogs.filter(l => new Date(l.sent_date) > weekAgo).length;
+      if (emailsThisWeek >= MAX_EMAILS_PER_WEEK) { skipped++; continue; }
     }
 
-    // Calcular emails enviados esta semana
+    // emailsThisWeek para el log (siempre calculado)
     const weekAgo = new Date(today);
     weekAgo.setDate(weekAgo.getDate() - 7);
     const emailsThisWeek = recentLogs.filter(l => new Date(l.sent_date) > weekAgo).length;
-    if (emailsThisWeek >= MAX_EMAILS_PER_WEEK) { skipped++; continue; }
 
     // Seleccionar plantilla
     let templateType = daysInactive >= 14 ? 'inactivity_14d'
@@ -66,6 +91,7 @@ Deno.serve(async (req) => {
       .replace(/{racha_previa}/g, profile.max_streak || 0);
 
     // Enviar email
+    console.log("Enviando email a:", user_email);
     await base44.asServiceRole.integrations.Core.SendEmail({
       to: user_email,
       subject,
