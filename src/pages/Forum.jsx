@@ -8,6 +8,7 @@ import { Plus, Search, MessageCircle } from "lucide-react";
 import ThreadCard from "@/components/forum/ThreadCard";
 import NewThreadForm from "@/components/forum/NewThreadForm";
 import { useUserEvent } from "@/hooks/useUserEvent";
+import { useEffect as _ue } from "react";
 
 export default function Forum() {
   const [user, setUser] = useState(null);
