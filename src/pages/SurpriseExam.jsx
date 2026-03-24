@@ -216,7 +216,9 @@ export default function SurpriseExam() {
         <div className="max-w-lg mx-auto p-4 sm:p-6 pt-8">
           {/* Pregunta */}
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 mb-5 border border-white/10">
-            <p className="text-white text-base sm:text-lg font-medium leading-relaxed">{q.question}</p>
+            <div className="text-white text-base sm:text-lg font-medium leading-relaxed prose prose-sm prose-invert max-w-none [&_.katex]:text-white [&_p]:my-0">
+              <RichContentRenderer content={q.question} inline />
+            </div>
           </div>
 
           {/* Opciones */}
