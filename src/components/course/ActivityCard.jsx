@@ -1,8 +1,24 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, ArrowRight } from "lucide-react";
-import MathText from '../math/MathText';
 import { useSound } from '@/contexts/SoundContext';
+
+function MdMath({ children, className = '' }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkMath]}
+      rehypePlugins={[rehypeKatex]}
+      components={{ p: ({ children }) => <span>{children}</span> }}
+      className={className}
+    >
+      {children || ''}
+    </ReactMarkdown>
+  );
+}
 
 export default function ActivityCard({ activity, activityNumber, totalActivities, onAnswer, onNext }) {
   const [selectedAnswer, setSelectedAnswer] = useState(null);
