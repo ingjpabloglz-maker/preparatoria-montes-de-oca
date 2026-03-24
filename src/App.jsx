@@ -10,6 +10,8 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { SoundProvider } from '@/contexts/SoundContext';
 import Rewards from './pages/Rewards';
 import SurpriseExam from './pages/SurpriseExam';
+import Forum from './pages/Forum';
+import ForumThread from './pages/ForumThread';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -63,6 +65,8 @@ const AuthenticatedApp = () => {
       ))}
       <Route path="/Rewards" element={<LayoutWrapper currentPageName="Rewards"><Rewards /></LayoutWrapper>} />
       <Route path="/SurpriseExam" element={<LayoutWrapper currentPageName="SurpriseExam"><SurpriseExam /></LayoutWrapper>} />
+      <Route path="/Forum" element={<LayoutWrapper currentPageName="Forum"><Forum /></LayoutWrapper>} />
+      <Route path="/Forum/thread/:id" element={<LayoutWrapper currentPageName="ForumThread"><ForumThread /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
