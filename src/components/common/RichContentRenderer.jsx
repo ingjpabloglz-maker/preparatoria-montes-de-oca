@@ -14,6 +14,9 @@ function normalizeLatex(text) {
     .replace(/\\\((.+?)\\\)/gs, '$$$1$$')
     // \[...\] → $$...$$
     .replace(/\\\[(.+?)\\\]/gs, '$$$$$1$$$$')
+    // \begin{...}...\end{...} sin delimitadores → $$...$$
+    .replace(/(?<!\$)(\\begin\{[a-zA-Z*]+\}[\s\S]*?\\end\{[a-zA-Z*]+\})(?!\$)/g,
+      (match) => `$$${match}$$`)
     // Paréntesis con comandos LaTeX comunes: (\frac...) → $\frac...$
     .replace(/\(\\(frac|sqrt|mathbb|sum|int|prod|lim|infty|cdot|times|div|pm|leq|geq|neq|approx|equiv|in|notin|subset|cup|cap|forall|exists|partial|nabla|alpha|beta|gamma|delta|theta|lambda|mu|pi|sigma|omega)[^)]*\)/g,
       (match) => `$${match.slice(1, -1)}$`);
