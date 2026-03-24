@@ -39,10 +39,10 @@ export default function GamificationHUD({ userEmail }) {
         <span>{profile.total_stars || 0}</span>
       </div>
 
-      {/* Nivel */}
+      {/* Rango XP */}
       <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-violet-100 text-violet-600 text-sm font-bold">
         <Zap className="w-4 h-4" />
-        <span>Nv.{profile.level || 1}</span>
+        <span>⚡{profile.level || 1}</span>
       </div>
     </Link>
   );

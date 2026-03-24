@@ -224,13 +224,9 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.GamificationProfile.create(gamUpdate);
   }
 
-  // Sincronizar UserProgress si hubo level up (en el nivel gamification, no en current_level del curso)
-  if (leveledUp && userProgressRecord) {
-    await base44.asServiceRole.entities.UserProgress.update(userProgressRecord.id, {
-      current_level: newLevel,
-      level_start_date: nowIso,
-    });
-  }
+  // NOTA: El nivel de XP (gamificación) es independiente del current_level académico.
+  // current_level en UserProgress SOLO se actualiza cuando el alumno avanza académicamente,
+  // no cuando sube de nivel por XP. Por eso NO se sincroniza aquí.
 
   // ─── 7. EVALUAR LOGROS ──────────────────────────────────────────────────────
   // Determinar todos los event_keys aplicables en este evento

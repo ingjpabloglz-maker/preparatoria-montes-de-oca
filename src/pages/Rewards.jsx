@@ -141,23 +141,23 @@ export default function Rewards() {
           </CardContent>
         </Card>
 
-        {/* Nivel y Progreso XP */}
+        {/* Rango XP */}
         <Card className="border-0 shadow-md">
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-full bg-violet-600 flex items-center justify-center text-white font-bold text-lg">
-                  {level}
+                  <Zap className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="font-bold text-gray-800">Nivel {level}</p>
+                  <p className="font-bold text-gray-800">⚡ Rango XP {level}</p>
                   <p className="text-xs text-gray-500">{xp} XP totales</p>
                 </div>
               </div>
               <p className="text-xs text-gray-400">{Math.max(0, xpInLevel)} / {xpNeeded} XP</p>
             </div>
             <Progress value={xpProgress} className="h-3" />
-            <p className="text-xs text-gray-400 mt-1">{xpProgress}% hacia el Nivel {level + 1}</p>
+            <p className="text-xs text-gray-400 mt-1">{xpProgress}% hacia el Rango {level + 1}</p>
           </CardContent>
         </Card>
 
