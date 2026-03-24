@@ -40,14 +40,17 @@ Deno.serve(async (req) => {
     // 4. Notificaciones
     await deleteAll('NotificationLog', { user_email });
 
-    // 5. Foro
-    await deleteAll('ForumThread', { author_email: user_email });
+    // 5. Pagos
+    await deleteAll('Payment', { user_email });
+
+    // 6. Foro — primero dependencias, luego hilos
     await deleteAll('ForumPost', { author_email: user_email });
     await deleteAll('ForumLike', { user_email });
     await deleteAll('ForumReport', { reported_by: user_email });
     await deleteAll('ForumPenalty', { user_email });
+    await deleteAll('ForumThread', { author_email: user_email });
 
-    // 6. Finalmente eliminar usuario
+    // 7. Finalmente eliminar usuario
     const users = await base44.asServiceRole.entities.User.filter({ email: user_email });
     if (users.length > 0) {
       await base44.asServiceRole.entities.User.delete(users[0].id);
