@@ -292,9 +292,39 @@ export default function LessonIntro({ lesson, activitiesCount, isMiniEval, alrea
     // Si no existe, generarla con IA y guardarla en la entidad para todos los usuarios
     setLoadingExplanation(true);
     base44.integrations.Core.InvokeLLM({
-      prompt: `Eres un tutor de matemáticas de preparatoria. La siguiente es la explicación corta de una lección llamada "${lesson.title}": "${lesson.explanation}". 
-Amplía esta explicación en 3-4 oraciones claras y didácticas para un estudiante de preparatoria. Incluye un ejemplo concreto si aplica. 
-Responde SOLO con el texto de la explicación ampliada, sin títulos ni listas.`
+      prompt: `Eres un profesor experto en educación media superior.
+
+Genera una explicación clara, estructurada y didáctica del tema: "${lesson.title}".
+
+Contexto base (amplía y mejora esto): "${lesson.explanation}"
+
+REQUISITOS:
+- Usa formato Markdown con subtítulos (##)
+- Párrafos cortos (máximo 3-4 líneas)
+- Incluye al menos un ejemplo claro
+- Explica paso a paso cuando sea necesario
+- Usa listas cuando ayuden a la claridad
+
+FORMATO OBLIGATORIO:
+## Concepto
+Explicación clara del tema
+
+## Ejemplo
+Ejemplo explicado paso a paso
+
+## Regla clave
+Resumen simple y directo
+
+MATEMÁTICAS (MUY IMPORTANTE):
+- USA SIEMPRE LaTeX para expresiones matemáticas
+- Fracciones: $\\frac{2}{3}$
+- Potencias: $x^2$
+- Raíces: $\\sqrt{2}$
+- Ecuaciones en línea: $ax + b = c$
+- NUNCA escribas: 2/3, sqrt(2), x^2 como texto plano
+- Si el tema es matemático, TODA expresión numérica debe estar en LaTeX
+
+LONGITUD: Completo pero conciso. No excedas 300 palabras.`
     }).then(result => {
       setEnrichedExplanation(result);
       // Guardar en la entidad para que otros usuarios no tengan que regenerarla
