@@ -87,6 +87,16 @@
   overflow-x: auto;
 }
 
+/* KaTeX styles */
+.katex {
+  font-size: 1.1em;
+}
+.katex-display {
+  margin: 0.75rem 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
