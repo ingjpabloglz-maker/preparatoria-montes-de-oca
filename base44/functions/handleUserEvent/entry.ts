@@ -1,5 +1,20 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
+// Zona horaria: America/Matamoros (UTC-6, sin horario de verano)
+const MATAMOROS_OFFSET_HOURS = -6;
+
+const getMatamorosLocalDate = () => {
+  const nowUtc = new Date();
+  return new Date(nowUtc.getTime() + (MATAMOROS_OFFSET_HOURS * 60 * 60 * 1000));
+};
+
+const getLocalDateString = (dateObj) => {
+  const y = dateObj.getUTCFullYear();
+  const m = (dateObj.getUTCMonth() + 1).toString().padStart(2, '0');
+  const d = dateObj.getUTCDate().toString().padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
