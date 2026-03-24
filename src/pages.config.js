@@ -82,7 +82,7 @@ export const PAGES = {
 }
 
 export const pagesConfig = {
-    mainPage: "AdminDashboard",
+    mainPage: "RoleRedirect",
     Pages: PAGES,
     Layout: __Layout,
 };
