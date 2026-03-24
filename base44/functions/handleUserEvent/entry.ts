@@ -77,7 +77,8 @@ Deno.serve(async (req) => {
   // ─── 6. ACTUALIZAR GAMIFICATION ─────────────────────────────────────────────
   const gamArr = await base44.asServiceRole.entities.GamificationProfile.filter({ user_email });
   let gam = gamArr[0] || null;
-  const today = new Date().toISOString().split('T')[0];
+  const matamorosNow = getMatamorosLocalDate();
+  const today = getLocalDateString(matamorosNow);
 
   // Para surprise_exam_completed, el score viene en event_data
   // XP = score * 0.5, water = floor(score / 20), como calculaba submitSurpriseExam
