@@ -154,12 +154,11 @@ Deno.serve(async (req) => {
 
   // ─── META SEMANAL ─────────────────────────────────────────────────────────────
   // Obtener inicio de semana actual (lunes)
-  const nowDate = new Date();
-  const dayOfWeek = nowDate.getDay(); // 0=Dom, 1=Lun ... 6=Sab
+  const dayOfWeek = matamorosNow.getUTCDay(); // día local Matamoros
   const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
-  const thisMonday = new Date(nowDate);
-  thisMonday.setDate(nowDate.getDate() + diffToMonday);
-  const thisMondayStr = thisMonday.toISOString().split('T')[0];
+  const thisMonday = new Date(matamorosNow);
+  thisMonday.setUTCDate(matamorosNow.getUTCDate() + diffToMonday);
+  const thisMondayStr = getLocalDateString(thisMonday);
 
   let weeklyProgress = gam?.weekly_goal_progress ?? 0;
   const weeklyTarget = gam?.weekly_goal_target ?? 10;
