@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, Trophy, XCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import MathText from '../math/MathText';
+import RichContentRenderer from '../common/RichContentRenderer';
 
 function shuffleAndPick(arr, n) {
   const shuffled = [...arr].sort(() => Math.random() - 0.5);
