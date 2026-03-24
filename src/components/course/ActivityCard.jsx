@@ -119,13 +119,15 @@ export default function ActivityCard({ activity, activityNumber, totalActivities
               {isCorrect ? '¡Correcto!' : 'Incorrecto'}
             </span>
             {!isCorrect && (
-              <span className="text-white/60 text-xs ml-1">
-                Respuesta: <span className="text-white/90 font-medium"><MathText text={activity.correct_answer} /></span>
+              <span className="text-white/60 text-xs ml-1 inline-flex items-center gap-1">
+                Respuesta: <span className="text-white/90 font-medium"><MdMath>{activity.correct_answer}</MdMath></span>
               </span>
             )}
           </div>
           {activity.explanation && (
-            <p className="text-white/70 text-xs leading-relaxed"><MathText text={activity.explanation} /></p>
+            <div className="text-white/75 text-xs leading-relaxed mt-1 prose prose-sm prose-invert max-w-none [&_.katex]:text-white/90 [&_p]:my-0.5 [&_h2]:text-xs [&_h2]:font-bold [&_ul]:my-0.5 [&_li]:my-0">
+              <MdMath>{activity.explanation}</MdMath>
+            </div>
           )}
         </div>
       )}
