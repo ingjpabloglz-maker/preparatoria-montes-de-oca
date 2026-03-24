@@ -4,9 +4,10 @@ import { CheckCircle2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import RoleBadge from "./RoleBadge";
+import ReportButton from "./ReportButton";
 import ReactMarkdown from "react-markdown";
 
-export default function PostCard({ post, canMarkSolution, onMarkSolution, threadStatus }) {
+export default function PostCard({ post, canMarkSolution, onMarkSolution, threadStatus, currentUserEmail }) {
   const timeAgo = formatDistanceToNow(new Date(post.created_date), { addSuffix: true, locale: es });
 
   return (
@@ -27,17 +28,25 @@ export default function PostCard({ post, canMarkSolution, onMarkSolution, thread
             <RoleBadge role={post.author_role} />
             <span>{timeAgo}</span>
           </div>
-          {canMarkSolution && !post.is_solution && threadStatus !== "closed" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onMarkSolution(post.id)}
-              className="text-green-600 border-green-300 hover:bg-green-50 text-xs"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-              Marcar solución
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {currentUserEmail && post.author_email !== currentUserEmail && (
+              <ReportButton
+                postId={post.id}
+                reportedBy={currentUserEmail}
+              />
+            )}
+            {canMarkSolution && !post.is_solution && threadStatus !== "closed" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onMarkSolution(post.id)}
+                className="text-green-600 border-green-300 hover:bg-green-50 text-xs"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                Marcar solución
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
