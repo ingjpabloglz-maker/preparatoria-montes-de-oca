@@ -92,12 +92,16 @@ Deno.serve(async (req) => {
     subject_test_passed: 100,
     activity_submitted: 5,
     surprise_exam_completed: Math.round(score * 0.5),
+    forum_thread_created: 10,
+    forum_post_created: 5,
+    forum_solution_earned: 25,
   };
   const STARS_MAP = {
     lesson_completed: 1,
     mini_eval_passed: 2,
     subject_test_passed: 3,
     surprise_exam_completed: 0,
+    forum_solution_earned: 1,
   };
   const WATER_MAP = {
     lesson_completed: 1,
