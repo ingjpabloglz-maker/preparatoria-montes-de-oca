@@ -8,28 +8,26 @@ import { Plus, Search, MessageCircle } from "lucide-react";
 import ThreadCard from "@/components/forum/ThreadCard";
 import NewThreadForm from "@/components/forum/NewThreadForm";
 import { useUserEvent } from "@/hooks/useUserEvent";
-import { useEffect as _ue } from "react";
 
 export default function Forum() {
   const [user, setUser] = useState(null);
-  const [userProgress, setUserProgress] = useState(null);
+  const [userLevel, setUserLevel] = useState(1);
   const [showNewThread, setShowNewThread] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("recent");
   const queryClient = useQueryClient();
-  const { fireEvent } = useUserEvent();
 
   useEffect(() => {
     const load = async () => {
       const u = await base44.auth.me();
       setUser(u);
       const prog = await base44.entities.UserProgress.filter({ user_email: u.email });
-      setUserProgress(prog?.[0] || null);
+      setUserLevel(prog?.[0]?.current_level || 1);
     };
     load();
   }, []);
 
-  const userLevel = userProgress?.current_level || 1;
+  const { dispatchUserEvent } = useUserEvent(user?.email);
 
   const { data: threads = [], isLoading } = useQuery({
     queryKey: ["forumThreads"],
@@ -39,47 +37,42 @@ export default function Forum() {
 
   const createMutation = useMutation({
     mutationFn: async ({ title, content, level_required }) => {
-      const now = new Date().toISOString();
       return base44.entities.ForumThread.create({
         title,
         content,
         author_email: user.email,
         author_name: user.full_name,
-        author_role: user.role === "admin" ? "admin" : (user.role === "teacher" ? "teacher" : "student"),
+        author_role: user.role === "admin" ? "admin" : user.role === "teacher" ? "teacher" : "student",
         level_required,
         status: "open",
         views_count: 0,
         replies_count: 0,
-        last_activity_at: now,
+        last_activity_at: new Date().toISOString(),
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["forumThreads"] });
       setShowNewThread(false);
-      fireEvent("forum_thread_created");
+      dispatchUserEvent("forum_thread_created").catch(() => {});
     },
   });
 
-  // Filtrar por nivel y búsqueda
   const filtered = threads
-    .filter(t => t.level_required <= userLevel)
+    .filter(t => (t.level_required || 1) <= userLevel)
     .filter(t => {
       if (!search) return true;
-      return (
-        t.title?.toLowerCase().includes(search.toLowerCase()) ||
-        t.content?.toLowerCase().includes(search.toLowerCase())
-      );
+      const q = search.toLowerCase();
+      return t.title?.toLowerCase().includes(q) || t.content?.toLowerCase().includes(q);
     })
     .filter(t => {
       if (filter === "unanswered") return (t.replies_count || 0) === 0;
       if (filter === "resolved") return t.status === "resolved";
-      return true; // recent: all
+      return true;
     });
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -96,7 +89,6 @@ export default function Forum() {
           )}
         </div>
 
-        {/* New Thread Form */}
         {showNewThread && (
           <NewThreadForm
             onSubmit={(data) => createMutation.mutate(data)}
@@ -106,7 +98,6 @@ export default function Forum() {
           />
         )}
 
-        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -126,12 +117,9 @@ export default function Forum() {
           </Tabs>
         </div>
 
-        {/* Thread List */}
         {isLoading ? (
           <div className="space-y-3">
-            {[1,2,3].map(i => (
-              <div key={i} className="h-24 bg-gray-200 rounded-xl animate-pulse" />
-            ))}
+            {[1,2,3].map(i => <div key={i} className="h-24 bg-gray-200 rounded-xl animate-pulse" />)}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">

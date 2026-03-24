@@ -14,11 +14,10 @@ import PostCard from "@/components/forum/PostCard";
 import NewPostForm from "@/components/forum/NewPostForm";
 import { useUserEvent } from "@/hooks/useUserEvent";
 
-export default function ForumThreadPage() {
+export default function ForumThread() {
   const { id } = useParams();
   const [user, setUser] = useState(null);
   const queryClient = useQueryClient();
-  const { fireEvent } = useUserEvent();
 
   useEffect(() => {
     const load = async () => {
@@ -28,15 +27,15 @@ export default function ForumThreadPage() {
     load();
   }, []);
 
-  // Incrementar vistas al cargar
+  const { dispatchUserEvent } = useUserEvent(user?.email);
+
+  // Incrementar vistas
   useEffect(() => {
-    if (id) {
-      base44.entities.ForumThread.update(id, { views_count: undefined }).catch(() => {});
-      // Incremento real: fetch + update
-      base44.entities.ForumThread.filter({ id }).then(([t]) => {
-        if (t) base44.entities.ForumThread.update(id, { views_count: (t.views_count || 0) + 1 });
-      }).catch(() => {});
-    }
+    if (!id) return;
+    base44.entities.ForumThread.filter({ id }).then((results) => {
+      const t = results?.[0];
+      if (t) base44.entities.ForumThread.update(id, { views_count: (t.views_count || 0) + 1 });
+    }).catch(() => {});
   }, [id]);
 
   const { data: thread, isLoading: loadingThread } = useQuery({
@@ -56,19 +55,18 @@ export default function ForumThreadPage() {
 
   const replyMutation = useMutation({
     mutationFn: async (content) => {
-      const post = await base44.entities.ForumPost.create({
+      await base44.entities.ForumPost.create({
         thread_id: id,
         content,
         author_email: user.email,
         author_name: user.full_name,
-        author_role: user.role === "admin" ? "admin" : (user.role === "teacher" ? "teacher" : "student"),
+        author_role: user.role === "admin" ? "admin" : user.role === "teacher" ? "teacher" : "student",
         is_solution: false,
       });
       await base44.entities.ForumThread.update(id, {
         replies_count: (thread?.replies_count || 0) + 1,
         last_activity_at: new Date().toISOString(),
       });
-      // Notificación al autor del hilo si no es él mismo respondiendo
       if (thread?.author_email && thread.author_email !== user.email) {
         base44.entities.NotificationLog.create({
           user_email: thread.author_email,
@@ -77,26 +75,23 @@ export default function ForumThreadPage() {
           status: "sent",
         }).catch(() => {});
       }
-      return post;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["forumPosts", id] });
       queryClient.invalidateQueries({ queryKey: ["forumThread", id] });
-      fireEvent("forum_post_created");
+      dispatchUserEvent("forum_post_created").catch(() => {});
     },
   });
 
   const solutionMutation = useMutation({
     mutationFn: async (postId) => {
-      // Quitar solución anterior si la hay
       const prevSolution = posts.find(p => p.is_solution);
       if (prevSolution) {
         await base44.entities.ForumPost.update(prevSolution.id, { is_solution: false });
       }
+      const solutionPost = posts.find(p => p.id === postId);
       await base44.entities.ForumPost.update(postId, { is_solution: true });
       await base44.entities.ForumThread.update(id, { status: "resolved" });
-      // Notificación al autor de la respuesta
-      const solutionPost = posts.find(p => p.id === postId);
       if (solutionPost?.author_email && solutionPost.author_email !== user.email) {
         base44.entities.NotificationLog.create({
           user_email: solutionPost.author_email,
@@ -104,13 +99,12 @@ export default function ForumThreadPage() {
           sent_date: new Date().toISOString(),
           status: "sent",
         }).catch(() => {});
-        // XP bonus al autor de la solución - no tenemos su evento directo, se registra sólo
       }
-      fireEvent("forum_solution_earned");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["forumPosts", id] });
       queryClient.invalidateQueries({ queryKey: ["forumThread", id] });
+      dispatchUserEvent("forum_solution_earned").catch(() => {});
     },
   });
 
@@ -125,9 +119,7 @@ export default function ForumThreadPage() {
   });
 
   const canManage = user?.role === "admin" || user?.role === "teacher";
-  const isAuthor = user?.email === thread?.author_email;
   const isClosed = thread?.status === "closed";
-  const isResolved = thread?.status === "resolved";
 
   if (loadingThread) {
     return (
@@ -149,13 +141,12 @@ export default function ForumThreadPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto p-6 space-y-6">
-        {/* Back */}
         <Link to="/Forum" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
           <ArrowLeft className="w-4 h-4" />
           Volver al foro
         </Link>
 
-        {/* Thread */}
+        {/* Hilo principal */}
         <Card className="border-0 shadow-md">
           <CardContent className="p-6">
             <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -172,26 +163,16 @@ export default function ForumThreadPage() {
                 <RoleBadge role={thread.author_role} />
                 <span>{formatDistanceToNow(new Date(thread.created_date), { addSuffix: true, locale: es })}</span>
               </div>
-              {(canManage || isAuthor) && (
+              {canManage && (
                 <div className="flex gap-2">
-                  {!isClosed && !isResolved && canManage && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => closeMutation.mutate()}
-                      className="text-xs text-gray-600"
-                    >
+                  {!isClosed && thread.status !== "resolved" && (
+                    <Button variant="outline" size="sm" onClick={() => closeMutation.mutate()} className="text-xs text-gray-600">
                       <Lock className="w-3.5 h-3.5 mr-1" />
                       Cerrar hilo
                     </Button>
                   )}
-                  {isClosed && canManage && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => reopenMutation.mutate()}
-                      className="text-xs text-green-600 border-green-300"
-                    >
+                  {isClosed && (
+                    <Button variant="outline" size="sm" onClick={() => reopenMutation.mutate()} className="text-xs text-green-600 border-green-300">
                       Reabrir
                     </Button>
                   )}
@@ -201,7 +182,7 @@ export default function ForumThreadPage() {
           </CardContent>
         </Card>
 
-        {/* Posts */}
+        {/* Respuestas */}
         <div>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             {posts.length} {posts.length === 1 ? "Respuesta" : "Respuestas"}
@@ -227,7 +208,7 @@ export default function ForumThreadPage() {
           )}
         </div>
 
-        {/* Reply Form */}
+        {/* Formulario de respuesta */}
         {!isClosed ? (
           <Card className="border-0 shadow-md">
             <CardContent className="p-4">
@@ -235,7 +216,6 @@ export default function ForumThreadPage() {
               <NewPostForm
                 onSubmit={(content) => replyMutation.mutate(content)}
                 isSubmitting={replyMutation.isPending}
-                disabled={false}
               />
             </CardContent>
           </Card>
