@@ -116,9 +116,9 @@ Deno.serve(async (req) => {
   if (gam) {
     const lastDate = gam.last_study_date_normalized;
     if (lastDate) {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const matamorosYesterday = new Date(matamorosNow);
+      matamorosYesterday.setUTCDate(matamorosYesterday.getUTCDate() - 1);
+      const yesterdayStr = getLocalDateString(matamorosYesterday);
 
       if (lastDate === yesterdayStr) {
         newStreakDays = (gam.streak_days || 0) + 1;
