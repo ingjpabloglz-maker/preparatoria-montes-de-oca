@@ -80,6 +80,7 @@ export default function Forum() {
     });
 
   return (
+    <LevelAccessGuard>
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

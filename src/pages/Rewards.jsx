@@ -67,6 +67,7 @@ export default function Rewards() {
   const canDoExam = profile?.last_surprise_exam_date_normalized !== today;
 
   return (
+    <LevelAccessGuard>
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-violet-50 p-4 sm:p-6">
       <div className="max-w-5xl mx-auto space-y-6">
 
