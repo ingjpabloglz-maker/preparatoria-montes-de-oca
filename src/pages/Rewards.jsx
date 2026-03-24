@@ -239,5 +239,6 @@ export default function Rewards() {
         </div>
       </div>
     </div>
+    </LevelAccessGuard>
   );
 }
