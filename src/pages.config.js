@@ -65,6 +65,7 @@ import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "RoleRedirect": RoleRedirect,
     "AdminDashboard": AdminDashboard,
     "CourseMap": CourseMap,
     "Dashboard": Dashboard,
