@@ -72,6 +72,15 @@ export default function ActivityCard({ activity, activityNumber, totalActivities
         <div className="text-white text-base sm:text-lg font-medium leading-relaxed prose prose-sm prose-invert max-w-none [&_.katex]:text-white [&_p]:my-0">
           <MdMath>{activity.question}</MdMath>
         </div>
+        {/* Imagen educativa de la actividad */}
+        {activity.visual_url && (
+          <img
+            src={activity.visual_url}
+            alt="Imagen de la actividad"
+            loading="lazy"
+            className="w-full rounded-xl mt-3 border border-white/10 object-contain max-h-56"
+          />
+        )}
       </div>
 
       {/* Answer Area */}

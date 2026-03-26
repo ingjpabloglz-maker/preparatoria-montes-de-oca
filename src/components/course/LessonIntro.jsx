@@ -284,12 +284,24 @@ export default function LessonIntro({ lesson, activitiesCount, isMiniEval, alrea
   const [enrichedExplanation, setEnrichedExplanation] = useState(null);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
 
+  const [lessonVisuals, setLessonVisuals] = useState([]); // [{prompt, url, position}]
+  const [loadingVisuals, setLoadingVisuals] = useState(false);
+
   useEffect(() => {
     if (!lesson?.explanation || isMiniEval) return;
 
     // Si ya existe una explicación cacheada en la entidad, usarla directamente
     if (lesson.ai_explanation) {
-      setEnrichedExplanation(lesson.ai_explanation);
+      try {
+        const parsed = JSON.parse(lesson.ai_explanation);
+        setEnrichedExplanation(parsed.explanation || lesson.ai_explanation);
+        if (parsed.visuals?.length) {
+          // Generar imágenes si no están cacheadas
+          generateVisuals(parsed.visuals);
+        }
+      } catch {
+        setEnrichedExplanation(lesson.ai_explanation);
+      }
       return;
     }
 
@@ -328,15 +340,66 @@ MATEMÁTICAS (MUY IMPORTANTE):
 - NUNCA escribas: 2/3, sqrt(2), x^2 como texto plano
 - Si el tema es matemático, TODA expresión numérica debe estar en LaTeX
 
-LONGITUD: Completo pero conciso. No excedas 300 palabras.`
+LONGITUD: Completo pero conciso. No excedas 300 palabras.
+
+APOYOS VISUALES:
+Además del texto, si el tema se beneficia de una imagen educativa, incluye hasta 2 visuales.
+Devuelve tu respuesta en formato JSON con esta estructura exacta:
+{
+  "explanation": "texto completo en Markdown",
+  "visuals": [
+    {
+      "prompt": "descripción detallada en inglés para generar la imagen educativa. Debe ser clara, educativa, sin texto dentro de la imagen. Ejemplo: 'Clean educational diagram showing the real number line with natural, integer, rational and real number sets illustrated as nested circles on white background'",
+      "position": "after_explanation"
+    }
+  ]
+}
+Si no hay visuals necesarios, devuelve "visuals": [].
+IMPORTANTE: devuelve SOLO el JSON, sin bloques de código markdown.`,
+      response_json_schema: {
+        type: "object",
+        properties: {
+          explanation: { type: "string" },
+          visuals: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                prompt: { type: "string" },
+                position: { type: "string" }
+              }
+            }
+          }
+        }
+      }
     }).then(result => {
-      setEnrichedExplanation(result);
+      const explanation = result?.explanation || lesson.explanation;
+      const visuals = result?.visuals || [];
+      setEnrichedExplanation(explanation);
+      if (visuals.length) generateVisuals(visuals);
       // Guardar en la entidad para que otros usuarios no tengan que regenerarla
-      base44.entities.CourseLesson.update(lesson.id, { ai_explanation: result });
+      base44.entities.CourseLesson.update(lesson.id, { ai_explanation: JSON.stringify({ explanation, visuals }) });
     }).finally(() => {
       setLoadingExplanation(false);
     });
   }, [lesson?.id]);
+
+  const generateVisuals = async (visuals) => {
+    if (!visuals?.length) return;
+    setLoadingVisuals(true);
+    const generated = await Promise.all(
+      visuals.slice(0, 2).map(async (v) => {
+        try {
+          const res = await base44.integrations.Core.GenerateImage({ prompt: v.prompt });
+          return { ...v, url: res?.url || null };
+        } catch {
+          return { ...v, url: null };
+        }
+      })
+    );
+    setLessonVisuals(generated.filter(v => v.url));
+    setLoadingVisuals(false);
+  };
 
   return (
     <div className="flex flex-col items-center text-center py-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -389,6 +452,22 @@ LONGITUD: Completo pero conciso. No excedas 300 palabras.`
               </ReactMarkdown>
             </div>
           )}
+          {/* Imágenes educativas generadas por IA */}
+          {loadingVisuals && (
+            <div className="flex items-center gap-2 text-white/40 text-xs mt-3">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span>Generando apoyos visuales...</span>
+            </div>
+          )}
+          {lessonVisuals.map((v, i) => (
+            <img
+              key={i}
+              src={v.url}
+              alt="Apoyo visual educativo"
+              loading="lazy"
+              className="w-full rounded-xl mt-3 border border-white/10 object-contain max-h-64"
+            />
+          ))}
         </div>
       )}
 
