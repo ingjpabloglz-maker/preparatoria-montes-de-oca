@@ -26,8 +26,27 @@ Deno.serve(async (req) => {
     const lastDate = new Date(last_study_date_normalized);
     const daysInactive = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
 
-    // Solo enviar si inactivo 3+ días
-    if (daysInactive < 3) { skipped++; continue; }
+    console.log(`Usuario ${user_email} con ${daysInactive} días inactivo`);
+
+    // Seleccionar plantilla según días exactos de inactividad
+    let templateKey = null;
+
+    if (daysInactive === 1) {
+      templateKey = 'inactivity_1d';
+    } else if (daysInactive === 3) {
+      templateKey = 'inactivity_3d';
+    } else if (daysInactive === 5) {
+      templateKey = 'inactivity_5d';
+    } else if (daysInactive === 7) {
+      templateKey = 'inactivity_7d';
+    } else if (daysInactive > 7 && daysInactive % 7 === 0) {
+      templateKey = 'inactivity_weekly';
+    }
+
+    console.log(`Plantilla seleccionada: ${templateKey}`);
+
+    // Si no hay plantilla para este día exacto, omitir
+    if (!templateKey) { skipped++; continue; }
 
     // Verificar cooldown y límite semanal
     const recentLogs = await base44.asServiceRole.entities.NotificationLog.filter({ user_email });
@@ -42,17 +61,7 @@ Deno.serve(async (req) => {
     const emailsThisWeek = recentLogs.filter(l => new Date(l.sent_date) > weekAgo).length;
     if (emailsThisWeek >= MAX_EMAILS_PER_WEEK) { skipped++; continue; }
 
-    // Seleccionar plantilla según días inactivo
-    let templateId;
-    if (daysInactive >= 7) {
-      templateId = 'inactivity_weekly';
-    } else {
-      templateId = `inactivity_${daysInactive}d`;
-    }
-
-    let template = templates.find(t => t.template_id === templateId);
-    // Fallback: plantilla más cercana disponible
-    if (!template) template = templates.find(t => t.template_id === 'inactivity_3d');
+    let template = templates.find(t => t.template_id === templateKey);
     if (!template) { skipped++; continue; }
 
     // Obtener nombre del usuario
