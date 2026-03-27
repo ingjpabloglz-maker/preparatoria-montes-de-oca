@@ -3,156 +3,74 @@ import { useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { ASSISTANT_EVENT_KEY, getAssistantQueue, clearAssistantQueue, setAssistantActive } from '@/lib/assistantEvents';
 
-// ─── MENSAJES PASIVOS ─────────────────────────────────────────────────────────
+// ─── UTILIDADES ───────────────────────────────────────────────────────────────
 
-const PASSIVE_MESSAGES = {
-  greeting_morning: [
-    "🌞 ¡Buenos días! Hoy es un gran día para aprender",
-    "☀️ Empezar temprano te da ventaja, vamos 💪",
-    "📚 Un poco de estudio ahora hará tu día mejor",
-    "🔥 Mantén tu racha viva desde temprano",
-  ],
-  greeting_afternoon: [
-    "👋 ¿Listo para continuar donde te quedaste?",
-    "⚡ Aún estás a tiempo de avanzar hoy",
-    "💡 ¿Qué tal una lección rápida?",
-    "🎯 Sigues en buen ritmo, no lo pierdas",
-  ],
-  greeting_night: [
-    "🌙 Cerrar el día aprendiendo es una gran decisión",
-    "🔥 No dejes que tu racha se rompa hoy",
-    "📚 Un último esfuerzo antes de descansar",
-    "💪 Los que avanzan hoy, lideran mañana",
-  ],
-  streak_risk: [
-    "⚠️ Tu racha está en riesgo, estudia hoy para salvarla",
-    "🔥 No dejes que se pierda tu progreso",
-    "🚨 Última oportunidad para conservar tu racha",
-  ],
-  streak_lost: [
-    "😢 Perdiste tu racha, pero puedes empezar otra hoy",
-    "🔁 Cada inicio es una nueva oportunidad",
-    "💪 No te detengas, retoma el ritmo",
-  ],
-  tree_water: [
-    "💧 Tienes agua disponible para tu árbol",
-    "🌳 Tu árbol puede crecer ahora mismo",
-    "🌱 Dale vida a tu progreso",
-  ],
-  xp_level: [
-    "🔥 Estás cerca de subir de nivel",
-    "🏆 El siguiente nivel está cerca",
-    "💥 Ese nivel ya casi es tuyo",
-  ],
-  challenge_available: [
-    "🎯 Tienes un desafío diario disponible",
-    "⚡ Es una gran oportunidad para ganar XP",
-    "🏆 No dejes pasar el desafío de hoy",
-  ],
-  onboarding: [
-    "👋 ¡Bienvenido! Aquí puedes ver tu progreso diario",
-    "🔥 Mantén tu racha estudiando todos los días",
-    "🌳 Usa tus tokens de agua para hacer crecer tu árbol",
-    "⭐ Gana estrellas completando actividades",
-    "🎯 Completa el desafío diario para ganar XP extra",
-  ],
-};
+function buildContext(profile) {
+  const today = new Date().toISOString().split('T')[0];
+  const xp = profile?.xp_points || 0;
+  const level = Math.max(1, Math.floor(Math.sqrt(xp / 10)));
+  const nextLevelXP = Math.pow(level + 1, 2) * 10;
+  const progressToNextLevel = Math.min(100, Math.round((xp / nextLevelXP) * 100));
+  const streakDays = profile?.streak_days || 0;
+  const todayStudied = profile?.last_study_date_normalized === today;
+  const examDoneToday = profile?.last_surprise_exam_date_normalized === today;
+  const waterTokens = profile?.water_tokens || 0;
+  const weeklyGoal = profile?.weekly_goal_target || 10;
+  const weeklyProgress = profile?.weekly_goal_progress || 0;
+  const weeklyPercent = Math.min(100, Math.round((weeklyProgress / weeklyGoal) * 100));
+
+  return {
+    today, xp, level, nextLevelXP, progressToNextLevel,
+    streakDays, todayStudied, examDoneToday,
+    waterTokens, weeklyGoal, weeklyProgress, weeklyPercent,
+  };
+}
 
 // ─── MENSAJES DE LOGIN ────────────────────────────────────────────────────────
 
 function buildLoginMessage(payload) {
   const { name, profile } = payload || {};
+  if (!profile) return { text: 'Bienvenido de nuevo, sigue avanzando hoy 🚀', type: 'login', isReactive: true, duration: 10000 };
+
   const firstName = name?.split(' ')[0] || 'estudiante';
   const hour = new Date().getHours();
-  const streakDays = profile?.streak_days || 0;
-  const examDone = profile?.last_surprise_exam_date_normalized === new Date().toISOString().split('T')[0];
-  const waterTokens = profile?.water_tokens || 0;
+  const ctx = buildContext(profile);
 
-  let greeting = '👋';
-  if (hour >= 5 && hour < 12) greeting = '🌞 ¡Buenos días';
-  else if (hour >= 12 && hour < 19) greeting = '☀️ ¡Buenas tardes';
-  else greeting = '🌙 ¡Buenas noches';
+  let saludo = '';
+  if (hour >= 5 && hour < 12) saludo = `🌞 ¡Buenos días, ${firstName}!`;
+  else if (hour >= 12 && hour < 19) saludo = `☀️ ¡Buenas tardes, ${firstName}!`;
+  else saludo = `🌙 ¡Buenas noches, ${firstName}!`;
 
-  let text = `${greeting}, ${firstName}!`;
+  let texto = saludo;
 
-  if (streakDays >= 3) {
-    text += ` 🔥 Llevas ${streakDays} días de racha, ¡no la pierdas hoy!`;
-  } else if (streakDays === 1) {
-    text += ` Tienes 1 día de racha, ¡sigue así!`;
-  } else if (!examDone) {
-    text += ` 🎯 Tienes el desafío diario disponible. ¡Gana XP!`;
-  } else if (waterTokens > 0) {
-    text += ` 💧 Tienes ${waterTokens} token${waterTokens > 1 ? 's' : ''} de agua para regar tu árbol.`;
+  // Prioridad 1: racha en riesgo (tiene racha pero no estudió hoy)
+  if (ctx.streakDays > 0 && !ctx.todayStudied) {
+    texto += ` 🔥 Tu racha de ${ctx.streakDays} día${ctx.streakDays > 1 ? 's' : ''} está en riesgo, ¡estudia hoy!`;
+  // Prioridad 2: tiene racha activa
+  } else if (ctx.streakDays >= 2) {
+    texto += ` 🔥 Llevas ${ctx.streakDays} días de racha, ¡no la pierdas!`;
+  // Prioridad 3: desafío disponible
+  } else if (!ctx.examDoneToday) {
+    texto += ` 🎯 Tienes el desafío diario disponible. ¡Gana XP extra!`;
+  // Prioridad 4: árbol sin regar
+  } else if (ctx.waterTokens > 0) {
+    texto += ` 💧 Tienes ${ctx.waterTokens} token${ctx.waterTokens > 1 ? 's' : ''} de agua para regar tu árbol.`;
+  // Prioridad 5: cerca de subir de nivel
+  } else if (ctx.progressToNextLevel >= 75) {
+    texto += ` ⚡ Estás al ${ctx.progressToNextLevel}% del siguiente nivel, ¡ya casi!`;
   } else {
-    text += ` Listo para aprender hoy? 📚`;
+    texto += ` Listo para seguir aprendiendo hoy 📚`;
   }
 
-  return { text, type: 'login', isReactive: true, duration: 10000 };
+  return { text: texto, type: 'login', isReactive: true, duration: 12000 };
 }
-
-// ─── MENSAJES REACTIVOS ───────────────────────────────────────────────────────
-
-const REACTIVE_MESSAGES = {
-  lesson_completed: [
-    "📚 ¡Lección completada!",
-    "💪 Buen trabajo, sigue así",
-    "🔥 Una más y tu racha se fortalece",
-    "✅ Gran avance hoy",
-  ],
-  quiz_perfect_score: [
-    "💯 ¡Perfecto! Sin errores",
-    "🏆 Nivel experto",
-    "🔥 Así se hace",
-    "⭐ ¡Impecable!",
-  ],
-  xp_gained: [
-    "⚡ ¡XP ganado!",
-    "📈 Tu progreso aumenta",
-    "🚀 Cada vez más fuerte",
-    "💥 Sigue acumulando",
-  ],
-  level_up: [
-    "🎉 ¡Subiste de nivel!",
-    "🏆 Nuevo nivel desbloqueado",
-    "🔥 Esto se pone interesante",
-    "🚀 ¡Increíble progreso!",
-  ],
-  tree_watered: [
-    "💧 Tu árbol crece",
-    "🌱 Se ve más fuerte",
-    "🌳 Gran progreso",
-    "🍃 ¡Lo cuidas muy bien!",
-  ],
-  streak_updated: [
-    "🔥 ¡Racha activa!",
-    "💪 No la pierdas",
-    "⚡ Excelente constancia",
-    "📈 Tu racha sigue creciendo",
-  ],
-  streak_lost: [
-    "😢 Se perdió la racha",
-    "🔁 Pero puedes empezar hoy",
-    "💪 No te rindas",
-  ],
-  daily_exam_completed: [
-    "🎯 ¡Desafío completado!",
-    "🏆 Buen extra de XP",
-    "🔥 Vas con todo hoy",
-    "⚡ ¡Excelente desafío!",
-  ],
-  achievement_unlocked: [
-    "🏆 ¡Nuevo logro desbloqueado!",
-    "🎖️ Bien ganado",
-    "✨ Sigue así",
-    "🌟 ¡Un nuevo mérito!",
-  ],
-};
 
 // ─── DURACIÓN POR TIPO ────────────────────────────────────────────────────────
 
 const REACTIVE_DURATION = {
   level_up: 20000,
   achievement_unlocked: 18000,
+  daily_exam_completed: 14000,
   default: 12000,
 };
 
@@ -162,69 +80,141 @@ function pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// ─── MENSAJES REACTIVOS (dinámicos con payload real) ─────────────────────────
+
 function buildReactiveMessage(eventType, payload) {
-  const msgs = REACTIVE_MESSAGES[eventType];
-  if (!msgs) return null;
+  let text = null;
 
-  let text = pickRandom(msgs);
+  switch (eventType) {
+    case 'lesson_completed':
+      text = payload?.lessonTitle
+        ? `📚 Lección "${payload.lessonTitle}" completada ✅`
+        : `📚 ¡Lección completada! Sigue así 💪`;
+      break;
+    case 'quiz_perfect_score':
+      text = `💯 ¡Puntuación perfecta! Sin errores 🏆`;
+      break;
+    case 'xp_gained':
+      text = payload?.xp ? `⚡ +${payload.xp} XP ganados` : null;
+      break;
+    case 'level_up':
+      text = payload?.level ? `🎉 ¡Subiste al Nivel ${payload.level}!` : `🎉 ¡Subiste de nivel!`;
+      break;
+    case 'tree_watered':
+      text = payload?.stage !== undefined
+        ? `💧 ¡Árbol regado! Etapa ${payload.stage} 🌱`
+        : `💧 Tu árbol ha crecido 🌳`;
+      break;
+    case 'streak_updated':
+      text = payload?.streak_days
+        ? `🔥 ¡Racha de ${payload.streak_days} día${payload.streak_days > 1 ? 's' : ''}!`
+        : `🔥 ¡Racha activa! Sigue estudiando`;
+      break;
+    case 'streak_lost':
+      text = `😢 Perdiste tu racha. Pero hoy puedes empezar una nueva 💪`;
+      break;
+    case 'daily_exam_completed': {
+      const score = payload?.score;
+      const xpEarned = payload?.xp_earned;
+      if (score !== undefined && xpEarned !== undefined) {
+        text = `🎯 Desafío completado: ${score}% de aciertos, +${xpEarned} XP 🏆`;
+      } else if (score !== undefined) {
+        text = `🎯 Desafío completado con ${score}% ¡Bien hecho!`;
+      } else {
+        text = `🎯 ¡Desafío diario completado! XP extra ganado ⚡`;
+      }
+      break;
+    }
+    case 'achievement_unlocked':
+      text = payload?.name
+        ? `🏆 Logro desbloqueado: "${payload.name}" ✨`
+        : `🏆 ¡Nuevo logro desbloqueado!`;
+      break;
+    default:
+      return null;
+  }
 
-  // Interpolaciones
-  if (eventType === 'xp_gained' && payload?.xp) {
-    text = `⚡ +${payload.xp} XP ganados`;
-  }
-  if (eventType === 'streak_updated' && payload?.streak_days) {
-    text = `🔥 Racha: ${payload.streak_days} días`;
-  }
-  if (eventType === 'level_up' && payload?.level) {
-    text = `🎉 ¡Subiste al Nivel ${payload.level}!`;
-  }
-
+  if (!text) return null;
   const duration = REACTIVE_DURATION[eventType] || REACTIVE_DURATION.default;
   return { text, type: eventType, isReactive: true, duration };
 }
 
 function selectPassiveMessage(profile, state) {
-  const today = new Date().toISOString().split('T')[0];
-  const lastText = state?.last_message_text || '';
+  if (!profile) return { text: 'Bienvenido de nuevo, sigue avanzando hoy 🚀', type: 'fallback' };
+
+  const ctx = buildContext(profile);
   const lastType = state?.last_message_type || '';
-
-  const isOnboarding = !state?.onboarding_completed;
-  if (isOnboarding) {
-    const msgs = PASSIVE_MESSAGES.onboarding.filter(m => m !== lastText);
-    return { text: pickRandom(msgs.length ? msgs : PASSIVE_MESSAGES.onboarding), type: 'onboarding' };
-  }
-
-  const candidates = [];
   const hour = new Date().getHours();
-  const streakDays = profile?.streak_days || 0;
-  const todayStudied = profile?.last_study_date_normalized === today;
-  const waterTokens = profile?.water_tokens || 0;
-  const examDone = profile?.last_surprise_exam_date_normalized === today;
-  const xp = profile?.xp_points || 0;
-  const level = Math.max(1, Math.floor(Math.sqrt(xp / 10)));
-  const nextLevelXP = Math.pow(level + 1, 2) * 10;
-  const xpProgress = xp / nextLevelXP;
 
-  if (!todayStudied && streakDays > 0) candidates.push({ type: 'streak_risk', msgs: PASSIVE_MESSAGES.streak_risk });
-  if (streakDays === 0) candidates.push({ type: 'streak_lost', msgs: PASSIVE_MESSAGES.streak_lost });
-  if (!examDone) candidates.push({ type: 'challenge_available', msgs: PASSIVE_MESSAGES.challenge_available });
-  if (waterTokens > 0) candidates.push({ type: 'tree_water', msgs: PASSIVE_MESSAGES.tree_water });
-  if (xpProgress > 0.75) candidates.push({ type: 'xp_level', msgs: PASSIVE_MESSAGES.xp_level });
-
-  const filtered = candidates.filter(c => c.type !== lastType);
-  const pool = filtered.length ? filtered : candidates;
-
-  if (pool.length > 0) {
-    const chosen = pool[Math.floor(Math.random() * pool.length)];
-    const msgs = chosen.msgs.filter(m => m !== lastText);
-    return { text: pickRandom(msgs.length ? msgs : chosen.msgs), type: chosen.type };
+  // Onboarding (usuario nuevo)
+  if (!state?.onboarding_completed) {
+    const onboardingMsgs = [
+      '👋 Aquí puedes ver tu progreso diario y racha de estudio',
+      '🌳 Usa tus tokens de agua para hacer crecer tu árbol del conocimiento',
+      '🎯 Completa el desafío diario para ganar XP extra cada día',
+      '⭐ Gana estrellas completando actividades y sube de nivel',
+    ];
+    const filtered = onboardingMsgs.filter(m => m !== state?.last_message_text);
+    return { text: pickRandom(filtered.length ? filtered : onboardingMsgs), type: 'onboarding' };
   }
 
-  let key = 'greeting_afternoon';
-  if (hour >= 5 && hour < 12) key = 'greeting_morning';
-  else if (hour >= 19 || hour < 5) key = 'greeting_night';
-  const greetMsgs = PASSIVE_MESSAGES[key].filter(m => m !== lastText);
-  return { text: pickRandom(greetMsgs.length ? greetMsgs : PASSIVE_MESSAGES[key]), type: key };
+  // Sistema de prioridad basado en estado real
+  // Prioridad 1: racha en riesgo (tiene racha pero no estudió hoy)
+  if (ctx.streakDays > 0 && !ctx.todayStudied && lastType !== 'streak_risk') {
+    return {
+      text: `⚠️ Tu racha de ${ctx.streakDays} día${ctx.streakDays > 1 ? 's' : ''} está en riesgo. ¡Estudia hoy para salvarla!`,
+      type: 'streak_risk',
+    };
+  }
+
+  // Prioridad 2: muy cerca de subir de nivel (>= 80%)
+  if (ctx.progressToNextLevel >= 80 && lastType !== 'xp_level') {
+    return {
+      text: `⚡ Estás al ${ctx.progressToNextLevel}% del Nivel ${ctx.level + 1}. ¡Ya casi llegas!`,
+      type: 'xp_level',
+    };
+  }
+
+  // Prioridad 3: desafío diario disponible
+  if (!ctx.examDoneToday && lastType !== 'challenge_available') {
+    return {
+      text: `🎯 Aún no hiciste el desafío diario. ¡Complétalo y gana XP extra!`,
+      type: 'challenge_available',
+    };
+  }
+
+  // Prioridad 4: tiene agua para regar árbol
+  if (ctx.waterTokens > 0 && lastType !== 'tree_water') {
+    return {
+      text: `💧 Tienes ${ctx.waterTokens} token${ctx.waterTokens > 1 ? 's' : ''} de agua disponible${ctx.waterTokens > 1 ? 's' : ''}. ¡Riega tu árbol!`,
+      type: 'tree_water',
+    };
+  }
+
+  // Prioridad 5: meta semanal en buen progreso
+  if (ctx.weeklyPercent >= 50 && ctx.weeklyPercent < 100 && lastType !== 'weekly_goal') {
+    return {
+      text: `📅 Llevas ${ctx.weeklyProgress} de ${ctx.weeklyGoal} lecciones esta semana (${ctx.weeklyPercent}%). ¡Vas muy bien!`,
+      type: 'weekly_goal',
+    };
+  }
+
+  // Prioridad 6: racha activa > 1 día
+  if (ctx.streakDays >= 2 && ctx.todayStudied && lastType !== 'streak_active') {
+    return {
+      text: `🔥 ¡${ctx.streakDays} días de racha! La constancia es tu superpoder 💪`,
+      type: 'streak_active',
+    };
+  }
+
+  // Fallback: saludo según hora
+  const hour12 = hour;
+  let text = '';
+  if (hour12 >= 5 && hour12 < 12) text = '🌞 Buenos días. Empezar el día estudiando te da ventaja. ¡Vamos!';
+  else if (hour12 >= 12 && hour12 < 19) text = '👋 ¿Listo para continuar donde te quedaste? Aún hay tiempo hoy.';
+  else text = '🌙 Cerrar el día aprendiendo algo nuevo siempre vale la pena 📚';
+
+  return { text, type: 'greeting' };
 }
 
 // ─── AGRUPADOR DE COLA ────────────────────────────────────────────────────────

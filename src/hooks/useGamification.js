@@ -16,6 +16,7 @@ export function useGamificationProfile(userEmail) {
     },
     enabled: !!userEmail,
     staleTime: 0,
+    refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
 }
