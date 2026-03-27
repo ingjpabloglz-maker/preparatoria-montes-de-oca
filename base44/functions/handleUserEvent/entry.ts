@@ -117,6 +117,8 @@ Deno.serve(async (req) => {
   let newStreakDays = gam?.streak_days || 0;
   let streakBroke = false;
 
+  let shieldUsed = false;
+
   if (gam) {
     const lastDate = gam.last_study_date_normalized;
     if (lastDate) {
@@ -127,8 +129,16 @@ Deno.serve(async (req) => {
       if (lastDate === yesterdayStr) {
         newStreakDays = (gam.streak_days || 0) + 1;
       } else if (lastDate < yesterdayStr) {
-        newStreakDays = 1;
-        streakBroke = (gam.streak_days || 0) > 1;
+        // Verificar si hay shields disponibles
+        const shields = gam.streak_shields || 0;
+        if (shields > 0) {
+          // Shield activo: mantener racha y consumir shield
+          newStreakDays = gam.streak_days || 1;
+          shieldUsed = true;
+        } else {
+          newStreakDays = 1;
+          streakBroke = (gam.streak_days || 0) > 1;
+        }
       }
       // Si lastDate === today, no cambiamos la racha
     } else {
@@ -224,6 +234,7 @@ Deno.serve(async (req) => {
     last_study_date_normalized: today,
     max_streak: newMaxStreak,
     total_stars: newStars,
+    streak_shields: shieldUsed ? Math.max(0, (gam?.streak_shields || 0) - 1) : (gam?.streak_shields || 0),
     water_tokens: newWater,
     xp_points: finalXP,
     level: finalLevel,
@@ -353,6 +364,7 @@ Deno.serve(async (req) => {
     status: 'ok',
     streak_days: newStreakDays,
     streak_broke: streakBroke,
+    streak_saved_by_shield: shieldUsed,
     xp_earned: earnedXP + weeklyBonusXP,
     total_xp: finalXP,
     total_stars: newStars,

@@ -6,11 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Trophy, Star, Flame, Zap, Swords, Target, BookOpen, Award, Lock, Droplets, CalendarDays, Sparkles } from 'lucide-react';
+import { Trophy, Star, Flame, Zap, Swords, Target, BookOpen, Award, Lock, Droplets, CalendarDays, Sparkles, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useGamificationProfile } from '@/hooks/useGamification';
 import confetti from 'canvas-confetti';
 import TreeVisualization from '@/components/gamification/TreeVisualization';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 const ICON_MAP = {
   Trophy, Star, Flame, Zap, Swords, Target, BookOpen, Award, Sparkles, CalendarDays,
@@ -27,12 +29,26 @@ const RARITY_LABELS = { common: 'Común', rare: 'Raro', epic: 'Épico', legendar
 
 export default function Rewards() {
   const [user, setUser] = useState(null);
+  const [buyingShield, setBuyingShield] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     base44.auth.me().then(setUser);
   }, []);
 
   const { data: profile } = useGamificationProfile(user?.email);
+
+  const handleBuyShield = async () => {
+    setBuyingShield(true);
+    const res = await base44.functions.invoke('purchaseStreakShield', {});
+    if (res.data?.success) {
+      toast.success('🛡️ Protección de racha activada');
+      queryClient.invalidateQueries({ queryKey: ['gamificationProfile', user?.email] });
+    } else {
+      toast.error(res.data?.error || 'No se pudo comprar la protección');
+    }
+    setBuyingShield(false);
+  };
 
   const { data: allAchievements = [] } = useQuery({
     queryKey: ['achievements'],
@@ -130,6 +146,37 @@ export default function Rewards() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Protección de Racha */}
+        <Card className="border-0 shadow-md bg-gradient-to-br from-sky-50 to-indigo-50 border border-sky-100">
+          <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center flex-shrink-0">
+                <Shield className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <p className="font-bold text-gray-800">Protección de Racha</p>
+                <p className="text-sm text-gray-500">Evita perder tu racha si un día no estudias.</p>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-sm font-semibold text-indigo-700">
+                    🛡️ {profile?.streak_shields || 0} / 2 activas
+                  </span>
+                  <span className="text-xs text-gray-400">Costo: 10 ⭐</span>
+                </div>
+              </div>
+            </div>
+            <Button
+              onClick={handleBuyShield}
+              disabled={buyingShield || (profile?.streak_shields || 0) >= 2 || (profile?.total_stars || 0) < 10}
+              className="bg-gradient-to-r from-sky-500 to-indigo-500 text-white font-bold shadow w-full sm:w-auto flex-shrink-0"
+            >
+              {buyingShield ? 'Comprando...' :
+               (profile?.streak_shields || 0) >= 2 ? 'Máximo alcanzado' :
+               (profile?.total_stars || 0) < 10 ? 'Estrellas insuficientes' :
+               'Comprar protección'}
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Árbol del Conocimiento */}
         <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50">

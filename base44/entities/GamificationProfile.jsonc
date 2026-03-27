@@ -1,0 +1,96 @@
+{
+  "name": "GamificationProfile",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario"
+    },
+    "streak_days": {
+      "type": "number",
+      "default": 0,
+      "description": "D\u00edas consecutivos de estudio"
+    },
+    "last_study_date_normalized": {
+      "type": "string",
+      "description": "Fecha normalizada YYYY-MM-DD de \u00faltima actividad"
+    },
+    "max_streak": {
+      "type": "number",
+      "default": 0,
+      "description": "Racha m\u00e1xima hist\u00f3rica"
+    },
+    "total_stars": {
+      "type": "number",
+      "default": 0,
+      "description": "Estrellas acumuladas"
+    },
+    "streak_shields": {
+      "type": "number",
+      "default": 0,
+      "description": "Protecciones de racha activas (m\u00e1x 2)"
+    },
+    "water_tokens": {
+      "type": "number",
+      "default": 0,
+      "description": "Tokens de agua consumibles para regar el \u00e1rbol"
+    },
+    "xp_points": {
+      "type": "number",
+      "default": 0,
+      "description": "Puntos de experiencia acumulados"
+    },
+    "level": {
+      "type": "number",
+      "default": 1,
+      "description": "Nivel actual del usuario (curva sqrt)"
+    },
+    "answered_surprise_questions_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de preguntas respondidas en ex\u00e1menes sorpresa (\u00faltimos 30 d\u00edas / max 100)"
+    },
+    "last_surprise_exam_date_normalized": {
+      "type": "string",
+      "description": "Fecha normalizada YYYY-MM-DD del \u00faltimo examen sorpresa"
+    },
+    "email_notifications_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el usuario acepta emails de notificaci\u00f3n"
+    },
+    "tree_stage": {
+      "type": "number",
+      "default": 0,
+      "description": "Etapa visual del \u00e1rbol (0-5), calculada desde tree_growth_points"
+    },
+    "tree_growth_points": {
+      "type": "number",
+      "default": 0,
+      "description": "Puntos de crecimiento del \u00e1rbol (1 por cada riego manual)"
+    },
+    "last_tree_update": {
+      "type": "string",
+      "description": "Fecha ISO de \u00faltima actualizaci\u00f3n del \u00e1rbol"
+    },
+    "weekly_goal_target": {
+      "type": "number",
+      "default": 10,
+      "description": "Meta semanal de lecciones completadas"
+    },
+    "weekly_goal_progress": {
+      "type": "number",
+      "default": 0,
+      "description": "Progreso actual de la meta semanal"
+    },
+    "weekly_goal_start_date": {
+      "type": "string",
+      "description": "Fecha de inicio de la semana actual de la meta (YYYY-MM-DD)"
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}
