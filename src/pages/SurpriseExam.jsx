@@ -17,7 +17,7 @@ export default function SurpriseExam() {
   const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
   const { dispatchUserEvent } = useUserEvent(user?.email);
-  const [phase, setPhase] = useState('loading'); // loading | ready | question | results | error
+  const [phase, setPhase] = useState('idle'); // idle | checking | loading | in_progress | completed | blocked | error
   const [questions, setQuestions] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState([]);
@@ -27,24 +27,41 @@ export default function SurpriseExam() {
   const [fillValue, setFillValue] = useState('');
   const [results, setResults] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    base44.auth.me().then(setUser);
-    loadExam();
+    const init = async () => {
+      const userData = await base44.auth.me();
+      setUser(userData);
+      // Solo verificar si ya hizo el examen hoy
+      setPhase('checking');
+      const res = await base44.functions.invoke('generateSurpriseExam', { check_only: true });
+      if (res.data?.error === 'already_done_today') {
+        setPhase('blocked');
+      } else if (res.data?.error === 'no_completed_lessons') {
+        setErrorMsg('Necesitas completar al menos una lección antes de poder hacer el desafío.');
+        setPhase('error');
+      } else {
+        // No ha hecho el examen, mostrar botón para comenzar
+        setPhase('idle');
+      }
+    };
+    init();
   }, []);
 
-  const loadExam = async () => {
+  const startExam = async () => {
     setPhase('loading');
     const res = await base44.functions.invoke('generateSurpriseExam', {});
     if (res.data?.error === 'already_done_today') {
-      setErrorMsg('Ya completaste el desafío de hoy. ¡Vuelve mañana!');
-      setPhase('error');
+      setPhase('blocked');
     } else if (res.data?.error === 'no_completed_lessons') {
       setErrorMsg('Necesitas completar al menos una lección antes de poder hacer el desafío.');
       setPhase('error');
     } else if (res.data?.questions) {
       setQuestions(res.data.questions);
-      setPhase('ready');
+      setAnswers([]);
+      setCurrentIdx(0);
+      setPhase('in_progress');
     } else {
       setErrorMsg('No se pudo cargar el examen. Intenta más tarde.');
       setPhase('error');
@@ -59,7 +76,6 @@ export default function SurpriseExam() {
     }
     if (!answer) return;
 
-    // Guardamos la respuesta
     const updatedAnswers = [...answers, { question_id: questions[currentIdx].id, answer }];
     setAnswers(updatedAnswers);
     setSubmitted(true);
@@ -73,18 +89,22 @@ export default function SurpriseExam() {
       setIsCorrect(false);
       setFillValue('');
     } else {
-      // Enviar examen
-      setPhase('loading');
-      const question_ids = answers.map(a => a.question_id);
-      const answerValues = answers.map(a => a.answer);
+      // Última pregunta: enviar examen y mostrar resultados
+      if (submitting) return;
+      setSubmitting(true);
+
+      const finalAnswers = [...answers]; // ya incluye la última (se guardó en handleSubmit)
+      const question_ids = finalAnswers.map(a => a.question_id);
+      const answerValues = finalAnswers.map(a => a.answer);
+
       const res = await base44.functions.invoke('submitSurpriseExam', {
         question_ids,
         answers: answerValues,
       });
+
       if (res.data) {
         setResults(res.data);
-        setPhase('results');
-        // handleUserEvent es la única fuente de verdad para XP, water, streak, logros e ids
+        setPhase('completed'); // NUNCA vuelve a loading
         if (user?.email) {
           const result = await dispatchUserEvent('surprise_exam_completed', {
             score: res.data.score,
@@ -109,19 +129,39 @@ export default function SurpriseExam() {
           playSound('achievement_unlocked');
         }
       }
+      setSubmitting(false);
     }
   };
 
   const q = questions[currentIdx];
   const progressPct = questions.length > 0 ? Math.round((currentIdx / questions.length) * 100) : 0;
 
-  if (phase === 'loading') {
+  if (phase === 'checking' || phase === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-900 to-blue-900">
         <div className="text-center text-white">
           <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4" />
-          <p className="text-lg font-medium">Preparando tu desafío...</p>
+          <p className="text-lg font-medium">
+            {phase === 'checking' ? 'Verificando tu progreso...' : 'Preparando tu desafío...'}
+          </p>
         </div>
+      </div>
+    );
+  }
+
+  if (phase === 'blocked') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-900 to-blue-900 p-6">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <CheckCircle2 className="w-12 h-12 mx-auto mb-4 text-green-500" />
+            <h2 className="text-xl font-bold text-gray-900 mb-2">¡Desafío completado!</h2>
+            <p className="text-gray-500">Ya completaste el desafío de hoy. ¡Vuelve mañana!</p>
+            <Link to="/Rewards">
+              <Button className="mt-6 w-full">Ver mis recompensas</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -142,7 +182,7 @@ export default function SurpriseExam() {
     );
   }
 
-  if (phase === 'ready') {
+  if (phase === 'idle') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-900 to-blue-900 p-6">
         <Card className="max-w-md w-full">
@@ -152,7 +192,7 @@ export default function SurpriseExam() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Desafío Diario!</h2>
             <p className="text-gray-500 mb-6">
-              {questions.length} preguntas basadas en tu aprendizaje previo.
+              Preguntas basadas en tu aprendizaje previo.
               ¡Demuestra lo que sabes!
             </p>
             <div className="flex justify-center gap-6 mb-8 text-sm text-gray-600">
@@ -160,7 +200,7 @@ export default function SurpriseExam() {
               <div className="flex items-center gap-1"><Droplets className="w-4 h-4 text-blue-500" /> Tokens de agua</div>
             </div>
             <Button
-              onClick={() => setPhase('question')}
+              onClick={startExam}
               className="w-full h-12 bg-gradient-to-r from-violet-600 to-blue-600 text-white font-bold"
             >
               ¡Comenzar!
@@ -171,7 +211,7 @@ export default function SurpriseExam() {
     );
   }
 
-  if (phase === 'results' && results) {
+  if (phase === 'completed' && results) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-900 to-blue-900 p-6">
         <Card className="max-w-md w-full">
@@ -206,8 +246,8 @@ export default function SurpriseExam() {
     );
   }
 
-  // Fase question
-  if (phase === 'question' && q) {
+  // Fase in_progress
+  if (phase === 'in_progress' && q) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-violet-900 via-blue-950 to-slate-900 text-white">
         {/* Top Bar */}
@@ -289,9 +329,10 @@ export default function SurpriseExam() {
           ) : (
             <Button
               onClick={handleNext}
+              disabled={submitting}
               className="w-full h-12 bg-gradient-to-r from-violet-500 to-blue-600 text-white font-bold rounded-xl"
             >
-              {currentIdx < questions.length - 1 ? 'Siguiente →' : 'Ver resultados'}
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : currentIdx < questions.length - 1 ? 'Siguiente →' : 'Ver resultados'}
             </Button>
           )}
         </div>
