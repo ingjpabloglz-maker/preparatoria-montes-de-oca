@@ -9,6 +9,7 @@ import RichContentRenderer from '@/components/common/RichContentRenderer';
 import { Link } from 'react-router-dom';
 import { useSound } from '@/contexts/SoundContext';
 import { useUserEvent } from '@/hooks/useUserEvent';
+import { dispatchAssistantEvent } from '@/lib/assistantEvents';
 import confetti from 'canvas-confetti';
 
 export default function SurpriseExam() {
@@ -93,8 +94,16 @@ export default function SurpriseExam() {
           });
           if (result?.leveled_up) {
             confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+            dispatchAssistantEvent('level_up', { level: result.level });
+          }
+          if (result?.xp_earned) {
+            dispatchAssistantEvent('xp_gained', { xp: result.xp_earned });
+          }
+          if (result?.newly_unlocked_achievements?.length > 0) {
+            dispatchAssistantEvent('achievement_unlocked', {});
           }
         }
+        dispatchAssistantEvent('daily_exam_completed', { score: res.data.score });
         if (res.data.score >= 80) {
           confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
           playSound('achievement_unlocked');

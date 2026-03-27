@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import confetti from 'canvas-confetti';
+import { dispatchAssistantEvent } from '@/lib/assistantEvents';
 
 const TREE_STAGES = [
   { name: 'Semilla',        description: '¡Todo empieza con una semilla!' },
@@ -207,6 +208,7 @@ export default function TreeVisualization({ profile, userEmail }) {
           tree_growth_points: res.data.tree_growth_points,
           water_tokens: res.data.water_tokens,
         });
+        dispatchAssistantEvent('tree_watered', { new_stage: res.data.tree_stage });
       }
       queryClient.invalidateQueries(['gamificationProfile', userEmail]);
     } catch {

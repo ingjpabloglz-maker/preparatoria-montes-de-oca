@@ -9,6 +9,7 @@ import ActivityCard from '../components/course/ActivityCard';
 import LessonResults from '../components/course/LessonResults';
 import LessonIntro from '../components/course/LessonIntro';
 import { useUserEvent } from '@/hooks/useUserEvent';
+import { dispatchAssistantEvent } from '@/lib/assistantEvents';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 import AiTutorChat from '../components/ai/AiTutorChat';
@@ -110,6 +111,21 @@ export default function Lesson() {
         passed: vars.passed,
         activity_duration_seconds: 30, // mínimo válido
       });
+
+      // Eventos del asistente
+      dispatchAssistantEvent('lesson_completed', { score: vars.score });
+      if (result?.xp_earned) {
+        dispatchAssistantEvent('xp_gained', { xp: result.xp_earned });
+      }
+      if (result?.leveled_up) {
+        dispatchAssistantEvent('level_up', { level: result.level });
+      }
+      if (result?.streak_days > 1) {
+        dispatchAssistantEvent('streak_updated', { streak_days: result.streak_days });
+      }
+      if (result?.newly_unlocked_achievements?.length > 0) {
+        dispatchAssistantEvent('achievement_unlocked', {});
+      }
 
       // Feedback visual
       if (result?.leveled_up) {
