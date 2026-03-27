@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { ASSISTANT_EVENT_KEY, getAssistantQueue, clearAssistantQueue, setAssistantMounted } from '@/lib/assistantEvents';
+import { ASSISTANT_EVENT_KEY, getAssistantQueue, clearAssistantQueue, setAssistantActive } from '@/lib/assistantEvents';
 
 // ─── MENSAJES PASIVOS ─────────────────────────────────────────────────────────
 
@@ -296,7 +297,13 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
   const hideTimerRef = useRef(null);
   const stateRef = useRef(null);
 
+  const location = useLocation();
   const isAllowed = allowedPages.includes(currentPage);
+
+  // assistantActive = true SOLO cuando la ruta es /dashboard o /rewards
+  const isActiveRoute =
+    location.pathname.toLowerCase().includes('dashboard') ||
+    location.pathname.toLowerCase().includes('rewards');
 
   // ── Mostrar siguiente mensaje de la cola ──────────────────────────────────
   const showNext = useCallback(() => {
@@ -326,12 +333,11 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
     }
   }, [isAllowed, showNext]);
 
-  // ── Registrar asistente como montado ─────────────────────────────────────
+  // ── Registrar si el asistente está en una ruta activa ────────────────────
   useEffect(() => {
-    if (!isAllowed) return;
-    setAssistantMounted(true);
-    return () => setAssistantMounted(false);
-  }, [isAllowed]);
+    setAssistantActive(isAllowed && isActiveRoute);
+    return () => setAssistantActive(false);
+  }, [isAllowed, isActiveRoute]);
 
   // ── Escuchar eventos reactivos (despacho inmediato) ──────────────────────
   useEffect(() => {

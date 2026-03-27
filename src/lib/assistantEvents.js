@@ -4,11 +4,12 @@ const ASSISTANT_EVENT_KEY = 'assistant_event';
 const QUEUE_STORAGE_KEY = 'assistant_event_queue';
 const MAX_QUEUE_SIZE = 20;
 
-// Flag en memoria: el asistente lo activa cuando está montado y escuchando
-let assistantMounted = false;
+// Flag en memoria: true SOLO cuando la ruta activa es dashboard o rewards
+let assistantActive = false;
 
-export function setAssistantMounted(value) {
-  assistantMounted = value;
+export function setAssistantActive(value) {
+  assistantActive = value;
+  console.log('Assistant active:', value);
 }
 
 // ─── COLA localStorage ────────────────────────────────────────────────────────
@@ -41,22 +42,21 @@ export function getAssistantQueue() {
 
 /**
  * Despacha un evento al asistente.
- * - Si el asistente está montado: despacho inmediato vía CustomEvent.
- * - Si no: guarda en localStorage para procesarlo al volver al Dashboard.
+ * - Si assistantActive (ruta es /dashboard o /rewards): despacho inmediato.
+ * - Si no: guarda en localStorage para procesarlo al volver a esas rutas.
  * - Eventos de login: siempre despacho inmediato (no van a cola).
  */
 export function dispatchAssistantEvent(eventType, payload = {}) {
-  if (eventType === 'login' || assistantMounted) {
-    // Despacho directo
+  if (eventType === 'login' || assistantActive) {
     window.dispatchEvent(new CustomEvent(ASSISTANT_EVENT_KEY, {
       detail: { eventType, payload, timestamp: Date.now() },
     }));
     return;
   }
 
-  // Asistente no montado → encolar
+  // Asistente no activo en esta ruta → encolar en localStorage
   const queue = getQueue();
-  if (queue.length >= MAX_QUEUE_SIZE) return; // cola llena, descartar más antiguo si se prefiere
+  if (queue.length >= MAX_QUEUE_SIZE) return;
 
   const event = {
     type: eventType,
@@ -66,6 +66,7 @@ export function dispatchAssistantEvent(eventType, payload = {}) {
   };
   queue.push(event);
   saveQueue(queue);
+  console.log('Event queued:', event.type);
 }
 
 export { ASSISTANT_EVENT_KEY };
