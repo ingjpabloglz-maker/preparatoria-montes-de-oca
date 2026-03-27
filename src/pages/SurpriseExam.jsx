@@ -97,19 +97,23 @@ export default function SurpriseExam() {
       const question_ids = finalAnswers.map(a => a.question_id);
       const answerValues = finalAnswers.map(a => a.answer);
 
-      const res = await base44.functions.invoke('submitSurpriseExam', {
-        question_ids,
-        answers: answerValues,
-      });
+      console.log("Submitting exam:", { question_ids, answers: answerValues });
 
-      if (res.data) {
-        setResults(res.data);
-        setPhase('completed'); // NUNCA vuelve a loading
+      try {
+        const res = await base44.functions.invoke('submitSurpriseExam', {
+          question_ids,
+          answers: answerValues,
+        });
+
+        const data = res.data;
+        setResults(data);
+        setPhase('completed');
+
         if (user?.email) {
           const result = await dispatchUserEvent('surprise_exam_completed', {
-            score: res.data.score,
+            score: data.score,
             question_ids,
-            correct_answers: res.data.correct_count,
+            correct_answers: data.correct_count,
             activity_duration_seconds: 60,
           });
           if (result?.leveled_up) {
@@ -123,13 +127,23 @@ export default function SurpriseExam() {
             dispatchAssistantEvent('achievement_unlocked', {});
           }
         }
-        dispatchAssistantEvent('daily_exam_completed', { score: res.data.score });
-        if (res.data.score >= 80) {
+        dispatchAssistantEvent('daily_exam_completed', { score: data.score });
+        if (data.score >= 80) {
           confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
           playSound('achievement_unlocked');
         }
+      } catch (error) {
+        console.error("submitSurpriseExam error:", error.response?.data || error);
+        const errData = error.response?.data;
+        if (errData?.error === 'already_completed_today') {
+          setPhase('blocked');
+        } else {
+          setErrorMsg('Error al enviar el examen. Por favor intenta de nuevo.');
+          setPhase('error');
+        }
+      } finally {
+        setSubmitting(false);
       }
-      setSubmitting(false);
     }
   };
 

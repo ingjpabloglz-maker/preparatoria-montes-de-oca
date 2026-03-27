@@ -8,7 +8,14 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { question_ids, answers } = await req.json();
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const { question_ids, answers } = body;
   if (!question_ids?.length || !answers?.length) {
     return Response.json({ error: 'question_ids and answers are required' }, { status: 400 });
   }
@@ -17,7 +24,7 @@ Deno.serve(async (req) => {
   const today = new Date().toISOString().split('T')[0];
   const existing = await base44.asServiceRole.entities.SurpriseExamAttempt.filter({ user_email: user.email, date: today });
   if (existing.length > 0) {
-    return Response.json({ error: 'already_completed_today' }, { status: 400 });
+    return Response.json({ error: 'already_completed_today', message: 'Ya completaste el desafío de hoy' }, { status: 400 });
   }
 
   const results = [];
