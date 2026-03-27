@@ -1,0 +1,41 @@
+{
+  "name": "AssistantState",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario"
+    },
+    "days_since_signup": {
+      "type": "number",
+      "default": 0
+    },
+    "onboarding_completed": {
+      "type": "boolean",
+      "default": false
+    },
+    "messages_shown_today": {
+      "type": "number",
+      "default": 0
+    },
+    "last_message_type": {
+      "type": "string",
+      "description": "\u00daltima categor\u00eda mostrada"
+    },
+    "last_message_seen_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_message_text": {
+      "type": "string",
+      "description": "\u00daltimo texto mostrado (anti-repetici\u00f3n)"
+    },
+    "last_reset_date": {
+      "type": "string",
+      "description": "Fecha YYYY-MM-DD del \u00faltimo reset de contador"
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}

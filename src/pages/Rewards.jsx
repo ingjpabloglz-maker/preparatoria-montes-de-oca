@@ -13,6 +13,8 @@ import confetti from 'canvas-confetti';
 import TreeVisualization from '@/components/gamification/TreeVisualization';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useAssistant } from '@/hooks/useAssistant';
+import AssistantBubble from '@/components/assistant/AssistantBubble';
 
 const ICON_MAP = {
   Trophy, Star, Flame, Zap, Swords, Target, BookOpen, Award, Sparkles, CalendarDays,
@@ -32,11 +34,18 @@ export default function Rewards() {
   const [buyingShield, setBuyingShield] = useState(false);
   const queryClient = useQueryClient();
 
+  const { data: profile } = useGamificationProfile(user?.email);
+
+  const { message: assistantMsg, visible: assistantVisible, dismiss: dismissAssistant } = useAssistant({
+    userEmail: user?.email,
+    profile,
+    allowedPages: ['Dashboard', 'Rewards'],
+    currentPage: 'Rewards',
+  });
+
   useEffect(() => {
     base44.auth.me().then(setUser);
   }, []);
-
-  const { data: profile } = useGamificationProfile(user?.email);
 
   const handleBuyShield = async () => {
     setBuyingShield(true);
@@ -104,6 +113,7 @@ export default function Rewards() {
 
   return (
     <LevelAccessGuard>
+    <AssistantBubble message={assistantMsg} visible={assistantVisible} onDismiss={dismissAssistant} />
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-violet-50 p-4 sm:p-6">
       <div className="max-w-5xl mx-auto space-y-6">
 
