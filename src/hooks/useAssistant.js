@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { ASSISTANT_EVENT_KEY } from '@/lib/assistantEvents';
+import { ASSISTANT_EVENT_KEY, getAssistantQueue, clearAssistantQueue, setAssistantMounted } from '@/lib/assistantEvents';
 
 // ─── MENSAJES PASIVOS ─────────────────────────────────────────────────────────
 
@@ -226,6 +226,63 @@ function selectPassiveMessage(profile, state) {
   return { text: pickRandom(greetMsgs.length ? greetMsgs : PASSIVE_MESSAGES[key]), type: key };
 }
 
+// ─── AGRUPADOR DE COLA ────────────────────────────────────────────────────────
+
+function groupQueuedEvents(queue) {
+  if (!queue.length) return [];
+
+  // Acumular datos agrupables
+  let totalXP = 0;
+  let lessons = 0;
+  let achievements = 0;
+  const standalone = []; // eventos que siempre se muestran solos
+
+  for (const event of queue) {
+    const t = event.type;
+    if (t === 'xp_gained') {
+      totalXP += event.data?.xp || 0;
+    } else if (t === 'lesson_completed') {
+      lessons += 1;
+    } else if (t === 'achievement_unlocked') {
+      achievements += 1;
+    } else if (t === 'level_up') {
+      // level_up siempre sale individual
+      const msg = buildReactiveMessage('level_up', event.data);
+      if (msg) standalone.push(msg);
+    } else if (t === 'streak_updated') {
+      const msg = buildReactiveMessage('streak_updated', event.data);
+      if (msg) standalone.push(msg);
+    } else if (t === 'daily_exam_completed') {
+      const msg = buildReactiveMessage('daily_exam_completed', event.data);
+      if (msg) standalone.push(msg);
+    }
+    // login no se procesa desde cola (ya se maneja de otro modo)
+  }
+
+  const messages = [];
+
+  // Mensaje agrupado de progreso
+  if (lessons > 0 || totalXP > 0 || achievements > 0) {
+    const parts = [];
+    if (lessons > 0) parts.push(`${lessons} lección${lessons > 1 ? 'es' : ''} completada${lessons > 1 ? 's' : ''}`);
+    if (totalXP > 0) parts.push(`+${totalXP} XP`);
+    if (achievements > 0) parts.push(`${achievements} logro${achievements > 1 ? 's' : ''} nuevo${achievements > 1 ? 's' : ''}`);
+
+    let text = '';
+    if (parts.length === 1) {
+      text = lessons > 0 ? `📚 ¡${parts[0]}!` : totalXP > 0 ? `⚡ ¡${parts[0]}!` : `🏆 ¡${parts[0]}!`;
+    } else {
+      text = `🔥 Gran avance: ${parts.join(', ')}`;
+    }
+    messages.push({ text, type: 'queued_summary', isReactive: true, duration: 10000 });
+  }
+
+  // Eventos individuales
+  messages.push(...standalone);
+
+  return messages;
+}
+
 // ─── HOOK PRINCIPAL ───────────────────────────────────────────────────────────
 
 const MAX_PASSIVE_PER_DAY = 4;
@@ -269,7 +326,14 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
     }
   }, [isAllowed, showNext]);
 
-  // ── Escuchar eventos reactivos ────────────────────────────────────────────
+  // ── Registrar asistente como montado ─────────────────────────────────────
+  useEffect(() => {
+    if (!isAllowed) return;
+    setAssistantMounted(true);
+    return () => setAssistantMounted(false);
+  }, [isAllowed]);
+
+  // ── Escuchar eventos reactivos (despacho inmediato) ──────────────────────
   useEffect(() => {
     if (!isAllowed) return;
 
@@ -287,6 +351,29 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
     window.addEventListener(ASSISTANT_EVENT_KEY, handler);
     return () => window.removeEventListener(ASSISTANT_EVENT_KEY, handler);
   }, [isAllowed, enqueue]);
+
+  // ── Procesar cola persistente (localStorage) al montar ───────────────────
+  useEffect(() => {
+    if (!isAllowed) return;
+
+    const queue = getAssistantQueue();
+    if (!queue.length) return;
+
+    // Limpiar cola ANTES de procesar para evitar duplicados
+    clearAssistantQueue();
+
+    // Agrupar eventos similares ocurridos en los últimos 30 min
+    const cutoff = Date.now() - 30 * 60 * 1000;
+    const recent = queue.filter(e => e.timestamp >= cutoff);
+
+    const grouped = groupQueuedEvents(recent);
+    grouped.forEach(msg => {
+      // Pequeño delay entre mensajes agrupados para no saturar
+      setTimeout(() => enqueue(msg), 800);
+    });
+  // Solo al montar (isAllowed cambia cuando el componente entra en una página permitida)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAllowed]);
 
   // ── Mensajes pasivos (carga inicial) ─────────────────────────────────────
   useEffect(() => {
