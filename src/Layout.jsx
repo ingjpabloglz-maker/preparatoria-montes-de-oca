@@ -117,15 +117,6 @@ export default function Layout({ children, currentPageName }) {
                       Administración
                     </Button>
                   </Link>
-                  <Link to={createPageUrl('ManageFolios')}>
-                    <Button 
-                      variant={currentPageName === 'ManageFolios' ? 'secondary' : 'ghost'}
-                      size="sm"
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      Gestionar Folios
-                    </Button>
-                  </Link>
                   <Link to={createPageUrl('ManageStudents')}>
                     <Button 
                       variant="ghost"
@@ -142,15 +133,6 @@ export default function Layout({ children, currentPageName }) {
                     >
                       <Settings className="w-4 h-4 mr-2" />
                       Administradores
-                    </Button>
-                  </Link>
-                  <Link to={createPageUrl('StudentStatistics')}>
-                    <Button 
-                      variant={currentPageName === 'StudentStatistics' ? 'secondary' : 'ghost'}
-                      size="sm"
-                    >
-                      <BarChart2 className="w-4 h-4 mr-2" />
-                      Estadísticas
                     </Button>
                   </Link>
                 </>
