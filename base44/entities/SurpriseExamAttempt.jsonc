@@ -1,0 +1,31 @@
+{
+  "name": "SurpriseExamAttempt",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario"
+    },
+    "date": {
+      "type": "string",
+      "description": "Fecha del intento en formato YYYY-MM-DD"
+    },
+    "score": {
+      "type": "number",
+      "description": "Puntuaci\u00f3n obtenida (0-100)"
+    },
+    "xp_earned": {
+      "type": "number",
+      "description": "XP ganados en este intento"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de creaci\u00f3n"
+    }
+  },
+  "required": [
+    "user_email",
+    "date"
+  ]
+}

@@ -13,6 +13,13 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'question_ids and answers are required' }, { status: 400 });
   }
 
+  // Validar que no haya completado el desafío hoy
+  const today = new Date().toISOString().split('T')[0];
+  const existing = await base44.asServiceRole.entities.SurpriseExamAttempt.filter({ user_email: user.email, date: today });
+  if (existing.length > 0) {
+    return Response.json({ error: 'already_completed_today' }, { status: 400 });
+  }
+
   const results = [];
   let correctCount = 0;
 
@@ -36,6 +43,15 @@ Deno.serve(async (req) => {
   const score = Math.round((correctCount / question_ids.length) * 100);
   const waterEarned = Math.floor(score / 20); // 0-5 tokens según puntaje
   const xpEarned = Math.round(score * 0.5);   // se informa al frontend para mostrar en UI
+
+  // Guardar intento del día
+  await base44.asServiceRole.entities.SurpriseExamAttempt.create({
+    user_email: user.email,
+    date: today,
+    score,
+    xp_earned: xpEarned,
+    created_at: new Date().toISOString(),
+  });
 
   return Response.json({
     score,
