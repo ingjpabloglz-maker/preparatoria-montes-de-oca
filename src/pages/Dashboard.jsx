@@ -38,6 +38,7 @@ import { getStreakStatus } from '@/lib/streakStatus';
 import { toast } from 'sonner';
 import { useAssistant } from '@/hooks/useAssistant';
 import AssistantBubble from '@/components/assistant/AssistantBubble';
+import { dispatchAssistantEvent } from '@/lib/assistantEvents';
 
 function AdminDashboardView({ user }) {
   const [studentSearch, setStudentSearch] = useState('');
@@ -347,6 +348,15 @@ export default function Dashboard() {
     allowedPages: ['Dashboard', 'Rewards'],
     currentPage: 'Dashboard',
   });
+
+  // Saludo de login: se dispara una vez por sesión cuando el asistente Y el perfil están listos
+  useEffect(() => {
+    if (!user || user.role === 'admin' || !gamProfile) return;
+    const sessionKey = `login_greeted_${new Date().toDateString()}`;
+    if (sessionStorage.getItem(sessionKey)) return;
+    sessionStorage.setItem(sessionKey, '1');
+    dispatchAssistantEvent('login', { name: user.full_name, profile: gamProfile });
+  }, [user?.email, gamProfile?.user_email]);
 
   // Toast de racha: mostrar una vez por sesión
   useEffect(() => {

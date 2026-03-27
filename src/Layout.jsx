@@ -28,15 +28,10 @@ import {
 import GamificationHUD from "@/components/gamification/GamificationHUD";
 import AchievementToast from "@/components/gamification/AchievementToast";
 import { cn } from "@/lib/utils";
-import { dispatchAssistantEvent } from '@/lib/assistantEvents';
-import { base44 as base44Client } from '@/api/base44Client';
-import { useGamificationProfile } from '@/hooks/useGamification';
 
 export default function Layout({ children, currentPageName }) {
   const [user, setUser] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const { data: gamProfile } = useGamificationProfile(user?.email);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -49,19 +44,6 @@ export default function Layout({ children, currentPageName }) {
     };
     loadUser();
   }, []);
-
-  // Disparar saludo al login una vez por sesión
-  useEffect(() => {
-    if (!user || user.role === 'admin') return;
-    const sessionKey = `login_greeted_${new Date().toDateString()}`;
-    if (sessionStorage.getItem(sessionKey)) return;
-    sessionStorage.setItem(sessionKey, '1');
-    // Esperar un momento para que el asistente esté listo
-    const t = setTimeout(() => {
-      dispatchAssistantEvent('login', { name: user.full_name, profile: gamProfile });
-    }, 1500);
-    return () => clearTimeout(t);
-  }, [user?.email, gamProfile?.user_email]);
 
   const isAdmin = user?.role === 'admin';
   const isAdminPage = ['AdminDashboard', 'ManageFolios', 'ManageSubjects', 'StudentDetail'].includes(currentPageName);
