@@ -12,6 +12,8 @@ import Rewards from './pages/Rewards';
 import SurpriseExam from './pages/SurpriseExam';
 import Forum from './pages/Forum';
 import ForumThread from './pages/ForumThread';
+import { useInactivityLogout } from '@/hooks/useInactivityLogout';
+import InactivityWarningModal from '@/components/common/InactivityWarningModal';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -23,6 +25,7 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { showWarning, updateActivity } = useInactivityLogout();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -46,6 +49,8 @@ const AuthenticatedApp = () => {
 
   // Render the main app
   return (
+    <>
+    {showWarning && <InactivityWarningModal onStayActive={updateActivity} />}
     <Routes>
       <Route path="/" element={
         <LayoutWrapper currentPageName={mainPageKey}>
@@ -69,6 +74,7 @@ const AuthenticatedApp = () => {
       <Route path="/Forum/thread/:id" element={<LayoutWrapper currentPageName="ForumThread"><ForumThread /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </>
   );
 };
 
