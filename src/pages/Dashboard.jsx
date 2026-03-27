@@ -350,12 +350,16 @@ export default function Dashboard() {
   });
 
   // Saludo de login: se dispara una vez por sesión cuando el asistente Y el perfil están listos
+  // El delay garantiza que setAssistantActive(true) ya se ejecutó antes del dispatch
   useEffect(() => {
     if (!user || user.role === 'admin' || !gamProfile) return;
     const sessionKey = `login_greeted_${new Date().toDateString()}`;
     if (sessionStorage.getItem(sessionKey)) return;
     sessionStorage.setItem(sessionKey, '1');
-    dispatchAssistantEvent('login', { name: user.full_name, profile: gamProfile });
+    const t = setTimeout(() => {
+      dispatchAssistantEvent('login', { name: user.full_name, profile: gamProfile });
+    }, 300);
+    return () => clearTimeout(t);
   }, [user?.email, gamProfile?.user_email]);
 
   // Toast de racha: mostrar una vez por sesión
