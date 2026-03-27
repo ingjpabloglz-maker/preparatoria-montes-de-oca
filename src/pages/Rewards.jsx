@@ -80,7 +80,27 @@ export default function Rewards() {
   const xpProgress = Math.max(0, Math.min(100, Math.round((xpInLevel / xpNeeded) * 100)));
 
   const today = new Date().toISOString().split('T')[0];
-  const canDoExam = profile?.last_surprise_exam_date_normalized !== today;
+  const alreadyDone = profile?.last_surprise_exam_date_normalized === today;
+  const canDoExam = !alreadyDone;
+
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    if (!alreadyDone) return;
+    const update = () => {
+      const now = new Date();
+      const tomorrow = new Date();
+      tomorrow.setHours(24, 0, 0, 0);
+      const diffMs = tomorrow - now;
+      const totalSecs = Math.max(0, Math.floor(diffMs / 1000));
+      const h = Math.floor(totalSecs / 3600);
+      const m = Math.floor((totalSecs % 3600) / 60);
+      setTimeLeft(`${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m`);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [alreadyDone]);
 
   return (
     <LevelAccessGuard>
@@ -96,15 +116,22 @@ export default function Rewards() {
             </h1>
             <p className="text-gray-500 mt-1">{unlockedCount} de {allAchievements.length} logros desbloqueados</p>
           </div>
-          <Link to="/SurpriseExam">
-            <Button
-              disabled={!canDoExam}
-              className="bg-gradient-to-r from-violet-600 to-blue-600 text-white font-bold shadow-lg"
-            >
-              <Swords className="w-4 h-4 mr-2" />
-              {canDoExam ? '¡Desafío Diario!' : 'Vuelve mañana'}
-            </Button>
-          </Link>
+          <div className="flex flex-col items-end gap-1">
+            <Link to={canDoExam ? '/SurpriseExam' : '#'} onClick={e => !canDoExam && e.preventDefault()}>
+              <Button
+                disabled={!canDoExam}
+                className="bg-gradient-to-r from-violet-600 to-blue-600 text-white font-bold shadow-lg disabled:opacity-60"
+              >
+                <Swords className="w-4 h-4 mr-2" />
+                {canDoExam ? '¡Desafío Diario!' : 'Ya completaste el desafío de hoy ✅'}
+              </Button>
+            </Link>
+            {alreadyDone && timeLeft && (
+              <p className="text-xs text-gray-400 text-right">
+                Nuevo desafío en <span className="font-semibold text-violet-600">{timeLeft}</span>
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Stats Cards */}
