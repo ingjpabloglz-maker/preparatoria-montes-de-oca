@@ -60,6 +60,14 @@ Deno.serve(async (req) => {
     created_at: new Date().toISOString(),
   });
 
+  // Marcar en GamificationProfile que ya hizo el examen hoy
+  const gamArr = await base44.asServiceRole.entities.GamificationProfile.filter({ user_email: user.email });
+  if (gamArr.length > 0) {
+    await base44.asServiceRole.entities.GamificationProfile.update(gamArr[0].id, {
+      last_surprise_exam_date_normalized: today,
+    });
+  }
+
   return Response.json({
     score,
     correct_count: correctCount,
