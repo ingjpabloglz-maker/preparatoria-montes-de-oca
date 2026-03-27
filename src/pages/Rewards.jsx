@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Trophy, Star, Flame, Zap, Swords, Target, BookOpen, Award, Lock, Droplets, CalendarDays, Sparkles, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useGamificationProfile } from '@/hooks/useGamification';
+import { useHasCompletedSurpriseExam } from '@/hooks/useSurpriseExamStatus';
 import confetti from 'canvas-confetti';
 import TreeVisualization from '@/components/gamification/TreeVisualization';
 import { useQueryClient } from '@tanstack/react-query';
@@ -88,8 +89,7 @@ export default function Rewards() {
   const xpNeeded = nextLevelXP - minXP;
   const xpProgress = Math.max(0, Math.min(100, Math.round((xpInLevel / xpNeeded) * 100)));
 
-  const today = new Date().toISOString().split('T')[0];
-  const alreadyDone = profile?.last_surprise_exam_date_normalized === today;
+  const alreadyDone = useHasCompletedSurpriseExam(user?.email);
   const canDoExam = !alreadyDone;
 
   const [timeLeft, setTimeLeft] = useState('');
