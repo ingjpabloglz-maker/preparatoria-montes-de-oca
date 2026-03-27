@@ -33,7 +33,9 @@ import SubjectCard from '../components/dashboard/SubjectCard';
 import FolioValidator from '../components/payment/FolioValidator';
 import WeeklyGoal from '../components/gamification/WeeklyGoal';
 import { useGamificationProfile } from '@/hooks/useGamification';
-import { AlertCircle, Lock } from "lucide-react";
+import { AlertCircle, Lock, Flame } from "lucide-react";
+import { getStreakStatus } from '@/lib/streakStatus';
+import { toast } from 'sonner';
 
 function AdminDashboardView({ user }) {
   const [studentSearch, setStudentSearch] = useState('');
@@ -337,6 +339,21 @@ export default function Dashboard() {
 
   const { data: gamProfile } = useGamificationProfile(user?.email);
 
+  // Toast de racha: mostrar una vez por sesión
+  useEffect(() => {
+    if (!gamProfile) return;
+    const status = getStreakStatus(gamProfile.last_study_date_normalized);
+    const streakDays = gamProfile.streak_days || 0;
+    const toastKey = `streak_toast_${new Date().toDateString()}`;
+    if (sessionStorage.getItem(toastKey)) return;
+    sessionStorage.setItem(toastKey, '1');
+    if (status === 'lost' && streakDays > 0) {
+      toast.error(`Perdiste tu racha de ${streakDays} días 💔`, { duration: 5000 });
+    } else if (status === 'at_risk') {
+      toast.warning('⚠️ Tu racha está en riesgo. ¡Estudia hoy!', { duration: 5000 });
+    }
+  }, [gamProfile?.last_study_date_normalized]);
+
   // Agrupar materias por nivel
   const subjectsByLevel = subjects.reduce((acc, subject) => {
     if (!acc[subject.level]) acc[subject.level] = [];
@@ -488,6 +505,21 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto p-6 space-y-8">
+        {/* Banner de racha en riesgo */}
+        {gamProfile && (() => {
+          const streakStatus = getStreakStatus(gamProfile.last_study_date_normalized);
+          if (streakStatus === 'at_risk') return (
+            <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 flex items-center gap-3 animate-pulse">
+              <Flame className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+              <p className="font-semibold text-yellow-800 flex-1">
+                ⚠️ Tu racha está en riesgo. Estudia hoy para mantenerla.
+              </p>
+            </div>
+          );
+          if (streakStatus === 'lost' && (gamProfile.streak_days || 0) === 0) return null;
+          return null;
+        })()}
+
         {/* Alerta perfil incompleto */}
         {!profileComplete && (
           <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3">
