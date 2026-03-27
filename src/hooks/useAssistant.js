@@ -57,6 +57,38 @@ const PASSIVE_MESSAGES = {
   ],
 };
 
+// ─── MENSAJES DE LOGIN ────────────────────────────────────────────────────────
+
+function buildLoginMessage(payload) {
+  const { name, profile } = payload || {};
+  const firstName = name?.split(' ')[0] || 'estudiante';
+  const hour = new Date().getHours();
+  const streakDays = profile?.streak_days || 0;
+  const examDone = profile?.last_surprise_exam_date_normalized === new Date().toISOString().split('T')[0];
+  const waterTokens = profile?.water_tokens || 0;
+
+  let greeting = '👋';
+  if (hour >= 5 && hour < 12) greeting = '🌞 ¡Buenos días';
+  else if (hour >= 12 && hour < 19) greeting = '☀️ ¡Buenas tardes';
+  else greeting = '🌙 ¡Buenas noches';
+
+  let text = `${greeting}, ${firstName}!`;
+
+  if (streakDays >= 3) {
+    text += ` 🔥 Llevas ${streakDays} días de racha, ¡no la pierdas hoy!`;
+  } else if (streakDays === 1) {
+    text += ` Tienes 1 día de racha, ¡sigue así!`;
+  } else if (!examDone) {
+    text += ` 🎯 Tienes el desafío diario disponible. ¡Gana XP!`;
+  } else if (waterTokens > 0) {
+    text += ` 💧 Tienes ${waterTokens} token${waterTokens > 1 ? 's' : ''} de agua para regar tu árbol.`;
+  } else {
+    text += ` Listo para aprender hoy? 📚`;
+  }
+
+  return { text, type: 'login', isReactive: true, duration: 10000 };
+}
+
 // ─── MENSAJES REACTIVOS ───────────────────────────────────────────────────────
 
 const REACTIVE_MESSAGES = {
@@ -243,6 +275,11 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
 
     const handler = (e) => {
       const { eventType, payload } = e.detail;
+      if (eventType === 'login') {
+        const msg = buildLoginMessage(payload);
+        enqueue(msg);
+        return;
+      }
       const msg = buildReactiveMessage(eventType, payload);
       if (msg) enqueue(msg);
     };
