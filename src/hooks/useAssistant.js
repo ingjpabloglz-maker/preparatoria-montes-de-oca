@@ -122,13 +122,17 @@ async function advanceOnboardingStep(userEmail, currentStep) {
 // espera una estructura plana: { text, type, priority, callToAction, isReactive, duration, decision_instance_id }
 
 function mapDecisionToMessage(decision) {
+  if (!decision || !decision.payload) {
+    console.warn('⚠️ Invalid decision:', decision);
+    return null;
+  }
   return {
-    text:                 decision.payload?.text,
-    type:                 decision.id,
-    priority:             decision.priorityKey,
-    isReactive:           decision.payload?.isReactive || false,
-    duration:             decision.payload?.duration || 13000,
-    callToAction:         decision.payload?.callToAction || null,
+    text:                 decision.payload.text || '...',
+    type:                 decision.id || 'unknown',
+    priority:             decision.priorityKey || 'AMBIENT',
+    isReactive:           decision.payload.isReactive ?? false,
+    duration:             decision.payload.duration || 12000,
+    callToAction:         decision.payload.callToAction || null,
     decision_instance_id: decision.decision_instance_id,
   };
 }
@@ -243,12 +247,16 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
           profile: payload?.profile,
           behavior: behaviorRef.current,
         });
-        enqueue(mapDecisionToMessage(decision));
+        const mappedLogin = mapDecisionToMessage(decision);
+        if (mappedLogin) enqueue(mappedLogin);
         return;
       }
 
       const decision = buildReactiveDecision(eventType, payload, ctxRef.current);
-      if (decision) enqueue(mapDecisionToMessage(decision));
+      if (decision) {
+        const mapped = mapDecisionToMessage(decision);
+        if (mapped) enqueue(mapped);
+      }
     };
 
     window.addEventListener(ASSISTANT_EVENT_KEY, handler);
@@ -264,7 +272,10 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
     const cutoff  = Date.now() - 30 * 60 * 1000;
     const recent  = queue.filter(e => e.timestamp >= cutoff);
     const grouped = groupQueuedDecisions(recent, ctxRef.current);
-    grouped.forEach((decision, i) => setTimeout(() => enqueue(mapDecisionToMessage(decision)), 800 * i));
+    grouped.forEach((decision, i) => {
+      const mapped = mapDecisionToMessage(decision);
+      if (mapped) setTimeout(() => enqueue(mapped), 800 * i);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAllowed]);
 
@@ -327,7 +338,8 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
       });
 
       // 5. Mostrar (el logging ocurre en showNext al hacer setVisible(true))
-      enqueue(mapDecisionToMessage(topDecision));
+      const mapped = mapDecisionToMessage(topDecision);
+      if (mapped) enqueue(mapped);
     };
 
     const t = setTimeout(loadPassive, 4000);
