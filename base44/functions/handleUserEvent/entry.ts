@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
-// Zona horaria: America/Matamoros (UTC-6, sin horario de verano)
+// ─── UTILIDADES DE FECHA ─────────────────────────────────────────────────────
 const MATAMOROS_OFFSET_HOURS = -6;
 
 const getMatamorosLocalDate = () => {
@@ -15,56 +15,19 @@ const getLocalDateString = (dateObj) => {
   return `${y}-${m}-${d}`;
 };
 
-Deno.serve(async (req) => {
-  const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+// ─── UTILIDADES DE NIVEL ──────────────────────────────────────────────────────
+const getLevelFromXP = (xp) => Math.max(1, Math.floor(Math.sqrt(xp / 10)));
 
-  const body = await req.json();
-  const { event_id, event_type, event_data = {} } = body;
+const getLevelXPRange = (lvl) => {
+  const minXP = Math.pow(lvl, 2) * 10;
+  const nextLevelXP = Math.pow(lvl + 1, 2) * 10;
+  return { minXP, nextLevelXP };
+};
 
-  if (!event_id || !event_type) {
-    return Response.json({ error: 'event_id and event_type are required' }, { status: 400 });
-  }
-
-  const user_email = user.email;
-
-  // ─── 1. IDEMPOTENCIA ────────────────────────────────────────────────────────
-  const existing = await base44.asServiceRole.entities.ProcessedEvent.filter({ event_id });
-  if (existing.length > 0) {
-    return Response.json({ status: 'already_processed' });
-  }
-
-  // ─── 2. ANTI-FRAUDE: Rate limiting ─────────────────────────────────────────
-  const nowIso = new Date().toISOString();
-  const currentMinute = nowIso.substring(0, 16); // "2026-03-22T10:05"
-
-  let metrics = null;
-  const metricsArr = await base44.asServiceRole.entities.UserMetrics.filter({ user_email });
-  metrics = metricsArr[0] || null;
-
-  if (metrics) {
-    if (metrics.last_event_minute === currentMinute) {
-      if ((metrics.events_this_minute || 0) >= 10) {
-        return Response.json({ error: 'Too many requests' }, { status: 429 });
-      }
-    }
-  }
-
-  // ─── 3. ANTI-FRAUDE: Duración mínima de actividad ──────────────────────────
-  const MIN_DURATION_SECONDS = 10;
-  if (event_data.activity_duration_seconds !== undefined &&
-      event_data.activity_duration_seconds < MIN_DURATION_SECONDS) {
-    return Response.json({ error: 'Activity too short' }, { status: 400 });
-  }
-
-  // ─── 4. (reservado) ─────────────────────────────────────────────────────────
-  // La idempotencia ya está garantizada por el event_id único en el paso 1.
-
-  // ─── 5. CREAR/OBTENER UserProgress ─────────────────────────────────────────
+// ─── BLOQUE 1: Inicializar UserProgress ──────────────────────────────────────
+async function initializeUserProgress(base44, user_email, nowIso) {
   const upArr = await base44.asServiceRole.entities.UserProgress.filter({ user_email });
   let userProgressRecord = upArr[0] || null;
-
   if (!userProgressRecord) {
     userProgressRecord = await base44.asServiceRole.entities.UserProgress.create({
       user_email,
@@ -73,19 +36,12 @@ Deno.serve(async (req) => {
       blocked_due_to_time: false,
     });
   }
+  return userProgressRecord;
+}
 
-  // ─── 6. ACTUALIZAR GAMIFICATION ─────────────────────────────────────────────
-  const gamArr = await base44.asServiceRole.entities.GamificationProfile.filter({ user_email });
-  let gam = gamArr[0] || null;
-  const matamorosNow = getMatamorosLocalDate();
-  const today = getLocalDateString(matamorosNow);
-
-  // Para surprise_exam_completed, el score viene en event_data
-  // XP = score * 0.5, water = floor(score / 20), como calculaba submitSurpriseExam
+// ─── BLOQUE 2: Calcular recompensas base por evento ──────────────────────────
+function calculateBaseAwards(event_type, event_data) {
   const score = event_data.score || 0;
-  const isSurpriseExam = event_type === 'surprise_exam_completed';
-
-  // Puntos base por evento
   const XP_MAP = {
     lesson_completed: 20,
     mini_eval_passed: 40,
@@ -109,14 +65,17 @@ Deno.serve(async (req) => {
     subject_test_passed: 5,
     surprise_exam_completed: Math.floor(score / 20),
   };
+  return {
+    baseXP: XP_MAP[event_type] || 5,
+    baseStars: STARS_MAP[event_type] || 0,
+    baseWater: WATER_MAP[event_type] || 0,
+  };
+}
 
-  const baseXP = XP_MAP[event_type] || 5;
-  const baseStars = STARS_MAP[event_type] || 0;
-  const baseWater = WATER_MAP[event_type] || 0;
-
+// ─── BLOQUE 3: Calcular racha ─────────────────────────────────────────────────
+function calculateStreak(gam, matamorosNow) {
   let newStreakDays = gam?.streak_days || 0;
   let streakBroke = false;
-
   let shieldUsed = false;
 
   if (gam) {
@@ -129,10 +88,8 @@ Deno.serve(async (req) => {
       if (lastDate === yesterdayStr) {
         newStreakDays = (gam.streak_days || 0) + 1;
       } else if (lastDate < yesterdayStr) {
-        // Verificar si hay shields disponibles
         const shields = gam.streak_shields || 0;
         if (shields > 0) {
-          // Shield activo: mantener racha y consumir shield
           newStreakDays = gam.streak_days || 1;
           shieldUsed = true;
         } else {
@@ -148,16 +105,22 @@ Deno.serve(async (req) => {
     newStreakDays = 1;
   }
 
-  // Multiplicador con cap x2
+  return { newStreakDays, streakBroke, shieldUsed };
+}
+
+// ─── BLOQUE 4: Calcular puntos de gamificación ───────────────────────────────
+function calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays) {
   const multiplier = Math.min(1 + (newStreakDays / 20), 2);
   const earnedXP = Math.round(baseXP * multiplier);
-
   const newXP = (gam?.xp_points || 0) + earnedXP;
   const newStars = (gam?.total_stars || 0) + baseStars;
   const newWater = (gam?.water_tokens || 0) + baseWater;
   const newMaxStreak = Math.max(gam?.max_streak || 0, newStreakDays);
+  return { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier };
+}
 
-  // ─── ÁRBOL DEL CONOCIMIENTO ──────────────────────────────────────────────────
+// ─── BLOQUE 5: Calcular crecimiento del árbol ────────────────────────────────
+function updateTreeGrowth(newWater, gam) {
   const TREE_THRESHOLDS = [0, 5, 15, 30, 60, 100];
   const prevTreeStage = gam?.tree_stage ?? 0;
   let newTreeStage = prevTreeStage;
@@ -165,11 +128,13 @@ Deno.serve(async (req) => {
     if (newWater >= TREE_THRESHOLDS[i]) { newTreeStage = i; break; }
   }
   const treeLevelUp = newTreeStage > prevTreeStage;
+  return { newTreeStage, treeLevelUp };
+}
 
-  // ─── META SEMANAL ─────────────────────────────────────────────────────────────
-  // Reset basado en 7 días desde weekly_goal_start_date del usuario (no por lunes global)
+// ─── BLOQUE 6: Gestionar meta semanal ────────────────────────────────────────
+function manageWeeklyGoal(gam, event_type, today, matamorosNow) {
   let weeklyProgress = gam?.weekly_goal_progress ?? 0;
-  const weeklyTarget = gam?.weekly_goal_target ?? null; // null = no configurada
+  const weeklyTarget = gam?.weekly_goal_target ?? null;
   const prevWeeklyStart = gam?.weekly_goal_start_date ?? null;
   let weeklyStartDate = prevWeeklyStart;
   let weeklyCompleted = gam?.weekly_goal_completed ?? false;
@@ -179,7 +144,6 @@ Deno.serve(async (req) => {
   let weeklyBonusXP = 0;
   let weeklyBonusStars = 0;
 
-  // Solo procesar meta semanal si el usuario la tiene configurada
   if (weeklyTarget && prevWeeklyStart) {
     const startMs = new Date(prevWeeklyStart + 'T00:00:00Z').getTime();
     const nowMs = matamorosNow.getTime();
@@ -187,7 +151,6 @@ Deno.serve(async (req) => {
     const weekExpired = (nowMs - startMs) >= sevenDaysMs;
 
     if (weekExpired) {
-      // Guardar resultado en historial
       const endDate = getLocalDateString(new Date(startMs + sevenDaysMs));
       const wasCompleted = weeklyProgress >= weeklyTarget;
       const historyEntry = {
@@ -198,30 +161,24 @@ Deno.serve(async (req) => {
         completed: wasCompleted,
       };
       weeklyHistory = [...weeklyHistory, historyEntry];
-      // Mantener máximo 52 semanas de historial
       if (weeklyHistory.length > 52) weeklyHistory = weeklyHistory.slice(-52);
 
-      // Otorgar recompensas si completó la semana anterior y no se otorgaron
       if (wasCompleted && !weeklyRewardClaimed) {
         weeklyBonusXP = 50;
         weeklyBonusStars = 3;
       }
 
-      // Resetear para nueva semana
       weeklyProgress = 0;
       weeklyStartDate = today;
       weeklyCompleted = false;
       weeklyRewardClaimed = false;
     }
 
-    // Incrementar progreso si es lección completada
     if (event_type === 'lesson_completed') {
-      weeklyProgress = Math.min(weeklyProgress + 1, weeklyTarget * 2); // cap razonable
-      // Detectar si se acaba de completar la meta por primera vez esta semana
+      weeklyProgress = Math.min(weeklyProgress + 1, weeklyTarget * 2);
       if (weeklyProgress >= weeklyTarget && !weeklyCompleted) {
         weeklyCompleted = true;
         weeklyGoalJustCompleted = true;
-        // Recompensas se dan aquí (semana en curso completada)
         if (!weeklyRewardClaimed) {
           weeklyBonusXP = 50;
           weeklyBonusStars = 3;
@@ -231,21 +188,15 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Fórmula de nivel: level = floor(sqrt(xp / 10)), mínimo 1
-  const getLevelFromXP = (xp) => Math.max(1, Math.floor(Math.sqrt(xp / 10)));
-  const getLevelXPRange = (lvl) => {
-    const minXP = Math.pow(lvl, 2) * 10;
-    const nextLevelXP = Math.pow(lvl + 1, 2) * 10;
-    return { minXP, nextLevelXP };
+  return {
+    weeklyProgress, weeklyTarget, weeklyStartDate, weeklyCompleted,
+    weeklyRewardClaimed, weeklyGoalJustCompleted, weeklyHistory,
+    weeklyBonusXP, weeklyBonusStars,
   };
+}
 
-  // Calcular nivel actual en base al XP total
-  let newLevel = getLevelFromXP(newXP);
-  newLevel = Math.max(1, newLevel);
-
-  const leveledUp = newLevel > (gam?.level || 1);
-
-  // Actualizar answered_surprise_questions_ids si es examen sorpresa
+// ─── BLOQUE 7: Gestionar datos de examen sorpresa ────────────────────────────
+function handleSurpriseExamData(gam, isSurpriseExam, event_data, today) {
   let surpriseIds = gam?.answered_surprise_questions_ids || [];
   let lastSurpriseExamDate = gam?.last_surprise_exam_date_normalized || null;
 
@@ -257,65 +208,23 @@ Deno.serve(async (req) => {
     surpriseIds = surpriseIds.slice(-100);
   }
 
-  const finalXP = newXP + weeklyBonusXP;
+  return { surpriseIds, lastSurpriseExamDate };
+}
 
-  // Recalcular nivel con XP bonus
-  let finalLevel = getLevelFromXP(finalXP);
-  finalLevel = Math.max(1, finalLevel);
-
-  // Sumar estrellas bonus de meta semanal
-  const finalStars = newStars + weeklyBonusStars;
-
-  const gamUpdate = {
-    user_email,
-    streak_days: newStreakDays,
-    last_study_date_normalized: today,
-    max_streak: newMaxStreak,
-    total_stars: finalStars,
-    streak_shields: shieldUsed ? Math.max(0, (gam?.streak_shields || 0) - 1) : (gam?.streak_shields || 0),
-    water_tokens: newWater,
-    xp_points: finalXP,
-    level: finalLevel,
-    answered_surprise_questions_ids: surpriseIds,
-    email_notifications_enabled: gam?.email_notifications_enabled !== false,
-    last_surprise_exam_date_normalized: lastSurpriseExamDate,
-    tree_stage: newTreeStage,
-    last_tree_update: nowIso,
-    weekly_goal_progress: weeklyProgress,
-    weekly_goal_target: weeklyTarget,
-    weekly_goal_start_date: weeklyStartDate,
-    weekly_goal_completed: weeklyCompleted,
-    weekly_goal_reward_claimed: weeklyRewardClaimed,
-    weekly_goal_history: weeklyHistory,
-  };
-
-  if (gam) {
-    await base44.asServiceRole.entities.GamificationProfile.update(gam.id, gamUpdate);
-  } else {
-    await base44.asServiceRole.entities.GamificationProfile.create(gamUpdate);
-  }
-
-  // NOTA: El nivel de XP (gamificación) es independiente del current_level académico.
-  // current_level en UserProgress SOLO se actualiza cuando el alumno avanza académicamente,
-  // no cuando sube de nivel por XP. Por eso NO se sincroniza aquí.
-
-  // ─── 7. EVALUAR LOGROS ──────────────────────────────────────────────────────
-  // Determinar todos los event_keys aplicables en este evento
+// ─── BLOQUE 8: Evaluar y otorgar logros ──────────────────────────────────────
+async function processAchievements(base44, user_email, event_type, newStreakDays, finalStars, nowIso) {
   const applicableKeys = [event_type];
 
-  // Logros de racha por hito
   const streakMilestones = [3, 7, 14, 30];
   for (const milestone of streakMilestones) {
     if (newStreakDays >= milestone) applicableKeys.push(`streak_${milestone}`);
   }
 
-  // Logros de estrellas por hito
   const starMilestones = [10, 50, 100];
   for (const milestone of starMilestones) {
-    if (newStars >= milestone) applicableKeys.push(`stars_${milestone}`);
+    if (finalStars >= milestone) applicableKeys.push(`stars_${milestone}`);
   }
 
-  // Obtener todos los logros aplicables (por condition_key)
   const allAchievements = await base44.asServiceRole.entities.Achievement.list();
   const applicableAchs = allAchievements.filter(a => applicableKeys.includes(a.condition_key));
 
@@ -328,8 +237,6 @@ Deno.serve(async (req) => {
     if (unlockedIds.includes(ach.id)) continue;
 
     const existing_ua = userAchievements.find(u => u.achievement_id === ach.id);
-
-    // Logros de hito (streak_X, stars_X, surprise_exam_completed) se desbloquean directo cuando se cumple la condición
     const isThresholdType = ach.condition_key.startsWith('streak_') || ach.condition_key.startsWith('stars_');
     let currentProgress, shouldUnlock;
 
@@ -367,7 +274,11 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ─── 8. ACTUALIZAR MÉTRICAS ─────────────────────────────────────────────────
+  return newlyUnlocked;
+}
+
+// ─── BLOQUE 9: Actualizar métricas de usuario ────────────────────────────────
+async function updateUserMetrics(base44, user_email, metrics, currentMinute, today, streakBroke, nowIso) {
   const eventsThisMinute = metrics?.last_event_minute === currentMinute
     ? (metrics.events_this_minute || 0) + 1
     : 1;
@@ -390,16 +301,120 @@ Deno.serve(async (req) => {
   } else {
     await base44.asServiceRole.entities.UserMetrics.create(metricUpdate);
   }
+}
 
-  // ─── 9. REGISTRAR EVENTO ────────────────────────────────────────────────────
+// ─── ORQUESTADOR PRINCIPAL ───────────────────────────────────────────────────
+Deno.serve(async (req) => {
+  const base44 = createClientFromRequest(req);
+  const user = await base44.auth.me();
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const body = await req.json();
+  const { event_id, event_type, event_data = {} } = body;
+
+  if (!event_id || !event_type) {
+    return Response.json({ error: 'event_id and event_type are required' }, { status: 400 });
+  }
+
+  const user_email = user.email;
+
+  // ─── 1. IDEMPOTENCIA ────────────────────────────────────────────────────────
+  const existing = await base44.asServiceRole.entities.ProcessedEvent.filter({ event_id });
+  if (existing.length > 0) {
+    return Response.json({ status: 'already_processed' });
+  }
+
+  // ─── 2. ANTI-FRAUDE: Rate limiting ─────────────────────────────────────────
+  const nowIso = new Date().toISOString();
+  const currentMinute = nowIso.substring(0, 16);
+
+  const metricsArr = await base44.asServiceRole.entities.UserMetrics.filter({ user_email });
+  const metrics = metricsArr[0] || null;
+
+  if (metrics?.last_event_minute === currentMinute && (metrics.events_this_minute || 0) >= 10) {
+    return Response.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
+  // ─── 3. ANTI-FRAUDE: Duración mínima de actividad ──────────────────────────
+  const MIN_DURATION_SECONDS = 10;
+  if (event_data.activity_duration_seconds !== undefined &&
+      event_data.activity_duration_seconds < MIN_DURATION_SECONDS) {
+    return Response.json({ error: 'Activity too short' }, { status: 400 });
+  }
+
+  // ─── 4. CREAR/OBTENER UserProgress ─────────────────────────────────────────
+  await initializeUserProgress(base44, user_email, nowIso);
+
+  // ─── 5. OBTENER GamificationProfile ─────────────────────────────────────────
+  const gamArr = await base44.asServiceRole.entities.GamificationProfile.filter({ user_email });
+  const gam = gamArr[0] || null;
+  const matamorosNow = getMatamorosLocalDate();
+  const today = getLocalDateString(matamorosNow);
+  const isSurpriseExam = event_type === 'surprise_exam_completed';
+
+  // ─── 6. CALCULAR TODOS LOS VALORES DE GAMIFICACIÓN ──────────────────────────
+  const { baseXP, baseStars, baseWater }                               = calculateBaseAwards(event_type, event_data);
+  const { newStreakDays, streakBroke, shieldUsed }                     = calculateStreak(gam, matamorosNow);
+  const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays);
+  const { newTreeStage, treeLevelUp }                                  = updateTreeGrowth(newWater, gam);
+  const {
+    weeklyProgress, weeklyTarget, weeklyStartDate, weeklyCompleted,
+    weeklyRewardClaimed, weeklyGoalJustCompleted, weeklyHistory,
+    weeklyBonusXP, weeklyBonusStars,
+  } = manageWeeklyGoal(gam, event_type, today, matamorosNow);
+  const { surpriseIds, lastSurpriseExamDate }                          = handleSurpriseExamData(gam, isSurpriseExam, event_data, today);
+
+  const finalXP     = newXP + weeklyBonusXP;
+  const finalStars  = newStars + weeklyBonusStars;
+  const finalLevel  = Math.max(1, getLevelFromXP(finalXP));
+  const leveledUp   = finalLevel > (gam?.level || 1);
+
+  // ─── 7. PERSISTIR GamificationProfile ────────────────────────────────────────
+  const gamUpdate = {
+    user_email,
+    streak_days: newStreakDays,
+    last_study_date_normalized: today,
+    max_streak: newMaxStreak,
+    total_stars: finalStars,
+    streak_shields: shieldUsed ? Math.max(0, (gam?.streak_shields || 0) - 1) : (gam?.streak_shields || 0),
+    water_tokens: newWater,
+    xp_points: finalXP,
+    level: finalLevel,
+    answered_surprise_questions_ids: surpriseIds,
+    email_notifications_enabled: gam?.email_notifications_enabled !== false,
+    last_surprise_exam_date_normalized: lastSurpriseExamDate,
+    tree_stage: newTreeStage,
+    last_tree_update: nowIso,
+    weekly_goal_progress: weeklyProgress,
+    weekly_goal_target: weeklyTarget,
+    weekly_goal_start_date: weeklyStartDate,
+    weekly_goal_completed: weeklyCompleted,
+    weekly_goal_reward_claimed: weeklyRewardClaimed,
+    weekly_goal_history: weeklyHistory,
+  };
+
+  if (gam) {
+    await base44.asServiceRole.entities.GamificationProfile.update(gam.id, gamUpdate);
+  } else {
+    await base44.asServiceRole.entities.GamificationProfile.create(gamUpdate);
+  }
+
+  // ─── 8. EVALUAR LOGROS ───────────────────────────────────────────────────────
+  const newlyUnlocked = await processAchievements(base44, user_email, event_type, newStreakDays, finalStars, nowIso);
+
+  // ─── 9. ACTUALIZAR MÉTRICAS ──────────────────────────────────────────────────
+  await updateUserMetrics(base44, user_email, metrics, currentMinute, today, streakBroke, nowIso);
+
+  // ─── 10. REGISTRAR EVENTO (idempotencia) ─────────────────────────────────────
   await base44.asServiceRole.entities.ProcessedEvent.create({
-    event_id, user_email, event_type, processed_at: nowIso
+    event_id, user_email, event_type, processed_at: nowIso,
   });
 
+  // ─── 11. CONSTRUIR RESPUESTA ─────────────────────────────────────────────────
   const { minXP: finalMinXP, nextLevelXP: finalNextXP } = getLevelXPRange(finalLevel);
-  const xpIntoLevel = finalXP - finalMinXP;
-  const xpNeededForNext = finalNextXP - finalMinXP;
-  const progressPercent = Math.max(0, Math.min(100, Math.round((xpIntoLevel / xpNeededForNext) * 100)));
+  const xpIntoLevel      = finalXP - finalMinXP;
+  const xpNeededForNext  = finalNextXP - finalMinXP;
+  const progressPercent  = Math.max(0, Math.min(100, Math.round((xpIntoLevel / xpNeededForNext) * 100)));
 
   return Response.json({
     status: 'ok',
@@ -410,7 +425,7 @@ Deno.serve(async (req) => {
     total_xp: finalXP,
     total_stars: finalStars,
     level: finalLevel,
-    leveled_up: finalLevel > (gam?.level || 1),
+    leveled_up: leveledUp,
     newly_unlocked_achievements: newlyUnlocked,
     multiplier,
     tree_level_up: treeLevelUp,
@@ -419,8 +434,6 @@ Deno.serve(async (req) => {
     xp_into_level: xpIntoLevel,
     xp_needed_for_next_level: xpNeededForNext,
     progress_percent: progressPercent,
-    gamificationProfile: {
-      ...gamUpdate,
-    },
+    gamificationProfile: { ...gamUpdate },
   });
 });
