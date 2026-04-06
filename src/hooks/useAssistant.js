@@ -1,7 +1,6 @@
 // ─── useAssistant ─────────────────────────────────────────────────────────────
-// Responsabilidad: UI, cola de mensajes, navegación CTA, logging de decisiones.
+// Responsabilidad: UI, cola de mensajes, CTA, logging de decisiones.
 // La lógica de decisión vive en /lib/productEngine.js.
-// El cooldown dinámico vive en /lib/decisionCooldowns.js.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -33,53 +32,19 @@ const MAX_PASSIVE_PER_DAY     = 4;
 const MIN_PASSIVE_INTERVAL_MS = 90 * 60 * 1000;
 const PASSIVE_DURATION        = 13000;
 
-// Feature flags globales (fácil de centralizar en el futuro)
+// Feature flags globales (extensible a remote config en el futuro)
 const FLAGS = {
   XP_MULTIPLIER_ENABLED: false,
 };
 
-// ─── LOGGING DE DECISIONES ────────────────────────────────────────────────────
-
-async function logDecisionShown(decision, userEmail) {
-  if (!decision?.decision_instance_id) return;
-  try {
-    await base44.entities.AssistantDecisionLog.create({
-      user_email:           userEmail,
-      decision_id:          decision.id,
-      decision_instance_id: decision.decision_instance_id,
-      decision_type:        decision.type,
-      score:                decision.score ?? 0,
-      shown_at:             new Date().toISOString(),
-      clicked:              false,
-      dismissed:            false,
-    });
-  } catch (e) {
-    console.warn('[Assistant] Error logging decision:', e.message);
-  }
-}
-
-async function updateDecisionLog(decisionInstanceId, update) {
-  if (!decisionInstanceId) return;
-  try {
-    const records = await base44.entities.AssistantDecisionLog.filter({
-      decision_instance_id: decisionInstanceId,
-    });
-    if (records[0]) {
-      await base44.entities.AssistantDecisionLog.update(records[0].id, update);
-    }
-  } catch (e) {
-    console.warn('[Assistant] Error updating decision log:', e.message);
-  }
-}
-
-// ─── COOLDOWN CHECK ───────────────────────────────────────────────────────────
+// ─── COOLDOWN HELPER ──────────────────────────────────────────────────────────
 
 async function isOnCooldown(userEmail, decisionId, userState) {
   const cooldownMs = getCooldown(decisionId, userState);
   if (!cooldownMs) return false;
 
   const logs = await base44.entities.AssistantDecisionLog.filter({
-    user_email:  userEmail,
+    user_email: userEmail,
     decision_id: decisionId,
   });
   if (!logs.length) return false;
@@ -88,22 +53,48 @@ async function isOnCooldown(userEmail, decisionId, userState) {
   return (Date.now() - new Date(last.shown_at).getTime()) < cooldownMs;
 }
 
+// ─── LOGGING HELPERS ──────────────────────────────────────────────────────────
+
+async function logDecisionShown(decision, userEmail) {
+  await base44.entities.AssistantDecisionLog.create({
+    user_email:           userEmail,
+    decision_id:          decision.id,
+    decision_instance_id: decision.decision_instance_id,
+    decision_type:        decision.priorityKey,
+    score:                decision.score,
+    shown_at:             new Date().toISOString(),
+    clicked:              false,
+    dismissed:            false,
+  });
+}
+
+async function updateDecisionLog(userEmail, decisionInstanceId, update) {
+  const logs = await base44.entities.AssistantDecisionLog.filter({
+    user_email:           userEmail,
+    decision_instance_id: decisionInstanceId,
+  });
+  if (logs.length) {
+    await base44.entities.AssistantDecisionLog.update(logs[0].id, update);
+  }
+}
+
 // ─── MEMORIA DEL USUARIO ──────────────────────────────────────────────────────
 
-async function trackAssistantInteraction(userEmail, type, actionTaken) {
+async function getOrCreateBehavior(userEmail) {
   const records = await base44.entities.AssistantBehavior.filter({ user_email: userEmail });
-  let state = records[0];
-  if (!state) {
-    state = await base44.entities.AssistantBehavior.create({
-      user_email: userEmail,
-      messages_ignored: 0,
-      messages_clicked: 0,
-      engagement_score: 50,
-      onboarding_step: 0,
-      onboarding_completed: false,
-    });
-  }
+  if (records[0]) return records[0];
+  return base44.entities.AssistantBehavior.create({
+    user_email: userEmail,
+    messages_ignored: 0,
+    messages_clicked: 0,
+    engagement_score: 50,
+    onboarding_step: 0,
+    onboarding_completed: false,
+  });
+}
 
+async function trackInteraction(userEmail, type, actionTaken) {
+  const state = await getOrCreateBehavior(userEmail);
   const update = { last_interaction_at: new Date().toISOString() };
   if (type === 'ignored') {
     update.messages_ignored = (state.messages_ignored || 0) + 1;
@@ -113,14 +104,11 @@ async function trackAssistantInteraction(userEmail, type, actionTaken) {
     update.engagement_score = Math.min(100, (state.engagement_score ?? 50) + 10);
     if (actionTaken) update.last_action_taken = actionTaken;
   }
-
   await base44.entities.AssistantBehavior.update(state.id, update);
 }
 
 async function advanceOnboardingStep(userEmail, currentStep) {
-  const records = await base44.entities.AssistantBehavior.filter({ user_email: userEmail });
-  const state = records[0];
-  if (!state) return;
+  const state = await getOrCreateBehavior(userEmail);
   const nextStep  = currentStep + 1;
   const completed = nextStep >= ONBOARDING_STEPS.length;
   await base44.entities.AssistantBehavior.update(state.id, {
@@ -135,12 +123,11 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
   const [message, setMessage] = useState(null);
   const [visible, setVisible] = useState(false);
 
-  const queueRef           = useRef([]);
-  const isShowingRef       = useRef(false);
-  const hideTimerRef       = useRef(null);
-  const assistantStateRef  = useRef(null);
-  const behaviorRef        = useRef(null);
-  const ctxRef             = useRef(null);
+  const queueRef          = useRef([]);
+  const isShowingRef      = useRef(false);
+  const hideTimerRef      = useRef(null);
+  const behaviorRef       = useRef(null);
+  const ctxRef            = useRef(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -163,39 +150,22 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
     setMessage(next);
     setVisible(true);
 
-    // Loggear que la decisión fue mostrada
-    if (userEmail && next?.decision_instance_id) {
-      logDecisionShown(next, userEmail);
+    // Log cuando se muestra
+    if (userEmail && next.decision_instance_id) {
+      logDecisionShown(next, userEmail).catch(() => {});
     }
 
     clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
       setVisible(false);
       setTimeout(showNext, 500);
-    }, next.duration || PASSIVE_DURATION);
+    }, next.payload?.duration || PASSIVE_DURATION);
   }, [userEmail]);
 
   // ── enqueue ───────────────────────────────────────────────────────────────
   const enqueue = useCallback((decision) => {
     if (!isAllowed) return;
-
-    // Normalizar: el mensaje para render une los campos del engine
-    const renderMsg = {
-      // Identificadores para tracking
-      decision_instance_id: decision.decision_instance_id,
-      id:                   decision.id,
-      type:                 decision.type,
-      score:                decision.score,
-      // Contenido
-      text:         decision.payload?.text    || decision.message,
-      messageType:  decision.payload?.messageType || decision.id,
-      isReactive:   decision.payload?.isReactive  || false,
-      duration:     decision.payload?.duration    || PASSIVE_DURATION,
-      priority:     decision.type,
-      callToAction: decision.payload?.callToAction || decision.cta || null,
-    };
-
-    queueRef.current.push(renderMsg);
+    queueRef.current.push(decision);
     if (!isShowingRef.current) showNext();
   }, [isAllowed, showNext]);
 
@@ -203,40 +173,43 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
   const dismiss = useCallback(() => {
     clearTimeout(hideTimerRef.current);
 
-    // Actualizar log: dismissed
-    if (message?.decision_instance_id) {
-      updateDecisionLog(message.decision_instance_id, { dismissed: true });
+    // Log dismissed
+    if (userEmail && message?.decision_instance_id) {
+      updateDecisionLog(userEmail, message.decision_instance_id, { dismissed: true }).catch(() => {});
+      trackInteraction(userEmail, 'ignored').catch(() => {});
     }
 
     setVisible(false);
-    queueRef.current     = [];
+    queueRef.current    = [];
     isShowingRef.current = false;
-    if (userEmail) trackAssistantInteraction(userEmail, 'ignored');
   }, [userEmail, message]);
 
   // ── handleCTA ─────────────────────────────────────────────────────────────
   const handleCTA = useCallback((msg) => {
-    if (!msg?.callToAction?.route) return;
-    navigate(msg.callToAction.route);
+    if (!msg?.payload?.callToAction?.route) return;
+    navigate(msg.payload.callToAction.route);
 
-    // Actualizar log: clicked
-    if (msg?.decision_instance_id) {
-      updateDecisionLog(msg.decision_instance_id, { clicked: true });
+    // Log clicked
+    if (userEmail && msg.decision_instance_id) {
+      updateDecisionLog(userEmail, msg.decision_instance_id, { clicked: true }).catch(() => {});
+      trackInteraction(userEmail, 'clicked', msg.id).catch(() => {});
     }
 
-    if (userEmail) trackAssistantInteraction(userEmail, 'clicked', msg.messageType);
-
     // Onboarding: avanzar paso
-    if (msg.messageType === 'onboarding' && behaviorRef.current) {
+    if (msg.id === 'onboarding' && behaviorRef.current) {
       const step = behaviorRef.current.onboarding_step || 0;
       advanceOnboardingStep(userEmail, step).then(() => {
         behaviorRef.current = { ...behaviorRef.current, onboarding_step: step + 1 };
       });
     }
-    dismiss();
-  }, [navigate, userEmail, dismiss]);
 
-  // ── Activar/desactivar según ruta ─────────────────────────────────────────
+    clearTimeout(hideTimerRef.current);
+    setVisible(false);
+    queueRef.current    = [];
+    isShowingRef.current = false;
+  }, [navigate, userEmail]);
+
+  // ── Activar/desactivar asistente según ruta ───────────────────────────────
   useEffect(() => {
     setAssistantActive(isAllowed && isActiveRoute);
     return () => setAssistantActive(false);
@@ -279,7 +252,7 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAllowed]);
 
-  // ── Mensajes pasivos (carga inicial con cooldown dinámico) ────────────────
+  // ── Mensajes pasivos (carga inicial) — flujo completo con cooldowns ───────
   useEffect(() => {
     if (!userEmail || !profile || !isAllowed) return;
 
@@ -287,7 +260,7 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
       const today = toDateStr(getMatamorosNow());
       const now   = new Date();
 
-      // AssistantState (contador diario)
+      // Cargar AssistantState (contador diario)
       let stateRecords = await base44.entities.AssistantState.filter({ user_email: userEmail });
       let state = stateRecords[0] || null;
 
@@ -301,22 +274,11 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
           user_email: userEmail, messages_shown_today: 0, last_reset_date: today,
         });
       }
-      assistantStateRef.current = state;
 
-      // AssistantBehavior (memoria del usuario)
-      let behaviorRecords = await base44.entities.AssistantBehavior.filter({ user_email: userEmail });
-      let behavior = behaviorRecords[0] || null;
-      if (!behavior) {
-        behavior = await base44.entities.AssistantBehavior.create({
-          user_email: userEmail,
-          messages_ignored: 0,
-          messages_clicked: 0,
-          engagement_score: 50,
-          onboarding_step: 0,
-          onboarding_completed: false,
-        });
-      }
+      // Cargar behavior
+      const behavior = await getOrCreateBehavior(userEmail);
       behaviorRef.current = behavior;
+      const userState = getUserState(behavior);
 
       // Verificar límites diarios
       if ((state.messages_shown_today || 0) >= MAX_PASSIVE_PER_DAY) return;
@@ -325,28 +287,30 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
         if (elapsed < MIN_PASSIVE_INTERVAL_MS) return;
       }
 
-      // ── Flujo completo del decision engine ──────────────────────────────
-      const userState   = getUserState(behavior);
+      // 1. Generar todas las decisiones
       const allDecisions = evaluateUserState({ profile, behavior, flags: FLAGS });
 
-      // Filtrar por cooldown dinámico
+      // 2. Filtrar por cooldown (verificación async)
       const validDecisions = [];
       for (const d of allDecisions) {
         const blocked = await isOnCooldown(userEmail, d.id, userState);
         if (!blocked) validDecisions.push(d);
       }
 
+      // 3. Seleccionar la mejor (ya ordenadas por score DESC)
       const topDecision = getTopDecision(validDecisions, state?.last_message_type || '');
       if (!topDecision) return;
 
-      // Actualizar AssistantState
+      // 4. Actualizar AssistantState
+      const newCount = (state.messages_shown_today || 0) + 1;
       await base44.entities.AssistantState.update(state.id, {
-        messages_shown_today: (state.messages_shown_today || 0) + 1,
+        messages_shown_today: newCount,
         last_message_type:    topDecision.id,
-        last_message_text:    topDecision.message,
+        last_message_text:    topDecision.payload?.text,
         last_message_seen_at: now.toISOString(),
       });
 
+      // 5. Mostrar (el logging ocurre en showNext al hacer setVisible(true))
       enqueue(topDecision);
     };
 
