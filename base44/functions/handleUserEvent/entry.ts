@@ -395,7 +395,7 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'event_id and event_type are required' }, { status: 400 });
   }
 
-  const user_email = user.email;
+  const user_email = event_data?.user_email || user.email;
   const nowIso = new Date().toISOString();
   const currentMinute = nowIso.substring(0, 16);
 
