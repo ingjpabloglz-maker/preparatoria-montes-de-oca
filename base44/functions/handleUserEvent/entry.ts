@@ -1,18 +1,37 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
 // ─── UTILIDADES DE FECHA ─────────────────────────────────────────────────────
-const MATAMOROS_OFFSET_HOURS = -6;
+const getMatamorosDateObject = () => {
+  const now = new Date();
+  const matamorosTimeParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Matamoros',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: 'numeric',
+    second: 'numeric',
+    hour12: false,
+  }).formatToParts(now);
 
-const getMatamorosLocalDate = () => {
-  const nowUtc = new Date();
-  return new Date(nowUtc.getTime() + (MATAMOROS_OFFSET_HOURS * 60 * 60 * 1000));
+  const year   = parseInt(matamorosTimeParts.find(p => p.type === 'year').value);
+  const month  = parseInt(matamorosTimeParts.find(p => p.type === 'month').value);
+  const day    = parseInt(matamorosTimeParts.find(p => p.type === 'day').value);
+  const hour   = parseInt(matamorosTimeParts.find(p => p.type === 'hour').value);
+  const minute = parseInt(matamorosTimeParts.find(p => p.type === 'minute').value);
+  const second = parseInt(matamorosTimeParts.find(p => p.type === 'second').value);
+
+  return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
 };
 
-const getLocalDateString = (dateObj) => {
-  const y = dateObj.getUTCFullYear();
-  const m = (dateObj.getUTCMonth() + 1).toString().padStart(2, '0');
-  const d = dateObj.getUTCDate().toString().padStart(2, '0');
-  return `${y}-${m}-${d}`;
+const getLocalDateString = () => {
+  const now = new Date();
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Matamoros',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
 };
 
 // ─── UTILIDADES DE NIVEL ──────────────────────────────────────────────────────
@@ -73,7 +92,7 @@ function calculateBaseAwards(event_type, event_data) {
 }
 
 // ─── BLOQUE 3: Calcular racha ─────────────────────────────────────────────────
-function calculateStreak(gam, matamorosNow) {
+function calculateStreak(gam, matamorosNow, todayString) {
   let newStreakDays = gam?.streak_days || 0;
   let streakBroke = false;
   let shieldUsed = false;
@@ -81,10 +100,16 @@ function calculateStreak(gam, matamorosNow) {
   if (gam) {
     const lastDate = gam.last_study_date_normalized;
     if (lastDate) {
+      // Evento duplicado en el mismo día: no modificar racha
+      if (lastDate === todayString) {
+        return { newStreakDays: gam.streak_days || 1, streakBroke: false, shieldUsed: false };
+      }
+
       const matamorosYesterday = new Date(matamorosNow);
       matamorosYesterday.setUTCDate(matamorosYesterday.getUTCDate() - 1);
-      const yesterdayStr = getLocalDateString(matamorosYesterday);
+      const yesterdayStr = `${matamorosYesterday.getUTCFullYear()}-${(matamorosYesterday.getUTCMonth() + 1).toString().padStart(2, '0')}-${matamorosYesterday.getUTCDate().toString().padStart(2, '0')}`;
 
+      // Comparación directa de strings YYYY-MM-DD (ordenables lexicográficamente, sin depender de timezone)
       if (lastDate === yesterdayStr) {
         newStreakDays = (gam.streak_days || 0) + 1;
       } else if (lastDate < yesterdayStr) {
@@ -97,7 +122,6 @@ function calculateStreak(gam, matamorosNow) {
           streakBroke = (gam.streak_days || 0) > 1;
         }
       }
-      // Si lastDate === today, no cambiamos la racha
     } else {
       newStreakDays = 1;
     }
@@ -358,8 +382,8 @@ Deno.serve(async (req) => {
     // ─── 5. OBTENER GamificationProfile ──────────────────────────────────────
     const gamArr = await base44.asServiceRole.entities.GamificationProfile.filter({ user_email });
     const gam = gamArr[0] || null;
-    const matamorosNow = getMatamorosLocalDate();
-    const today = getLocalDateString(matamorosNow);
+    const matamorosNow = getMatamorosDateObject();
+    const today = getLocalDateString();
     const isSurpriseExam = event_type === 'surprise_exam_completed';
 
     // ─── 6. CALCULAR TODOS LOS VALORES DE GAMIFICACIÓN ───────────────────────
