@@ -61,7 +61,7 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link 
-              to={createPageUrl('Dashboard')} 
+              to={isAdmin ? createPageUrl('AdminDashboard') : createPageUrl('Dashboard')} 
               className="flex items-center gap-2"
             >
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
