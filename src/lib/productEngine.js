@@ -23,6 +23,15 @@ export const toDateStr = (dateObj) =>
     timeZone: MATAMOROS_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(dateObj);
 
+// ─── UUID ─────────────────────────────────────────────────────────────────────
+
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+};
+
 // ─── UTILIDADES DE NIVEL ──────────────────────────────────────────────────────
 
 const getLevelFromXP   = (xp)  => Math.max(1, Math.floor(Math.sqrt(xp / 10)));
@@ -56,8 +65,57 @@ export const ONBOARDING_STEPS = [
   { text: '🌱 Un último paso: riega tu árbol con tus tokens de agua', route: '/Rewards', label: 'Ver mi árbol' },
 ];
 
+// ─── createDecision ───────────────────────────────────────────────────────────
+// Fábrica estándar de decisiones. Calcula el score final con todos los factores.
+
+export function createDecision({ id, type, priority, reason, message, cta, ctx, userState, source = 'rule_engine' }) {
+  // Factor urgencia por tipo
+  const urgency =
+    type === 'URGENT'      ? 1.5 :
+    type === 'OPPORTUNITY' ? 1.2 :
+    1;
+
+  // Factor engagement
+  const engagementWeight =
+    userState === 'engaged' ? 1.2 :
+    userState === 'at_risk' ? 1.5 :
+    1;
+
+  // Factor tiempo (horas restantes en el día)
+  const hours = ctx?.hoursUntilDayEnd ?? 24;
+  const timeFactor =
+    hours <= 3 ? 1.5 :
+    hours <= 6 ? 1.2 :
+    1;
+
+  const score = priority * urgency * engagementWeight * timeFactor;
+
+  return {
+    // Identificadores
+    id,                                        // tipo de decisión (ej: 'save_streak')
+    decision_instance_id: generateUUID(),      // instancia única para tracking
+    // Metadata
+    type,
+    priority,
+    score,
+    reason,
+    source,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 1000 * 60 * 60,   // 1h por defecto
+    // Contenido
+    message,
+    cta,
+    // Interno para useAssistant
+    payload: {
+      text: message,
+      messageType: id,
+      callToAction: cta || null,
+    },
+    priorityKey: type,
+  };
+}
+
 // ─── buildContext ─────────────────────────────────────────────────────────────
-// Construye el contexto enriquecido a partir del perfil de gamificación.
 
 export function buildContext(profile) {
   const now = getMatamorosNow();
@@ -71,16 +129,16 @@ export function buildContext(profile) {
   const xpIntoLevel   = xp - minXp;
   const canLevelUpNow = xpToNextLevel <= 0;
 
-  const streakDays  = profile?.streak_days || 0;
-  const lastStudy   = profile?.last_study_date_normalized;
+  const streakDays   = profile?.streak_days || 0;
+  const lastStudy    = profile?.last_study_date_normalized;
   const todayStudied = lastStudy === todayString;
   const streakAtRisk = streakDays > 0 && !todayStudied;
 
-  const currentHour   = now.getUTCHours();
+  const currentHour      = now.getUTCHours();
   const hoursUntilDayEnd = Math.max(0, 23 - currentHour);
 
-  const examDoneToday  = profile?.last_surprise_exam_date_normalized === todayString;
-  const waterTokens    = profile?.water_tokens || 0;
+  const examDoneToday = profile?.last_surprise_exam_date_normalized === todayString;
+  const waterTokens   = profile?.water_tokens || 0;
 
   const weeklyTarget   = profile?.weekly_goal_target || null;
   const weeklyProgress = profile?.weekly_goal_progress || 0;
@@ -98,7 +156,6 @@ export function buildContext(profile) {
 }
 
 // ─── getUserState ─────────────────────────────────────────────────────────────
-// Infiere el estado emocional/engagement del usuario desde su historial.
 
 export function getUserState(behavior) {
   if (!behavior) return 'neutral';
@@ -109,18 +166,21 @@ export function getUserState(behavior) {
 }
 
 // ─── evaluateUserState ────────────────────────────────────────────────────────
-// Función principal del motor. Recibe perfil y comportamiento, devuelve
-// un array ordenado de decisiones estructuradas.
+// Retorna un array de decisiones ordenadas por score DESC.
+// Acepta flags para feature flags dinámicos.
 
-export function evaluateUserState({ profile, behavior }) {
+export function evaluateUserState({ profile, behavior, flags = {} }) {
   if (!profile) {
     return [
-      {
-        type: ACTION_TYPES.SHOW_MESSAGE,
+      createDecision({
+        id: 'fallback',
+        type: 'AMBIENT',
         priority: PRIORITY.AMBIENT,
-        priorityKey: 'AMBIENT',
-        payload: { text: '¡Tu aventura de aprendizaje empieza ahora! 🚀', messageType: 'fallback' },
-      },
+        reason: 'no_profile',
+        message: '¡Tu aventura de aprendizaje empieza ahora! 🚀',
+        ctx: null,
+        userState: 'neutral',
+      }),
     ];
   }
 
@@ -128,169 +188,173 @@ export function evaluateUserState({ profile, behavior }) {
   const userState = getUserState(behavior);
   const decisions = [];
 
-  // ── ONBOARDING (prioridad alta, bloquea el resto si activo) ──────────────
+  // ── ONBOARDING (bloquea el resto si activo) ───────────────────────────────
   if (!behavior?.onboarding_completed) {
     const step = behavior?.onboarding_step || 0;
     const onboardingStep = ONBOARDING_STEPS[step];
     if (onboardingStep) {
-      decisions.push({
-        type: ACTION_TYPES.SHOW_MESSAGE,
+      const d = createDecision({
+        id: `onboarding_step_${step}`,
+        type: 'ONBOARDING',
         priority: PRIORITY.ONBOARDING,
-        priorityKey: 'ONBOARDING',
-        payload: {
-          text: onboardingStep.text,
-          messageType: 'onboarding',
-          callToAction: { label: onboardingStep.label, route: onboardingStep.route },
-          onboardingStep: step,
-        },
+        reason: 'onboarding_incomplete',
+        message: onboardingStep.text,
+        cta: { label: onboardingStep.label, route: onboardingStep.route },
+        ctx,
+        userState,
       });
-      // En onboarding no evaluamos más decisiones
-      return decisions;
+      d.payload.messageType = 'onboarding';
+      d.payload.onboardingStep = step;
+      return [d];
     }
   }
 
-  // ── RECOVERY — usuario desenganchado ─────────────────────────────────────
+  // ── RECOVERY — usuario desenganchado ──────────────────────────────────────
   if (userState === 'at_risk') {
-    decisions.push({
-      type: ACTION_TYPES.SHOW_MESSAGE,
+    decisions.push(createDecision({
+      id: 'recovery',
+      type: 'RECOVERY',
       priority: PRIORITY.RECOVERY,
-      priorityKey: 'RECOVERY',
-      payload: {
-        text: '👀 Hace tiempo que no avanzas… retomemos poco a poco.',
-        messageType: 'recovery',
-        callToAction: { label: 'Volver ahora', route: '/Dashboard' },
-      },
-    });
+      reason: 'low_engagement_score',
+      message: '👀 Hace tiempo que no avanzas… retomemos poco a poco.',
+      cta: { label: 'Volver ahora', route: '/Dashboard' },
+      ctx,
+      userState,
+    }));
   }
 
-  // ── URGENT — Racha en riesgo con presión progresiva ───────────────────────
+  // ── URGENT — Racha en riesgo ──────────────────────────────────────────────
   if (ctx.streakAtRisk) {
     const h = ctx.hoursUntilDayEnd;
-    let urgencyLevel = 'low';
-    if (h <= 6) urgencyLevel = 'high';
-    if (h <= 2) urgencyLevel = 'critical';
-
+    const urgencyLevel = h <= 2 ? 'critical' : h <= 6 ? 'high' : 'low';
     const urgencyText = {
       low:      `⏳ Te quedan ${h}h para no perder tu racha de ${ctx.streakDays} días. Haz una lección.`,
       high:     `⚠️ Últimas ${h}h. Tu racha de ${ctx.streakDays} días está en peligro.`,
       critical: `🚨 ÚLTIMO AVISO. Pierdes ${ctx.streakDays} días de racha si no estudias ahora.`,
     };
-
-    decisions.push({
-      type: ACTION_TYPES.SHOW_MESSAGE,
+    const d = createDecision({
+      id: 'save_streak',
+      type: 'URGENT',
       priority: PRIORITY.URGENT,
-      priorityKey: 'URGENT',
-      payload: {
-        text: urgencyText[urgencyLevel],
-        messageType: 'save_streak',
-        urgencyLevel,
-        callToAction: { label: 'Salvar mi racha', route: '/Dashboard' },
-      },
+      reason: 'streak_at_risk',
+      message: urgencyText[urgencyLevel],
+      cta: { label: 'Salvar mi racha', route: '/Dashboard' },
+      ctx,
+      userState,
     });
+    d.payload.urgencyLevel = urgencyLevel;
+    decisions.push(d);
   }
 
   // ── OPPORTUNITY — Nivel próximo ───────────────────────────────────────────
   if (ctx.xpToNextLevel > 0 && ctx.xpToNextLevel <= 50) {
-    decisions.push({
-      type: ACTION_TYPES.SHOW_MESSAGE,
+    decisions.push(createDecision({
+      id: 'level_up_imminent',
+      type: 'OPPORTUNITY',
       priority: PRIORITY.OPPORTUNITY,
-      priorityKey: 'OPPORTUNITY',
-      payload: {
-        text: `⚡ Estás a solo ${ctx.xpToNextLevel} XP del Nivel ${ctx.level + 1}. ¡Una lección te lleva ahí!`,
-        messageType: 'level_up_imminent',
-        callToAction: { label: 'Subir de nivel', route: '/Dashboard' },
-      },
-    });
-
-    decisions.push({
-      type: ACTION_TYPES.REWARD,
-      priority: PRIORITY.OPPORTUNITY,
-      priorityKey: 'OPPORTUNITY',
-      payload: { description: `Nivel ${ctx.level + 1} desbloqueado` },
-    });
+      reason: 'close_to_level_up',
+      message: `⚡ Estás a solo ${ctx.xpToNextLevel} XP del Nivel ${ctx.level + 1}. ¡Una lección te lleva ahí!`,
+      cta: { label: 'Subir de nivel', route: '/Dashboard' },
+      ctx,
+      userState,
+    }));
   }
 
   // ── OPPORTUNITY — Meta semanal casi terminada ─────────────────────────────
   if (ctx.lessonsNeededForWeeklyGoal !== null && ctx.lessonsNeededForWeeklyGoal > 0 && ctx.lessonsNeededForWeeklyGoal <= 2) {
-    decisions.push({
-      type: ACTION_TYPES.SHOW_MESSAGE,
+    decisions.push(createDecision({
+      id: 'complete_weekly_goal',
+      type: 'OPPORTUNITY',
       priority: PRIORITY.OPPORTUNITY,
-      priorityKey: 'OPPORTUNITY',
-      payload: {
-        text: `📅 Te faltan solo ${ctx.lessonsNeededForWeeklyGoal} lección(es) para completar tu meta semanal.`,
-        messageType: 'complete_weekly_goal',
-        callToAction: { label: 'Terminar mi meta', route: '/Dashboard' },
-      },
-    });
+      reason: 'weekly_goal_near_completion',
+      message: `📅 Te faltan solo ${ctx.lessonsNeededForWeeklyGoal} lección(es) para completar tu meta semanal.`,
+      cta: { label: 'Terminar mi meta', route: '/Dashboard' },
+      ctx,
+      userState,
+    }));
   }
 
-  // ── OPPORTUNITY — Economía conductual: doble XP ───────────────────────────
-  if (!ctx.todayStudied && !ctx.streakAtRisk) {
-    decisions.push({
-      type: ACTION_TYPES.SHOW_MESSAGE,
+  // ── OPPORTUNITY — Feature flag: doble XP ─────────────────────────────────
+  if (flags.XP_MULTIPLIER_ENABLED && !ctx.todayStudied) {
+    decisions.push(createDecision({
+      id: 'xp_multiplier',
+      type: 'OPPORTUNITY',
       priority: PRIORITY.OPPORTUNITY,
-      priorityKey: 'OPPORTUNITY',
-      payload: {
-        text: `🔥 Estudia ahora y tus lecciones de hoy valen el doble de XP. Solo por hoy.`,
-        messageType: 'double_xp',
-        callToAction: { label: 'Aprovechar bonus', route: '/Dashboard' },
-      },
-    });
+      reason: 'xp_multiplier_active',
+      message: '🔥 ¡Doble XP disponible por tiempo limitado! Estudia ahora y duplica tus puntos.',
+      cta: { label: 'Aprovechar bonus', route: '/Dashboard' },
+      ctx,
+      userState,
+    }));
+  }
+
+  // ── OPPORTUNITY — Economía conductual: doble XP (orgánico) ───────────────
+  if (!flags.XP_MULTIPLIER_ENABLED && !ctx.todayStudied && !ctx.streakAtRisk) {
+    decisions.push(createDecision({
+      id: 'double_xp',
+      type: 'OPPORTUNITY',
+      priority: PRIORITY.OPPORTUNITY,
+      reason: 'first_study_bonus',
+      message: '🔥 Estudia ahora y tus lecciones de hoy valen el doble de XP. Solo por hoy.',
+      cta: { label: 'Aprovechar bonus', route: '/Dashboard' },
+      ctx,
+      userState,
+    }));
   }
 
   // ── MISSION — Desafío diario ──────────────────────────────────────────────
   if (!ctx.examDoneToday) {
-    decisions.push({
-      type: ACTION_TYPES.SHOW_MESSAGE,
+    decisions.push(createDecision({
+      id: 'do_daily_challenge',
+      type: 'MISSION',
       priority: PRIORITY.MISSION,
-      priorityKey: 'MISSION',
-      payload: {
-        text: `🎯 Tu desafío diario está disponible. Complétalo y gana XP extra.`,
-        messageType: 'do_daily_challenge',
-        callToAction: { label: 'Aceptar desafío', route: '/SurpriseExam' },
-      },
-    });
+      reason: 'daily_challenge_pending',
+      message: '🎯 Tu desafío diario está disponible. Complétalo y gana XP extra.',
+      cta: { label: 'Aceptar desafío', route: '/SurpriseExam' },
+      ctx,
+      userState,
+    }));
   }
 
   // ── MISSION — Agua disponible ─────────────────────────────────────────────
   if (ctx.waterTokens > 0) {
-    decisions.push({
-      type: ACTION_TYPES.SHOW_MESSAGE,
+    decisions.push(createDecision({
+      id: 'water_tree',
+      type: 'MISSION',
       priority: PRIORITY.MISSION,
-      priorityKey: 'MISSION',
-      payload: {
-        text: `💧 Tienes ${ctx.waterTokens} token${ctx.waterTokens > 1 ? 's' : ''} de agua. Tu árbol puede crecer ahora.`,
-        messageType: 'water_tree',
-        callToAction: { label: 'Regar mi árbol', route: '/Rewards' },
-      },
-    });
+      reason: 'water_tokens_available',
+      message: `💧 Tienes ${ctx.waterTokens} token${ctx.waterTokens > 1 ? 's' : ''} de agua. Tu árbol puede crecer ahora.`,
+      cta: { label: 'Regar mi árbol', route: '/Rewards' },
+      ctx,
+      userState,
+    }));
   }
 
   // ── MISSION — Progreso semanal ────────────────────────────────────────────
   if (ctx.weeklyTarget && !ctx.weeklyGoalCompleted) {
-    decisions.push({
-      type: ACTION_TYPES.SHOW_MESSAGE,
+    decisions.push(createDecision({
+      id: 'progress_weekly',
+      type: 'MISSION',
       priority: PRIORITY.MISSION,
-      priorityKey: 'MISSION',
-      payload: {
-        text: `📖 Llevas ${ctx.weeklyProgress}/${ctx.weeklyTarget} lecciones esta semana. Sigues a tiempo.`,
-        messageType: 'progress_weekly',
-        callToAction: { label: 'Continuar', route: '/Dashboard' },
-      },
-    });
+      reason: 'weekly_progress_reminder',
+      message: `📖 Llevas ${ctx.weeklyProgress}/${ctx.weeklyTarget} lecciones esta semana. Sigues a tiempo.`,
+      cta: { label: 'Continuar', route: '/Dashboard' },
+      ctx,
+      userState,
+    }));
   }
 
   // ── AMBIENT — Racha activa ────────────────────────────────────────────────
   if (ctx.streakDays >= 2 && ctx.todayStudied) {
-    decisions.push({
-      type: ACTION_TYPES.SHOW_MESSAGE,
+    decisions.push(createDecision({
+      id: 'streak_active',
+      type: 'AMBIENT',
       priority: PRIORITY.AMBIENT,
-      priorityKey: 'AMBIENT',
-      payload: {
-        text: `🔥 ¡${ctx.streakDays} días de racha! La constancia es tu superpoder.`,
-        messageType: 'streak_active',
-      },
-    });
+      reason: 'streak_ongoing',
+      message: `🔥 ¡${ctx.streakDays} días de racha! La constancia es tu superpoder.`,
+      ctx,
+      userState,
+    }));
   }
 
   // ── AMBIENT — Saludo por hora ─────────────────────────────────────────────
@@ -301,31 +365,33 @@ export function evaluateUserState({ profile, behavior }) {
     ? '👋 ¿Listo para continuar donde te quedaste? Aún hay tiempo hoy.'
     : '🌙 Cerrar el día aprendiendo algo nuevo siempre vale la pena 📚';
 
-  decisions.push({
-    type: ACTION_TYPES.SHOW_MESSAGE,
+  decisions.push(createDecision({
+    id: 'greeting',
+    type: 'AMBIENT',
     priority: PRIORITY.AMBIENT,
-    priorityKey: 'AMBIENT',
-    payload: { text: greetText, messageType: 'greeting' },
-  });
+    reason: 'time_based_greeting',
+    message: greetText,
+    ctx,
+    userState,
+  }));
 
-  // Ordenar por prioridad descendente
-  return decisions.sort((a, b) => b.priority - a.priority);
+  // Ordenar por score descendente (scoring completo aplicado)
+  return decisions.sort((a, b) => b.score - a.score);
 }
 
 // ─── getTopDecision ───────────────────────────────────────────────────────────
-// Devuelve solo la decisión de mayor prioridad de tipo SHOW_MESSAGE.
+// Recibe decisiones ya filtradas por cooldown, devuelve la de mayor score.
 
-export function getTopDecision({ profile, behavior, lastMessageType }) {
-  const decisions = evaluateUserState({ profile, behavior });
-  const messages  = decisions.filter(d => d.type === ACTION_TYPES.SHOW_MESSAGE);
+export function getTopDecision(decisions, lastMessageType) {
+  const messages = decisions.filter(d => d.payload?.text);
   if (!messages.length) return null;
 
   const top = messages[0];
   // Evitar el mismo tipo consecutivo (salvo urgentes)
   if (
     lastMessageType &&
-    top.payload.messageType === lastMessageType &&
-    top.priorityKey !== 'URGENT'
+    top.id === lastMessageType &&
+    top.type !== 'URGENT'
   ) {
     return messages[1] || top;
   }
@@ -334,49 +400,49 @@ export function getTopDecision({ profile, behavior, lastMessageType }) {
 }
 
 // ─── buildLoginDecision ───────────────────────────────────────────────────────
-// Genera la decisión de bienvenida al hacer login.
 
 export function buildLoginDecision({ name, profile, behavior }) {
+  const ctx = profile ? buildContext(profile) : null;
+  const userState = getUserState(behavior);
+
   if (!profile) {
-    return {
-      type: ACTION_TYPES.SHOW_MESSAGE,
+    return createDecision({
+      id: 'login_welcome',
+      type: 'AMBIENT',
       priority: PRIORITY.AMBIENT,
-      priorityKey: 'AMBIENT',
-      payload: {
-        text: 'Bienvenido de nuevo. ¡Sigue avanzando hoy! 🚀',
-        messageType: 'login',
-        isReactive: true,
-        duration: 10000,
-      },
-    };
+      reason: 'login_event',
+      message: 'Bienvenido de nuevo. ¡Sigue avanzando hoy! 🚀',
+      ctx,
+      userState,
+    });
   }
 
-  const ctx = buildContext(profile);
-  const h   = ctx.now.getUTCHours();
+  const h = ctx.now.getUTCHours();
   const firstName = name?.split(' ')[0] || 'estudiante';
   const saludo = h >= 5 && h < 12 ? `🌞 ¡Buenos días, ${firstName}!`
     : h < 19 ? `☀️ ¡Buenas tardes, ${firstName}!`
     : `🌙 ¡Buenas noches, ${firstName}!`;
 
-  const topDecision = getTopDecision({ profile, behavior, lastMessageType: null });
-  const next = topDecision?.payload;
+  const allDecisions  = evaluateUserState({ profile, behavior });
+  const topDecision   = allDecisions[0];
 
-  return {
-    type: ACTION_TYPES.SHOW_MESSAGE,
+  const d = createDecision({
+    id: 'login_welcome',
+    type: 'AMBIENT',
     priority: PRIORITY.AMBIENT,
-    priorityKey: 'AMBIENT',
-    payload: {
-      text: `${saludo} ${next?.text || '¡Sigue avanzando!'}`,
-      messageType: 'login',
-      isReactive: true,
-      duration: 12000,
-      callToAction: next?.callToAction || null,
-    },
-  };
+    reason: 'login_event',
+    message: `${saludo} ${topDecision?.message || '¡Sigue avanzando!'}`,
+    cta: topDecision?.cta || null,
+    ctx,
+    userState,
+  });
+  d.payload.isReactive = true;
+  d.payload.duration   = 12000;
+  d.payload.messageType = 'login';
+  return d;
 }
 
 // ─── buildReactiveDecision ────────────────────────────────────────────────────
-// Convierte un evento de usuario en una decisión estructurada de tipo SHOW_MESSAGE.
 
 const REACTIVE_DURATION = {
   level_up: 20000,
@@ -388,55 +454,56 @@ const REACTIVE_DURATION = {
 };
 
 export function buildReactiveDecision(eventType, payload, ctx) {
-  let text = null;
+  const userState = 'neutral';
+  let message = null;
 
   switch (eventType) {
     case 'lesson_completed': {
       const xpGain = payload?.xp || 0;
       const title  = payload?.lessonTitle;
-      text = title
+      message = title
         ? `📚 "${title}" completada. +${xpGain} XP ⚡`
         : `📚 ¡Lección completada! +${xpGain} XP ⚡`;
-      if (ctx?.xpToNextLevel > 0) text += ` Estás a ${ctx.xpToNextLevel} XP del Nivel ${ctx.level + 1}.`;
+      if (ctx?.xpToNextLevel > 0) message += ` Estás a ${ctx.xpToNextLevel} XP del Nivel ${ctx.level + 1}.`;
       break;
     }
     case 'quiz_perfect_score':
-      text = `💯 ¡Puntuación PERFECTA! +${payload?.xp || 0} XP 🏆`;
+      message = `💯 ¡Puntuación PERFECTA! +${payload?.xp || 0} XP 🏆`;
       break;
     case 'xp_gained': {
       if (!payload?.xp) return null;
-      text = `⚡ +${payload.xp} XP ganados. Total: ${ctx?.xp || '??'} XP.`;
-      if (ctx?.xpToNextLevel > 0) text += ` Faltan ${ctx.xpToNextLevel} XP para el Nivel ${ctx?.level + 1}.`;
+      message = `⚡ +${payload.xp} XP ganados. Total: ${ctx?.xp || '??'} XP.`;
+      if (ctx?.xpToNextLevel > 0) message += ` Faltan ${ctx.xpToNextLevel} XP para el Nivel ${ctx?.level + 1}.`;
       break;
     }
     case 'level_up':
-      text = payload?.level
+      message = payload?.level
         ? `🎉 ¡SUBISTE AL NIVEL ${payload.level}! Con ${ctx?.xp || '??'} XP acumulados. ¡Nuevo reto desbloqueado!`
         : `🎉 ¡NUEVO NIVEL! Sigue así.`;
       break;
     case 'tree_watered':
-      text = payload?.stage !== undefined
+      message = payload?.stage !== undefined
         ? `💧 ¡Árbol en Etapa ${payload.stage}! Sigue regando para verlo florecer 🌳`
         : `💧 ¡Tu árbol ha crecido!`;
       break;
     case 'streak_updated':
-      text = payload?.streak_days
+      message = payload?.streak_days
         ? `🔥 ¡${payload.streak_days} día${payload.streak_days > 1 ? 's' : ''} de racha! Mañana, día ${payload.streak_days + 1}.`
         : `🔥 ¡Racha activa! Cada día cuenta.`;
       break;
     case 'streak_lost':
-      text = `💔 Perdiste tu racha. Pero HOY puedes empezar una nueva. ¡El primer paso es el más importante!`;
+      message = `💔 Perdiste tu racha. Pero HOY puedes empezar una nueva. ¡El primer paso es el más importante!`;
       break;
     case 'daily_exam_completed': {
       const score    = payload?.score;
       const xpEarned = payload?.xp_earned;
-      text = score !== undefined && xpEarned !== undefined
+      message = score !== undefined && xpEarned !== undefined
         ? `🎯 Desafío completado: ${score}% de aciertos. +${xpEarned} XP 🏆`
         : `🎯 ¡Desafío diario completado! XP extra en camino.`;
       break;
     }
     case 'achievement_unlocked':
-      text = payload?.name
+      message = payload?.name
         ? `🏆 Logro desbloqueado: "${payload.name}" ✨`
         : `🏆 ¡Nuevo logro desbloqueado!`;
       break;
@@ -444,23 +511,23 @@ export function buildReactiveDecision(eventType, payload, ctx) {
       return null;
   }
 
-  if (!text) return null;
+  if (!message) return null;
 
-  return {
-    type: ACTION_TYPES.SHOW_MESSAGE,
+  const d = createDecision({
+    id: eventType,
+    type: 'URGENT',
     priority: PRIORITY.URGENT,
-    priorityKey: 'URGENT',
-    payload: {
-      text,
-      messageType: eventType,
-      isReactive: true,
-      duration: REACTIVE_DURATION[eventType] || REACTIVE_DURATION.default,
-    },
-  };
+    reason: `reactive_${eventType}`,
+    message,
+    ctx,
+    userState,
+  });
+  d.payload.isReactive = true;
+  d.payload.duration   = REACTIVE_DURATION[eventType] || REACTIVE_DURATION.default;
+  return d;
 }
 
 // ─── groupQueuedDecisions ─────────────────────────────────────────────────────
-// Agrupa eventos encolados en decisiones resumidas.
 
 export function groupQueuedDecisions(queue, ctx) {
   if (!queue.length) return [];
@@ -472,8 +539,8 @@ export function groupQueuedDecisions(queue, ctx) {
 
   for (const event of queue) {
     const t = event.type;
-    if (t === 'xp_gained')            totalXP += event.data?.xp || 0;
-    else if (t === 'lesson_completed') lessons += 1;
+    if (t === 'xp_gained')               totalXP += event.data?.xp || 0;
+    else if (t === 'lesson_completed')    lessons += 1;
     else if (t === 'achievement_unlocked') achievements += 1;
     else if (['level_up', 'streak_updated', 'daily_exam_completed'].includes(t)) {
       const d = buildReactiveDecision(t, event.data, ctx);
@@ -488,15 +555,18 @@ export function groupQueuedDecisions(queue, ctx) {
     if (lessons > 0)      parts.push(`${lessons} lección${lessons > 1 ? 'es' : ''} completada${lessons > 1 ? 's' : ''}`);
     if (totalXP > 0)      parts.push(`+${totalXP} XP`);
     if (achievements > 0) parts.push(`${achievements} logro${achievements > 1 ? 's' : ''} nuevo${achievements > 1 ? 's' : ''}`);
-    let text = parts.length > 1 ? `🔥 ¡Gran sesión! ${parts.join(', ')}.` : `📚 ¡${parts[0]}!`;
-    if (ctx?.xpToNextLevel > 0) text += ` Estás a ${ctx.xpToNextLevel} XP del Nivel ${ctx.level + 1}.`;
+    let msg = parts.length > 1 ? `🔥 ¡Gran sesión! ${parts.join(', ')}.` : `📚 ¡${parts[0]}!`;
+    if (ctx?.xpToNextLevel > 0) msg += ` Estás a ${ctx.xpToNextLevel} XP del Nivel ${ctx.level + 1}.`;
 
-    decisions.push({
-      type: ACTION_TYPES.SHOW_MESSAGE,
+    decisions.push(createDecision({
+      id: 'queued_summary',
+      type: 'URGENT',
       priority: PRIORITY.URGENT,
-      priorityKey: 'URGENT',
-      payload: { text, messageType: 'queued_summary', isReactive: true, duration: 10000 },
-    });
+      reason: 'queued_events_summary',
+      message: msg,
+      ctx,
+      userState: 'neutral',
+    }));
   }
 
   decisions.push(...standalone);

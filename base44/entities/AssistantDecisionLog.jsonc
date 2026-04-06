@@ -1,0 +1,49 @@
+{
+  "name": "AssistantDecisionLog",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario asociado a la decisi\u00f3n"
+    },
+    "decision_id": {
+      "type": "string",
+      "description": "ID del tipo de decisi\u00f3n (ej. 'save_streak', 'level_up_imminent')"
+    },
+    "decision_instance_id": {
+      "type": "string",
+      "description": "UUID \u00fanico de esta instancia de decisi\u00f3n para tracking individual"
+    },
+    "decision_type": {
+      "type": "string",
+      "description": "Categor\u00eda de la decisi\u00f3n (ej. 'URGENT', 'OPPORTUNITY', 'AMBIENT')"
+    },
+    "score": {
+      "type": "number",
+      "description": "Score calculado de la decisi\u00f3n (priority * urgency * engagementWeight * timeFactor)"
+    },
+    "shown_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp cuando la decisi\u00f3n fue mostrada al usuario"
+    },
+    "clicked": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si el usuario hizo clic en el CTA"
+    },
+    "dismissed": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si el usuario descart\u00f3 la decisi\u00f3n sin hacer clic"
+    }
+  },
+  "required": [
+    "user_email",
+    "decision_id",
+    "decision_instance_id",
+    "decision_type",
+    "score",
+    "shown_at"
+  ]
+}
