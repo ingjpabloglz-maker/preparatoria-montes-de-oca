@@ -77,8 +77,7 @@
     },
     "weekly_goal_target": {
       "type": "number",
-      "default": 10,
-      "description": "Meta semanal de lecciones completadas"
+      "description": "Meta semanal de lecciones completadas (null = no configurada a\u00fan)"
     },
     "weekly_goal_progress": {
       "type": "number",
@@ -87,7 +86,41 @@
     },
     "weekly_goal_start_date": {
       "type": "string",
-      "description": "Fecha de inicio de la semana actual de la meta (YYYY-MM-DD)"
+      "description": "Fecha de inicio de la semana actual YYYY-MM-DD (basada en cuando el usuario configur\u00f3 su meta)"
+    },
+    "weekly_goal_completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el usuario complet\u00f3 la meta de esta semana"
+    },
+    "weekly_goal_reward_claimed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si las recompensas de esta semana ya fueron otorgadas (anti-duplicado)"
+    },
+    "weekly_goal_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string"
+          },
+          "end_date": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "number"
+          },
+          "progress": {
+            "type": "number"
+          },
+          "completed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "description": "Historial de semanas pasadas"
     }
   },
   "required": [

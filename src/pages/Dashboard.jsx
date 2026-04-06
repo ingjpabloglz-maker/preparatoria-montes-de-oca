@@ -32,6 +32,7 @@ import StatsOverview from '../components/dashboard/StatsOverview';
 import SubjectCard from '../components/dashboard/SubjectCard';
 import FolioValidator from '../components/payment/FolioValidator';
 import WeeklyGoal from '../components/gamification/WeeklyGoal';
+import WeeklyGoalSetupModal from '../components/gamification/WeeklyGoalSetupModal';
 import { useGamificationProfile } from '@/hooks/useGamification';
 import { AlertCircle, Lock, Flame } from "lucide-react";
 import { getStreakStatus } from '@/lib/streakStatus';
@@ -340,7 +341,7 @@ export default function Dashboard() {
   const progress = userProgress?.[0];
   const currentLevel = progress?.current_level || 1;
 
-  const { data: gamProfile } = useGamificationProfile(user?.email);
+  const { data: gamProfile, refetch: refetchGamProfile } = useGamificationProfile(user?.email);
 
   const { message: assistantMsg, visible: assistantVisible, dismiss: dismissAssistant } = useAssistant({
     userEmail: user?.email,
@@ -585,8 +586,13 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Modal de configuración de meta semanal (solo si el usuario no tiene meta) */}
+        {gamProfile && !gamProfile.weekly_goal_target && (
+          <WeeklyGoalSetupModal onComplete={() => refetchGamProfile()} />
+        )}
+
         {/* Meta Semanal */}
-        {gamProfile && (
+        {gamProfile && gamProfile.weekly_goal_target && (
           <Card className="border-0 shadow-md">
             <CardContent className="p-5">
               <WeeklyGoal profile={gamProfile} />

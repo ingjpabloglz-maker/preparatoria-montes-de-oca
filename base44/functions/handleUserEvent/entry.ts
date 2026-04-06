@@ -167,30 +167,67 @@ Deno.serve(async (req) => {
   const treeLevelUp = newTreeStage > prevTreeStage;
 
   // ─── META SEMANAL ─────────────────────────────────────────────────────────────
-  // Obtener inicio de semana actual (lunes)
-  const dayOfWeek = matamorosNow.getUTCDay(); // día local Matamoros
-  const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
-  const thisMonday = new Date(matamorosNow);
-  thisMonday.setUTCDate(matamorosNow.getUTCDate() + diffToMonday);
-  const thisMondayStr = getLocalDateString(thisMonday);
-
+  // Reset basado en 7 días desde weekly_goal_start_date del usuario (no por lunes global)
   let weeklyProgress = gam?.weekly_goal_progress ?? 0;
-  const weeklyTarget = gam?.weekly_goal_target ?? 10;
+  const weeklyTarget = gam?.weekly_goal_target ?? null; // null = no configurada
   const prevWeeklyStart = gam?.weekly_goal_start_date ?? null;
-  let weeklyStartDate = prevWeeklyStart ?? thisMondayStr;
+  let weeklyStartDate = prevWeeklyStart;
+  let weeklyCompleted = gam?.weekly_goal_completed ?? false;
+  let weeklyRewardClaimed = gam?.weekly_goal_reward_claimed ?? false;
   let weeklyGoalJustCompleted = false;
+  let weeklyHistory = gam?.weekly_goal_history ?? [];
+  let weeklyBonusXP = 0;
+  let weeklyBonusStars = 0;
 
-  // Resetear si es una nueva semana
-  if (prevWeeklyStart !== thisMondayStr) {
-    weeklyProgress = 0;
-    weeklyStartDate = thisMondayStr;
-  }
+  // Solo procesar meta semanal si el usuario la tiene configurada
+  if (weeklyTarget && prevWeeklyStart) {
+    const startMs = new Date(prevWeeklyStart + 'T00:00:00Z').getTime();
+    const nowMs = matamorosNow.getTime();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    const weekExpired = (nowMs - startMs) >= sevenDaysMs;
 
-  if (event_type === 'lesson_completed') {
-    weeklyProgress += 1;
-    if (weeklyProgress === weeklyTarget) {
-      weeklyGoalJustCompleted = true;
-      // Bonus XP por completar meta semanal (ya se suma al newXP si modificamos earnedXP antes, pero aquí lo hacemos via gamUpdate)
+    if (weekExpired) {
+      // Guardar resultado en historial
+      const endDate = getLocalDateString(new Date(startMs + sevenDaysMs));
+      const wasCompleted = weeklyProgress >= weeklyTarget;
+      const historyEntry = {
+        start_date: prevWeeklyStart,
+        end_date: endDate,
+        goal: weeklyTarget,
+        progress: weeklyProgress,
+        completed: wasCompleted,
+      };
+      weeklyHistory = [...weeklyHistory, historyEntry];
+      // Mantener máximo 52 semanas de historial
+      if (weeklyHistory.length > 52) weeklyHistory = weeklyHistory.slice(-52);
+
+      // Otorgar recompensas si completó la semana anterior y no se otorgaron
+      if (wasCompleted && !weeklyRewardClaimed) {
+        weeklyBonusXP = 50;
+        weeklyBonusStars = 3;
+      }
+
+      // Resetear para nueva semana
+      weeklyProgress = 0;
+      weeklyStartDate = today;
+      weeklyCompleted = false;
+      weeklyRewardClaimed = false;
+    }
+
+    // Incrementar progreso si es lección completada
+    if (event_type === 'lesson_completed') {
+      weeklyProgress = Math.min(weeklyProgress + 1, weeklyTarget * 2); // cap razonable
+      // Detectar si se acaba de completar la meta por primera vez esta semana
+      if (weeklyProgress >= weeklyTarget && !weeklyCompleted) {
+        weeklyCompleted = true;
+        weeklyGoalJustCompleted = true;
+        // Recompensas se dan aquí (semana en curso completada)
+        if (!weeklyRewardClaimed) {
+          weeklyBonusXP = 50;
+          weeklyBonusStars = 3;
+          weeklyRewardClaimed = true;
+        }
+      }
     }
   }
 
@@ -220,20 +257,21 @@ Deno.serve(async (req) => {
     surpriseIds = surpriseIds.slice(-100);
   }
 
-  // XP bonus por meta semanal completada
-  const weeklyBonusXP = weeklyGoalJustCompleted ? 50 : 0;
   const finalXP = newXP + weeklyBonusXP;
 
   // Recalcular nivel con XP bonus
   let finalLevel = getLevelFromXP(finalXP);
   finalLevel = Math.max(1, finalLevel);
 
+  // Sumar estrellas bonus de meta semanal
+  const finalStars = newStars + weeklyBonusStars;
+
   const gamUpdate = {
     user_email,
     streak_days: newStreakDays,
     last_study_date_normalized: today,
     max_streak: newMaxStreak,
-    total_stars: newStars,
+    total_stars: finalStars,
     streak_shields: shieldUsed ? Math.max(0, (gam?.streak_shields || 0) - 1) : (gam?.streak_shields || 0),
     water_tokens: newWater,
     xp_points: finalXP,
@@ -246,6 +284,9 @@ Deno.serve(async (req) => {
     weekly_goal_progress: weeklyProgress,
     weekly_goal_target: weeklyTarget,
     weekly_goal_start_date: weeklyStartDate,
+    weekly_goal_completed: weeklyCompleted,
+    weekly_goal_reward_claimed: weeklyRewardClaimed,
+    weekly_goal_history: weeklyHistory,
   };
 
   if (gam) {
@@ -367,7 +408,7 @@ Deno.serve(async (req) => {
     streak_saved_by_shield: shieldUsed,
     xp_earned: earnedXP + weeklyBonusXP,
     total_xp: finalXP,
-    total_stars: newStars,
+    total_stars: finalStars,
     level: finalLevel,
     leveled_up: finalLevel > (gam?.level || 1),
     newly_unlocked_achievements: newlyUnlocked,
