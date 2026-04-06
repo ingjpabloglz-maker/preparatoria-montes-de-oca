@@ -3,35 +3,35 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 // ─── UTILIDADES DE FECHA ─────────────────────────────────────────────────────
 const getMatamorosDateObject = () => {
   const now = new Date();
-  const matamorosTimeParts = new Intl.DateTimeFormat('en-US', {
+  const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Matamoros',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: 'numeric',
-    second: 'numeric',
-    hour12: false,
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: '2-digit', minute: 'numeric', second: 'numeric', hour12: false,
   }).formatToParts(now);
 
-  const year   = parseInt(matamorosTimeParts.find(p => p.type === 'year').value);
-  const month  = parseInt(matamorosTimeParts.find(p => p.type === 'month').value);
-  const day    = parseInt(matamorosTimeParts.find(p => p.type === 'day').value);
-  const hour   = parseInt(matamorosTimeParts.find(p => p.type === 'hour').value);
-  const minute = parseInt(matamorosTimeParts.find(p => p.type === 'minute').value);
-  const second = parseInt(matamorosTimeParts.find(p => p.type === 'second').value);
+  const year   = parseInt(parts.find(p => p.type === 'year').value);
+  const month  = parseInt(parts.find(p => p.type === 'month').value);
+  const day    = parseInt(parts.find(p => p.type === 'day').value);
+  const hour   = parseInt(parts.find(p => p.type === 'hour').value);
+  const minute = parseInt(parts.find(p => p.type === 'minute').value);
+  const second = parseInt(parts.find(p => p.type === 'second').value);
 
   return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
 };
 
-const getLocalDateString = () => {
-  const now = new Date();
+// Formatea un Date object a YYYY-MM-DD en la zona horaria de Matamoros
+const getLocalDateString = (dateObj) => {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Matamoros',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(dateObj);
+};
+
+// Convierte YYYY-MM-DD a número entero para comparación 100% timezone-agnostic
+const toDayNumber = (dateStr) => {
+  if (!dateStr) return 0;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return y * 10000 + m * 100 + d;
 };
 
 // ─── UTILIDADES DE NIVEL ──────────────────────────────────────────────────────
@@ -105,14 +105,20 @@ function calculateStreak(gam, matamorosNow, todayString) {
         return { newStreakDays: gam.streak_days || 1, streakBroke: false, shieldUsed: false };
       }
 
+      // Calcular "ayer" en la zona horaria de Matamoros
       const matamorosYesterday = new Date(matamorosNow);
       matamorosYesterday.setUTCDate(matamorosYesterday.getUTCDate() - 1);
-      const yesterdayStr = `${matamorosYesterday.getUTCFullYear()}-${(matamorosYesterday.getUTCMonth() + 1).toString().padStart(2, '0')}-${matamorosYesterday.getUTCDate().toString().padStart(2, '0')}`;
+      const yesterdayStr = getLocalDateString(matamorosYesterday);
 
-      // Comparación directa de strings YYYY-MM-DD (ordenables lexicográficamente, sin depender de timezone)
-      if (lastDate === yesterdayStr) {
+      // Comparación numérica: 100% independiente de timezone y DST
+      const lastDayNum      = toDayNumber(lastDate);
+      const yesterdayDayNum = toDayNumber(yesterdayStr);
+
+      if (lastDayNum === yesterdayDayNum) {
+        // Estudió ayer → continúa racha
         newStreakDays = (gam.streak_days || 0) + 1;
-      } else if (lastDate < yesterdayStr) {
+      } else if (lastDayNum < yesterdayDayNum) {
+        // Faltó al menos un día → verificar escudo
         const shields = gam.streak_shields || 0;
         if (shields > 0) {
           newStreakDays = gam.streak_days || 1;
@@ -134,7 +140,8 @@ function calculateStreak(gam, matamorosNow, todayString) {
 
 // ─── BLOQUE 4: Calcular puntos de gamificación ───────────────────────────────
 function calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays) {
-  const multiplier = Math.min(1 + (newStreakDays / 20), 2);
+  // Clamp inferior a 1 para proteger contra streakDays corruptos (ej: negativos)
+  const multiplier = Math.max(1, Math.min(1 + (newStreakDays / 20), 2));
   const earnedXP = Math.round(baseXP * multiplier);
   const newXP = (gam?.xp_points || 0) + earnedXP;
   const newStars = (gam?.total_stars || 0) + baseStars;
@@ -144,23 +151,27 @@ function calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStrea
 }
 
 // ─── BLOQUE 5: Calcular crecimiento del árbol ────────────────────────────────
-function updateTreeGrowth(newWater, gam) {
+function updateTreeGrowth(newWater) {
   const TREE_THRESHOLDS = [0, 5, 15, 30, 60, 100];
-  const prevTreeStage = gam?.tree_stage ?? 0;
-  let newTreeStage = prevTreeStage;
+  let newTreeStage = 0;
   for (let i = TREE_THRESHOLDS.length - 1; i >= 0; i--) {
     if (newWater >= TREE_THRESHOLDS[i]) { newTreeStage = i; break; }
   }
-  const treeLevelUp = newTreeStage > prevTreeStage;
-  return { newTreeStage, treeLevelUp };
+  return { newTreeStage };
 }
 
 // ─── BLOQUE 6: Gestionar meta semanal ────────────────────────────────────────
-function manageWeeklyGoal(gam, event_type, today, matamorosNow) {
+function manageWeeklyGoal(gam, event_type, todayString, matamorosNow) {
   let weeklyProgress = gam?.weekly_goal_progress ?? 0;
   const weeklyTarget = gam?.weekly_goal_target ?? null;
   const prevWeeklyStart = gam?.weekly_goal_start_date ?? null;
   let weeklyStartDate = prevWeeklyStart;
+
+  // Si hay meta pero no hay fecha de inicio → inicializar ahora
+  if (weeklyTarget && !weeklyStartDate) {
+    weeklyStartDate = todayString;
+  }
+
   let weeklyCompleted = gam?.weekly_goal_completed ?? false;
   let weeklyRewardClaimed = gam?.weekly_goal_reward_claimed ?? false;
   let weeklyGoalJustCompleted = false;
@@ -168,32 +179,37 @@ function manageWeeklyGoal(gam, event_type, today, matamorosNow) {
   let weeklyBonusXP = 0;
   let weeklyBonusStars = 0;
 
-  if (weeklyTarget && prevWeeklyStart) {
-    const startMs = new Date(prevWeeklyStart + 'T00:00:00Z').getTime();
-    const nowMs = matamorosNow.getTime();
+  if (weeklyTarget && weeklyStartDate) {
+    const startDayNum   = toDayNumber(weeklyStartDate);
+    const todayDayNum   = toDayNumber(todayString);
+    const daysSinceStart = todayDayNum - startDayNum; // Aproximación en días (numérica)
+
+    // Usar ms para calcular expiración de 7 días de forma precisa
+    const startMs     = new Date(weeklyStartDate + 'T00:00:00').getTime();
+    const nowMs       = matamorosNow.getTime();
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     const weekExpired = (nowMs - startMs) >= sevenDaysMs;
 
     if (weekExpired) {
       const endDate = getLocalDateString(new Date(startMs + sevenDaysMs));
       const wasCompleted = weeklyProgress >= weeklyTarget;
-      const historyEntry = {
-        start_date: prevWeeklyStart,
+      weeklyHistory = [...weeklyHistory, {
+        start_date: weeklyStartDate,
         end_date: endDate,
         goal: weeklyTarget,
         progress: weeklyProgress,
         completed: wasCompleted,
-      };
-      weeklyHistory = [...weeklyHistory, historyEntry];
+      }];
       if (weeklyHistory.length > 52) weeklyHistory = weeklyHistory.slice(-52);
 
+      // Recompensa por semana expirada si se completó y no se cobró
       if (wasCompleted && !weeklyRewardClaimed) {
-        weeklyBonusXP = 50;
-        weeklyBonusStars = 3;
+        weeklyBonusXP += 50;
+        weeklyBonusStars += 3;
       }
 
       weeklyProgress = 0;
-      weeklyStartDate = today;
+      weeklyStartDate = todayString;
       weeklyCompleted = false;
       weeklyRewardClaimed = false;
     }
@@ -204,8 +220,8 @@ function manageWeeklyGoal(gam, event_type, today, matamorosNow) {
         weeklyCompleted = true;
         weeklyGoalJustCompleted = true;
         if (!weeklyRewardClaimed) {
-          weeklyBonusXP = 50;
-          weeklyBonusStars = 3;
+          weeklyBonusXP += 50;
+          weeklyBonusStars += 3;
           weeklyRewardClaimed = true;
         }
       }
@@ -220,14 +236,14 @@ function manageWeeklyGoal(gam, event_type, today, matamorosNow) {
 }
 
 // ─── BLOQUE 7: Gestionar datos de examen sorpresa ────────────────────────────
-function handleSurpriseExamData(gam, isSurpriseExam, event_data, today) {
+function handleSurpriseExamData(gam, isSurpriseExam, event_data, todayString) {
   let surpriseIds = gam?.answered_surprise_questions_ids || [];
   let lastSurpriseExamDate = gam?.last_surprise_exam_date_normalized || null;
 
   if (isSurpriseExam && event_data.question_ids?.length) {
     surpriseIds = [...surpriseIds, ...event_data.question_ids];
     if (surpriseIds.length > 100) surpriseIds = surpriseIds.slice(-100);
-    lastSurpriseExamDate = today;
+    lastSurpriseExamDate = todayString;
   } else if (surpriseIds.length > 100) {
     surpriseIds = surpriseIds.slice(-100);
   }
@@ -302,7 +318,7 @@ async function processAchievements(base44, user_email, event_type, newStreakDays
 }
 
 // ─── BLOQUE 9: Actualizar métricas de usuario ────────────────────────────────
-async function updateUserMetrics(base44, user_email, metrics, currentMinute, today, streakBroke, nowIso) {
+async function updateUserMetrics(base44, user_email, metrics, currentMinute, todayString, streakBroke, nowIso) {
   const eventsThisMinute = metrics?.last_event_minute === currentMinute
     ? (metrics.events_this_minute || 0) + 1
     : 1;
@@ -315,7 +331,7 @@ async function updateUserMetrics(base44, user_email, metrics, currentMinute, tod
     last_updated: nowIso,
     total_streak_breaks: (metrics?.total_streak_breaks || 0) + (streakBroke ? 1 : 0),
     last_daily_active: nowIso,
-    total_days_active: metrics?.last_daily_active?.split('T')[0] !== today
+    total_days_active: metrics?.last_daily_active?.split('T')[0] !== todayString
       ? (metrics?.total_days_active || 0) + 1
       : (metrics?.total_days_active || 0),
   };
@@ -341,11 +357,10 @@ Deno.serve(async (req) => {
   }
 
   const user_email = user.email;
-
   const nowIso = new Date().toISOString();
   const currentMinute = nowIso.substring(0, 16);
 
-  // ─── 1. IDEMPOTENCIA FUERTE: crear primero como lock lógico ─────────────────
+  // ─── 1. IDEMPOTENCIA: registrar evento antes de procesar ─────────────────
   try {
     await base44.asServiceRole.entities.ProcessedEvent.create({
       event_id, user_email, event_type, processed_at: nowIso,
@@ -383,31 +398,32 @@ Deno.serve(async (req) => {
     const gamArr = await base44.asServiceRole.entities.GamificationProfile.filter({ user_email });
     const gam = gamArr[0] || null;
     const matamorosNow = getMatamorosDateObject();
-    const today = getLocalDateString();
+    const todayString = getLocalDateString(matamorosNow); // YYYY-MM-DD timezone-safe
     const isSurpriseExam = event_type === 'surprise_exam_completed';
 
     // ─── 6. CALCULAR TODOS LOS VALORES DE GAMIFICACIÓN ───────────────────────
     const { baseXP, baseStars, baseWater }                               = calculateBaseAwards(event_type, event_data);
-    const { newStreakDays, streakBroke, shieldUsed }                     = calculateStreak(gam, matamorosNow, today);
+    const { newStreakDays, streakBroke, shieldUsed }                     = calculateStreak(gam, matamorosNow, todayString);
     const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays);
-    const { newTreeStage, treeLevelUp }                                  = updateTreeGrowth(newWater, gam);
+    const { newTreeStage }                                               = updateTreeGrowth(newWater);
+    const treeLevelUp                                                    = newTreeStage > (gam?.tree_stage ?? 0);
     const {
       weeklyProgress, weeklyTarget, weeklyStartDate, weeklyCompleted,
       weeklyRewardClaimed, weeklyGoalJustCompleted, weeklyHistory,
       weeklyBonusXP, weeklyBonusStars,
-    } = manageWeeklyGoal(gam, event_type, today, matamorosNow);
-    const { surpriseIds, lastSurpriseExamDate }                          = handleSurpriseExamData(gam, isSurpriseExam, event_data, today);
+    } = manageWeeklyGoal(gam, event_type, todayString, matamorosNow);
+    const { surpriseIds, lastSurpriseExamDate }                          = handleSurpriseExamData(gam, isSurpriseExam, event_data, todayString);
 
-    const finalXP     = newXP + weeklyBonusXP;
-    const finalStars  = newStars + weeklyBonusStars;
-    const finalLevel  = Math.max(1, getLevelFromXP(finalXP));
-    const leveledUp   = finalLevel > (gam?.level || 1);
+    const finalXP    = newXP + weeklyBonusXP;
+    const finalStars = newStars + weeklyBonusStars;
+    const finalLevel = Math.max(1, getLevelFromXP(finalXP));
+    const leveledUp  = finalLevel > (gam?.level || 1);
 
     // ─── 7. PERSISTIR GamificationProfile ────────────────────────────────────
     const gamUpdate = {
       user_email,
       streak_days: newStreakDays,
-      last_study_date_normalized: today,
+      last_study_date_normalized: todayString,
       max_streak: newMaxStreak,
       total_stars: finalStars,
       streak_shields: shieldUsed ? Math.max(0, (gam?.streak_shields || 0) - 1) : (gam?.streak_shields || 0),
@@ -437,13 +453,13 @@ Deno.serve(async (req) => {
     const newlyUnlocked = await processAchievements(base44, user_email, event_type, newStreakDays, finalStars, nowIso);
 
     // ─── 9. ACTUALIZAR MÉTRICAS ───────────────────────────────────────────────
-    await updateUserMetrics(base44, user_email, metrics, currentMinute, today, streakBroke, nowIso);
+    await updateUserMetrics(base44, user_email, metrics, currentMinute, todayString, streakBroke, nowIso);
 
     // ─── 10. CONSTRUIR RESPUESTA ──────────────────────────────────────────────
     const { minXP: finalMinXP, nextLevelXP: finalNextXP } = getLevelXPRange(finalLevel);
-    const xpIntoLevel      = finalXP - finalMinXP;
-    const xpNeededForNext  = finalNextXP - finalMinXP;
-    const progressPercent  = Math.max(0, Math.min(100, Math.round((xpIntoLevel / xpNeededForNext) * 100)));
+    const xpIntoLevel     = finalXP - finalMinXP;
+    const xpNeededForNext = finalNextXP - finalMinXP;
+    const progressPercent = Math.max(0, Math.min(100, Math.round((xpIntoLevel / xpNeededForNext) * 100)));
 
     return Response.json({
       status: 'ok',
