@@ -17,6 +17,7 @@ import {
 
 import SubjectCard from '../components/dashboard/SubjectCard';
 import NextStepCard from '../components/dashboard/NextStepCard';
+import { useMultiSubjectProgress } from '@/hooks/useSubjectProgress';
 export default function Level() {
   const urlParams = new URLSearchParams(window.location.search);
   const levelNum = parseInt(urlParams.get('level')) || 1;
@@ -68,11 +69,13 @@ export default function Level() {
   const isCurrentLevel = levelNum === currentLevel;
   const isCompleted = levelNum < currentLevel;
 
-  // Calcular progreso del nivel
+  const subjectIds = subjects.map(s => s.id);
+  const { progressMap } = useMultiSubjectProgress(user?.email, subjectIds);
+
+  // Calcular progreso del nivel desde datos reales de lecciones
   const levelProgress = subjects.length > 0
     ? subjects.reduce((sum, subject) => {
-        const sp = subjectProgress.find(p => p.subject_id === subject.id);
-        return sum + (sp?.progress_percent || 0);
+        return sum + (progressMap[subject.id]?.realProgress || 0);
       }, 0) / subjects.length
     : 0;
 
@@ -82,20 +85,19 @@ export default function Level() {
     return sp?.test_passed === true;
   });
 
-  // Calcular siguiente materia pendiente
+  // Calcular siguiente materia pendiente usando progreso real
   const nextSubject = (() => {
     const inProgress = subjects.find(s => {
+      const pct = progressMap[s.id]?.realProgress || 0;
       const sp = subjectProgress.find(p => p.subject_id === s.id);
-      const pct = sp?.progress_percent || 0;
       return pct > 0 && pct < 100 && !sp?.test_passed;
     });
     if (inProgress) {
-      const sp = subjectProgress.find(p => p.subject_id === inProgress.id);
-      return { ...inProgress, progress: Math.round(sp?.progress_percent || 0) };
+      return { ...inProgress, progress: progressMap[inProgress.id]?.realProgress || 0 };
     }
     const pending = subjects.find(s => {
       const sp = subjectProgress.find(p => p.subject_id === s.id);
-      return !sp?.test_passed && (sp?.progress_percent || 0) === 0;
+      return !sp?.test_passed && (progressMap[s.id]?.realProgress || 0) === 0;
     });
     return pending ? { ...pending, progress: 0 } : null;
   })();
@@ -191,12 +193,13 @@ export default function Level() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {subjects.map((subject) => {
               const sp = subjectProgress.find(p => p.subject_id === subject.id);
+              const realPct = progressMap[subject.id]?.realProgress || 0;
               const testStatus = sp?.test_passed ? 'aprobado' : sp?.test_attempts > 0 ? 'no_aprobado' : 'pendiente';
               return (
                 <SubjectCard
                   key={subject.id}
                   subject={subject}
-                  progress={sp?.progress_percent || 0}
+                  progress={realPct}
                   isCompleted={sp?.test_passed || false}
                   testStatus={testStatus}
                   onClick={() => window.location.href = createPageUrl(`Subject?id=${subject.id}`)}

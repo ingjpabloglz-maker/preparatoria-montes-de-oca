@@ -19,6 +19,7 @@ import {
 import SubjectTest from '../components/tests/SubjectTest';
 import ExtraordinaryFolioValidator from '../components/payment/ExtraordinaryFolioValidator';
 import { Map } from "lucide-react";
+import { useSubjectRealProgress } from '@/hooks/useSubjectProgress';
 
 export default function Subject() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -103,8 +104,10 @@ export default function Subject() {
     }
   });
 
-  const currentProgress = progressData?.progress_percent || 0;
-  const isCompleted = progressData?.completed || false;
+  const { realProgress, completedLessons, totalLessons } = useSubjectRealProgress(user?.email, subjectId);
+  // El progreso real viene de LessonProgress. completed = 100% de lecciones terminadas
+  const currentProgress = realProgress;
+  const isCompleted = totalLessons > 0 ? realProgress >= 100 : (progressData?.completed || false);
   const testPassed = progressData?.test_passed || false;
   const testAttempts = progressData?.test_attempts || 0;
   const finalGrade = progressData?.final_grade;
