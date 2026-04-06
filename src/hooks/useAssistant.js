@@ -117,6 +117,22 @@ async function advanceOnboardingStep(userEmail, currentStep) {
   });
 }
 
+// ─── MAPPER: decisión del engine → formato UI ─────────────────────────────────
+// El productEngine devuelve decisiones con payload anidado. La UI (AssistantBubble)
+// espera una estructura plana: { text, type, priority, callToAction, isReactive, duration, decision_instance_id }
+
+function mapDecisionToMessage(decision) {
+  return {
+    text:                 decision.payload?.text,
+    type:                 decision.id,
+    priority:             decision.priorityKey,
+    isReactive:           decision.payload?.isReactive || false,
+    duration:             decision.payload?.duration || 13000,
+    callToAction:         decision.payload?.callToAction || null,
+    decision_instance_id: decision.decision_instance_id,
+  };
+}
+
 // ─── HOOK PRINCIPAL ───────────────────────────────────────────────────────────
 
 export function useAssistant({ userEmail, profile, allowedPages, currentPage }) {
@@ -227,12 +243,12 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
           profile: payload?.profile,
           behavior: behaviorRef.current,
         });
-        enqueue(decision);
+        enqueue(mapDecisionToMessage(decision));
         return;
       }
 
       const decision = buildReactiveDecision(eventType, payload, ctxRef.current);
-      if (decision) enqueue(decision);
+      if (decision) enqueue(mapDecisionToMessage(decision));
     };
 
     window.addEventListener(ASSISTANT_EVENT_KEY, handler);
@@ -248,7 +264,7 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
     const cutoff  = Date.now() - 30 * 60 * 1000;
     const recent  = queue.filter(e => e.timestamp >= cutoff);
     const grouped = groupQueuedDecisions(recent, ctxRef.current);
-    grouped.forEach((decision, i) => setTimeout(() => enqueue(decision), 800 * i));
+    grouped.forEach((decision, i) => setTimeout(() => enqueue(mapDecisionToMessage(decision)), 800 * i));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAllowed]);
 
@@ -311,7 +327,7 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
       });
 
       // 5. Mostrar (el logging ocurre en showNext al hacer setVisible(true))
-      enqueue(topDecision);
+      enqueue(mapDecisionToMessage(topDecision));
     };
 
     const t = setTimeout(loadPassive, 4000);
