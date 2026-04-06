@@ -343,6 +343,45 @@ async function updateUserMetrics(base44, user_email, metrics, currentMinute, tod
   }
 }
 
+// ─── BLOQUE 10: Actualizar SubjectProgress.progress_percent ─────────────────
+async function updateSubjectProgressPercent(base44, user_email, event_data) {
+  const subject_id = event_data?.subject_id;
+  if (!subject_id) return;
+
+  // Contar lecciones totales y completadas del subject (sin mini evals)
+  const [allLessons, completedLessons] = await Promise.all([
+    base44.asServiceRole.entities.CourseLesson.filter({ subject_id }),
+    base44.asServiceRole.entities.LessonProgress.filter({ user_email, subject_id, completed: true }),
+  ]);
+
+  const totalCount = allLessons.filter(l => !l.is_mini_eval).length;
+  if (totalCount === 0) return;
+
+  const completedCount = completedLessons.filter(lp => {
+    const lesson = allLessons.find(l => l.id === lp.lesson_id);
+    return lesson && !lesson.is_mini_eval;
+  }).length;
+
+  const progress_percent = Math.round((completedCount / totalCount) * 100);
+
+  // Buscar o crear SubjectProgress
+  const existing = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email, subject_id });
+  if (existing[0]) {
+    await base44.asServiceRole.entities.SubjectProgress.update(existing[0].id, {
+      progress_percent,
+      last_activity: new Date().toISOString(),
+    });
+  } else {
+    await base44.asServiceRole.entities.SubjectProgress.create({
+      user_email,
+      subject_id,
+      progress_percent,
+      completed: false,
+      last_activity: new Date().toISOString(),
+    });
+  }
+}
+
 // ─── ORQUESTADOR PRINCIPAL ───────────────────────────────────────────────────
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -454,6 +493,11 @@ Deno.serve(async (req) => {
 
     // ─── 9. ACTUALIZAR MÉTRICAS ───────────────────────────────────────────────
     await updateUserMetrics(base44, user_email, metrics, currentMinute, todayString, streakBroke, nowIso);
+
+    // ─── 10. SINCRONIZAR SubjectProgress (si aplica) ──────────────────────────
+    if (event_type === 'lesson_completed' || event_type === 'mini_eval_passed') {
+      await updateSubjectProgressPercent(base44, user_email, event_data);
+    }
 
     // ─── 10. CONSTRUIR RESPUESTA ──────────────────────────────────────────────
     const { minXP: finalMinXP, nextLevelXP: finalNextXP } = getLevelXPRange(finalLevel);

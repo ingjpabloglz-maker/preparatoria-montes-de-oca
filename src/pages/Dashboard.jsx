@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/table";
 
 import LevelCard from '../components/dashboard/LevelCard';
-import { useMultiSubjectProgress } from '@/hooks/useSubjectProgress';
 import StatsOverview from '../components/dashboard/StatsOverview';
 import SubjectCard from '../components/dashboard/SubjectCard';
 import HeroBanner from '../components/dashboard/HeroBanner';
@@ -389,20 +388,15 @@ export default function Dashboard() {
     return acc;
   }, {});
 
-  // Calcular progreso por nivel
+  // Calcular progreso por nivel desde SubjectProgress.progress_percent
   const getLevelProgress = (levelNum) => {
     const levelSubjects = subjectsByLevel[levelNum] || [];
     if (levelSubjects.length === 0) return 0;
-
-    // Nivel ya completado → 100%
     if (levelNum < currentLevel) return 100;
-
     const progressSum = levelSubjects.reduce((sum, subject) => {
       const sp = subjectProgress.find(p => p.subject_id === subject.id);
-      if (sp?.completed && sp?.test_passed) return sum + 100;
-      return sum + (sp?.progress_percent || 0);
+      return sum + (sp?.test_passed ? 100 : sp?.progress_percent || 0);
     }, 0);
-
     return progressSum / levelSubjects.length;
   };
 
@@ -444,30 +438,32 @@ export default function Dashboard() {
 
   const currentLevelConfig = levels.find(l => l.level_number === currentLevel);
   const currentLevelSubjects = subjectsByLevel[currentLevel] || [];
-  const currentLevelSubjectIds = currentLevelSubjects.map(s => s.id);
-  const { progressMap: realProgressMap } = useMultiSubjectProgress(user?.email, currentLevelSubjectIds);
   const completedSubjectsCount = subjectProgress.filter(p => p.test_passed).length;
   const totalSubjectsCount = subjects.length;
   const totalProgress = totalSubjectsCount > 0
     ? Math.min(100, (subjectProgress.reduce((sum, p) => sum + Math.min(100, p.progress_percent || 0), 0) / totalSubjectsCount))
     : 0;
 
-  // Calcular siguiente materia pendiente usando progreso real de lecciones
+  // Calcular siguiente materia pendiente desde SubjectProgress.progress_percent
   const getNextSubject = () => {
     const levelSubjects = currentLevelSubjects;
     if (!levelSubjects.length) return null;
     const inProgress = levelSubjects.find(s => {
-      const pct = realProgressMap[s.id]?.realProgress || 0;
       const sp = subjectProgress.find(p => p.subject_id === s.id);
+      const pct = sp?.progress_percent || 0;
       return pct > 0 && pct < 100 && !sp?.test_passed;
     });
-    if (inProgress) return { ...inProgress, progress: realProgressMap[inProgress.id]?.realProgress || 0 };
+    if (inProgress) {
+      const sp = subjectProgress.find(p => p.subject_id === inProgress.id);
+      return { ...inProgress, progress: sp?.progress_percent || 0 };
+    }
     const pending = levelSubjects.find(s => {
       const sp = subjectProgress.find(p => p.subject_id === s.id);
-      return !sp?.test_passed && (realProgressMap[s.id]?.realProgress || 0) === 0;
+      return !sp?.test_passed && (sp?.progress_percent || 0) === 0;
     });
     if (pending) return { ...pending, progress: 0 };
-    return { ...levelSubjects[0], progress: realProgressMap[levelSubjects[0].id]?.realProgress || 0 };
+    const sp0 = subjectProgress.find(p => p.subject_id === levelSubjects[0].id);
+    return { ...levelSubjects[0], progress: sp0?.progress_percent || 0 };
   };
   const nextSubject = getNextSubject();
 
@@ -647,13 +643,12 @@ export default function Dashboard() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {currentLevelSubjects.map((subject) => {
               const sp = subjectProgress.find(p => p.subject_id === subject.id);
-              const realPct = realProgressMap[subject.id]?.realProgress || 0;
               const testStatus = sp?.test_passed ? 'aprobado' : sp?.test_attempts > 0 ? 'no_aprobado' : 'pendiente';
               return (
                 <SubjectCard
                   key={subject.id}
                   subject={subject}
-                  progress={realPct}
+                  progress={sp?.progress_percent || 0}
                   isCompleted={sp?.test_passed || false}
                   testStatus={testStatus}
                   onClick={() => {
