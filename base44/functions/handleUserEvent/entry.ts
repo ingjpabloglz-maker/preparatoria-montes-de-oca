@@ -318,122 +318,131 @@ Deno.serve(async (req) => {
 
   const user_email = user.email;
 
-  // ─── 1. IDEMPOTENCIA ────────────────────────────────────────────────────────
-  const existing = await base44.asServiceRole.entities.ProcessedEvent.filter({ event_id });
-  if (existing.length > 0) {
-    return Response.json({ status: 'already_processed' });
-  }
-
-  // ─── 2. ANTI-FRAUDE: Rate limiting ─────────────────────────────────────────
   const nowIso = new Date().toISOString();
   const currentMinute = nowIso.substring(0, 16);
 
-  const metricsArr = await base44.asServiceRole.entities.UserMetrics.filter({ user_email });
-  const metrics = metricsArr[0] || null;
-
-  if (metrics?.last_event_minute === currentMinute && (metrics.events_this_minute || 0) >= 10) {
-    return Response.json({ error: 'Too many requests' }, { status: 429 });
+  // ─── 1. IDEMPOTENCIA FUERTE: crear primero como lock lógico ─────────────────
+  try {
+    await base44.asServiceRole.entities.ProcessedEvent.create({
+      event_id, user_email, event_type, processed_at: nowIso,
+    });
+  } catch (err) {
+    if (err.message && (
+      err.message.includes('unique constraint') ||
+      err.message.includes('duplicate key')
+    )) {
+      return Response.json({ status: 'already_processed' });
+    }
+    throw err;
   }
 
-  // ─── 3. ANTI-FRAUDE: Duración mínima de actividad ──────────────────────────
-  const MIN_DURATION_SECONDS = 10;
-  if (event_data.activity_duration_seconds !== undefined &&
-      event_data.activity_duration_seconds < MIN_DURATION_SECONDS) {
-    return Response.json({ error: 'Activity too short' }, { status: 400 });
+  try {
+    // ─── 2. ANTI-FRAUDE: Rate limiting ───────────────────────────────────────
+    const metricsArr = await base44.asServiceRole.entities.UserMetrics.filter({ user_email });
+    const metrics = metricsArr[0] || null;
+
+    if (metrics?.last_event_minute === currentMinute && (metrics.events_this_minute || 0) >= 10) {
+      return Response.json({ error: 'Too many requests' }, { status: 429 });
+    }
+
+    // ─── 3. ANTI-FRAUDE: Duración mínima de actividad ────────────────────────
+    const MIN_DURATION_SECONDS = 10;
+    if (event_data.activity_duration_seconds !== undefined &&
+        event_data.activity_duration_seconds < MIN_DURATION_SECONDS) {
+      return Response.json({ error: 'Activity too short' }, { status: 400 });
+    }
+
+    // ─── 4. CREAR/OBTENER UserProgress ───────────────────────────────────────
+    await initializeUserProgress(base44, user_email, nowIso);
+
+    // ─── 5. OBTENER GamificationProfile ──────────────────────────────────────
+    const gamArr = await base44.asServiceRole.entities.GamificationProfile.filter({ user_email });
+    const gam = gamArr[0] || null;
+    const matamorosNow = getMatamorosLocalDate();
+    const today = getLocalDateString(matamorosNow);
+    const isSurpriseExam = event_type === 'surprise_exam_completed';
+
+    // ─── 6. CALCULAR TODOS LOS VALORES DE GAMIFICACIÓN ───────────────────────
+    const { baseXP, baseStars, baseWater }                               = calculateBaseAwards(event_type, event_data);
+    const { newStreakDays, streakBroke, shieldUsed }                     = calculateStreak(gam, matamorosNow, today);
+    const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays);
+    const { newTreeStage, treeLevelUp }                                  = updateTreeGrowth(newWater, gam);
+    const {
+      weeklyProgress, weeklyTarget, weeklyStartDate, weeklyCompleted,
+      weeklyRewardClaimed, weeklyGoalJustCompleted, weeklyHistory,
+      weeklyBonusXP, weeklyBonusStars,
+    } = manageWeeklyGoal(gam, event_type, today, matamorosNow);
+    const { surpriseIds, lastSurpriseExamDate }                          = handleSurpriseExamData(gam, isSurpriseExam, event_data, today);
+
+    const finalXP     = newXP + weeklyBonusXP;
+    const finalStars  = newStars + weeklyBonusStars;
+    const finalLevel  = Math.max(1, getLevelFromXP(finalXP));
+    const leveledUp   = finalLevel > (gam?.level || 1);
+
+    // ─── 7. PERSISTIR GamificationProfile ────────────────────────────────────
+    const gamUpdate = {
+      user_email,
+      streak_days: newStreakDays,
+      last_study_date_normalized: today,
+      max_streak: newMaxStreak,
+      total_stars: finalStars,
+      streak_shields: shieldUsed ? Math.max(0, (gam?.streak_shields || 0) - 1) : (gam?.streak_shields || 0),
+      water_tokens: newWater,
+      xp_points: finalXP,
+      level: finalLevel,
+      answered_surprise_questions_ids: surpriseIds,
+      email_notifications_enabled: gam?.email_notifications_enabled !== false,
+      last_surprise_exam_date_normalized: lastSurpriseExamDate,
+      tree_stage: newTreeStage,
+      last_tree_update: nowIso,
+      weekly_goal_progress: weeklyProgress,
+      weekly_goal_target: weeklyTarget,
+      weekly_goal_start_date: weeklyStartDate,
+      weekly_goal_completed: weeklyCompleted,
+      weekly_goal_reward_claimed: weeklyRewardClaimed,
+      weekly_goal_history: weeklyHistory,
+    };
+
+    if (gam) {
+      await base44.asServiceRole.entities.GamificationProfile.update(gam.id, gamUpdate);
+    } else {
+      await base44.asServiceRole.entities.GamificationProfile.create(gamUpdate);
+    }
+
+    // ─── 8. EVALUAR LOGROS ────────────────────────────────────────────────────
+    const newlyUnlocked = await processAchievements(base44, user_email, event_type, newStreakDays, finalStars, nowIso);
+
+    // ─── 9. ACTUALIZAR MÉTRICAS ───────────────────────────────────────────────
+    await updateUserMetrics(base44, user_email, metrics, currentMinute, today, streakBroke, nowIso);
+
+    // ─── 10. CONSTRUIR RESPUESTA ──────────────────────────────────────────────
+    const { minXP: finalMinXP, nextLevelXP: finalNextXP } = getLevelXPRange(finalLevel);
+    const xpIntoLevel      = finalXP - finalMinXP;
+    const xpNeededForNext  = finalNextXP - finalMinXP;
+    const progressPercent  = Math.max(0, Math.min(100, Math.round((xpIntoLevel / xpNeededForNext) * 100)));
+
+    return Response.json({
+      status: 'ok',
+      streak_days: newStreakDays,
+      streak_broke: streakBroke,
+      streak_saved_by_shield: shieldUsed,
+      xp_earned: earnedXP + weeklyBonusXP,
+      total_xp: finalXP,
+      total_stars: finalStars,
+      level: finalLevel,
+      leveled_up: leveledUp,
+      newly_unlocked_achievements: newlyUnlocked,
+      multiplier,
+      tree_level_up: treeLevelUp,
+      new_tree_stage: newTreeStage,
+      weekly_goal_completed: weeklyGoalJustCompleted,
+      xp_into_level: xpIntoLevel,
+      xp_needed_for_next_level: xpNeededForNext,
+      progress_percent: progressPercent,
+      gamificationProfile: { ...gamUpdate },
+    });
+  } catch (err) {
+    console.error('handleUserEvent error:', err.message, err.stack);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
-
-  // ─── 4. CREAR/OBTENER UserProgress ─────────────────────────────────────────
-  await initializeUserProgress(base44, user_email, nowIso);
-
-  // ─── 5. OBTENER GamificationProfile ─────────────────────────────────────────
-  const gamArr = await base44.asServiceRole.entities.GamificationProfile.filter({ user_email });
-  const gam = gamArr[0] || null;
-  const matamorosNow = getMatamorosLocalDate();
-  const today = getLocalDateString(matamorosNow);
-  const isSurpriseExam = event_type === 'surprise_exam_completed';
-
-  // ─── 6. CALCULAR TODOS LOS VALORES DE GAMIFICACIÓN ──────────────────────────
-  const { baseXP, baseStars, baseWater }                               = calculateBaseAwards(event_type, event_data);
-  const { newStreakDays, streakBroke, shieldUsed }                     = calculateStreak(gam, matamorosNow);
-  const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays);
-  const { newTreeStage, treeLevelUp }                                  = updateTreeGrowth(newWater, gam);
-  const {
-    weeklyProgress, weeklyTarget, weeklyStartDate, weeklyCompleted,
-    weeklyRewardClaimed, weeklyGoalJustCompleted, weeklyHistory,
-    weeklyBonusXP, weeklyBonusStars,
-  } = manageWeeklyGoal(gam, event_type, today, matamorosNow);
-  const { surpriseIds, lastSurpriseExamDate }                          = handleSurpriseExamData(gam, isSurpriseExam, event_data, today);
-
-  const finalXP     = newXP + weeklyBonusXP;
-  const finalStars  = newStars + weeklyBonusStars;
-  const finalLevel  = Math.max(1, getLevelFromXP(finalXP));
-  const leveledUp   = finalLevel > (gam?.level || 1);
-
-  // ─── 7. PERSISTIR GamificationProfile ────────────────────────────────────────
-  const gamUpdate = {
-    user_email,
-    streak_days: newStreakDays,
-    last_study_date_normalized: today,
-    max_streak: newMaxStreak,
-    total_stars: finalStars,
-    streak_shields: shieldUsed ? Math.max(0, (gam?.streak_shields || 0) - 1) : (gam?.streak_shields || 0),
-    water_tokens: newWater,
-    xp_points: finalXP,
-    level: finalLevel,
-    answered_surprise_questions_ids: surpriseIds,
-    email_notifications_enabled: gam?.email_notifications_enabled !== false,
-    last_surprise_exam_date_normalized: lastSurpriseExamDate,
-    tree_stage: newTreeStage,
-    last_tree_update: nowIso,
-    weekly_goal_progress: weeklyProgress,
-    weekly_goal_target: weeklyTarget,
-    weekly_goal_start_date: weeklyStartDate,
-    weekly_goal_completed: weeklyCompleted,
-    weekly_goal_reward_claimed: weeklyRewardClaimed,
-    weekly_goal_history: weeklyHistory,
-  };
-
-  if (gam) {
-    await base44.asServiceRole.entities.GamificationProfile.update(gam.id, gamUpdate);
-  } else {
-    await base44.asServiceRole.entities.GamificationProfile.create(gamUpdate);
-  }
-
-  // ─── 8. EVALUAR LOGROS ───────────────────────────────────────────────────────
-  const newlyUnlocked = await processAchievements(base44, user_email, event_type, newStreakDays, finalStars, nowIso);
-
-  // ─── 9. ACTUALIZAR MÉTRICAS ──────────────────────────────────────────────────
-  await updateUserMetrics(base44, user_email, metrics, currentMinute, today, streakBroke, nowIso);
-
-  // ─── 10. REGISTRAR EVENTO (idempotencia) ─────────────────────────────────────
-  await base44.asServiceRole.entities.ProcessedEvent.create({
-    event_id, user_email, event_type, processed_at: nowIso,
-  });
-
-  // ─── 11. CONSTRUIR RESPUESTA ─────────────────────────────────────────────────
-  const { minXP: finalMinXP, nextLevelXP: finalNextXP } = getLevelXPRange(finalLevel);
-  const xpIntoLevel      = finalXP - finalMinXP;
-  const xpNeededForNext  = finalNextXP - finalMinXP;
-  const progressPercent  = Math.max(0, Math.min(100, Math.round((xpIntoLevel / xpNeededForNext) * 100)));
-
-  return Response.json({
-    status: 'ok',
-    streak_days: newStreakDays,
-    streak_broke: streakBroke,
-    streak_saved_by_shield: shieldUsed,
-    xp_earned: earnedXP + weeklyBonusXP,
-    total_xp: finalXP,
-    total_stars: finalStars,
-    level: finalLevel,
-    leveled_up: leveledUp,
-    newly_unlocked_achievements: newlyUnlocked,
-    multiplier,
-    tree_level_up: treeLevelUp,
-    new_tree_stage: newTreeStage,
-    weekly_goal_completed: weeklyGoalJustCompleted,
-    xp_into_level: xpIntoLevel,
-    xp_needed_for_next_level: xpNeededForNext,
-    progress_percent: progressPercent,
-    gamificationProfile: { ...gamUpdate },
-  });
 });
