@@ -343,7 +343,7 @@ export default function Dashboard() {
 
   const { data: gamProfile, refetch: refetchGamProfile } = useGamificationProfile(user?.email);
 
-  const { message: assistantMsg, visible: assistantVisible, dismiss: dismissAssistant } = useAssistant({
+  const { message: assistantMsg, visible: assistantVisible, dismiss: dismissAssistant, handleCTA: assistantHandleCTA } = useAssistant({
     userEmail: user?.email,
     profile: gamProfile,
     allowedPages: ['Dashboard', 'Rewards'],
@@ -528,7 +528,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <AssistantBubble message={assistantMsg} visible={assistantVisible} onDismiss={dismissAssistant} />
+      <AssistantBubble message={assistantMsg} visible={assistantVisible} onDismiss={dismissAssistant} onCTA={assistantHandleCTA} />
       <div className="max-w-7xl mx-auto p-6 space-y-8">
         {/* Banner de racha en riesgo */}
         {gamProfile && (() => {
