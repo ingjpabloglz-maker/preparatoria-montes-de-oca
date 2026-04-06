@@ -18,7 +18,8 @@ import {
   Settings,
   ArrowRight,
   Search,
-  Eye
+  Eye,
+  Flame
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,11 +31,13 @@ import {
 import LevelCard from '../components/dashboard/LevelCard';
 import StatsOverview from '../components/dashboard/StatsOverview';
 import SubjectCard from '../components/dashboard/SubjectCard';
+import HeroBanner from '../components/dashboard/HeroBanner';
+import NextStepCard from '../components/dashboard/NextStepCard';
 import FolioValidator from '../components/payment/FolioValidator';
 import WeeklyGoal from '../components/gamification/WeeklyGoal';
 import WeeklyGoalSetupModal from '../components/gamification/WeeklyGoalSetupModal';
 import { useGamificationProfile } from '@/hooks/useGamification';
-import { AlertCircle, Lock, Flame } from "lucide-react";
+import { AlertCircle, Lock } from "lucide-react";
 import { getStreakStatus } from '@/lib/streakStatus';
 import { toast } from 'sonner';
 import { useAssistant } from '@/hooks/useAssistant';
@@ -446,6 +449,31 @@ export default function Dashboard() {
     ? Math.min(100, (subjectProgress.reduce((sum, p) => sum + Math.min(100, p.progress_percent || 0), 0) / totalSubjectsCount))
     : 0;
 
+  // Calcular siguiente materia pendiente (primera con progress < 100% o sin progreso)
+  const getNextSubject = () => {
+    const levelSubjects = currentLevelSubjects;
+    if (!levelSubjects.length) return null;
+    // Primero buscar en progreso (1-99%)
+    const inProgress = levelSubjects.find(s => {
+      const sp = subjectProgress.find(p => p.subject_id === s.id);
+      const pct = sp?.progress_percent || 0;
+      return pct > 0 && pct < 100 && !sp?.test_passed;
+    });
+    if (inProgress) {
+      const sp = subjectProgress.find(p => p.subject_id === inProgress.id);
+      return { ...inProgress, progress: Math.round(sp?.progress_percent || 0) };
+    }
+    // Luego buscar pendiente (0%)
+    const pending = levelSubjects.find(s => {
+      const sp = subjectProgress.find(p => p.subject_id === s.id);
+      return !sp?.test_passed && (sp?.progress_percent || 0) === 0;
+    });
+    if (pending) return { ...pending, progress: 0 };
+    // Si todo completado, volver a la primera
+    return { ...levelSubjects[0], progress: Math.round(subjectProgress.find(p => p.subject_id === levelSubjects[0].id)?.progress_percent || 0) };
+  };
+  const nextSubject = getNextSubject();
+
   // Vista de administrador
   if (user?.role === 'admin') {
     return <AdminDashboardView user={user} />;
@@ -526,24 +554,20 @@ export default function Dashboard() {
     );
   }
 
+  const goToNextSubject = () => {
+    if (!profileComplete) { window.location.href = createPageUrl('Profile'); return; }
+    if (currentLevel === 1 && !hasLevel1Folio) { window.location.href = createPageUrl('UnlockLevel?level=1'); return; }
+    if (nextSubject) {
+      window.location.href = createPageUrl(`Subject?id=${nextSubject.id}`);
+    } else {
+      window.location.href = createPageUrl(`Level?level=${currentLevel}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <AssistantBubble message={assistantMsg} visible={assistantVisible} onDismiss={dismissAssistant} onCTA={assistantHandleCTA} />
-      <div className="max-w-7xl mx-auto p-6 space-y-8">
-        {/* Banner de racha en riesgo */}
-        {gamProfile && (() => {
-          const streakStatus = getStreakStatus(gamProfile.last_study_date_normalized);
-          if (streakStatus === 'at_risk') return (
-            <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 flex items-center gap-3 animate-pulse">
-              <Flame className="w-5 h-5 text-yellow-500 flex-shrink-0" />
-              <p className="font-semibold text-yellow-800 flex-1">
-                ⚠️ Tu racha está en riesgo. Estudia hoy para mantenerla.
-              </p>
-            </div>
-          );
-          if (streakStatus === 'lost' && (gamProfile.streak_days || 0) === 0) return null;
-          return null;
-        })()}
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
 
         {/* Alerta perfil incompleto */}
         {!profileComplete && (
@@ -551,45 +575,38 @@ export default function Dashboard() {
             <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="font-semibold text-amber-800">Completa tu información personal</p>
-              <p className="text-sm text-amber-700 mt-0.5">
-                Debes llenar tu perfil antes de poder iniciar los niveles.
-              </p>
+              <p className="text-sm text-amber-700 mt-0.5">Debes llenar tu perfil antes de poder iniciar los niveles.</p>
             </div>
-            <Button
-              size="sm"
-              className="bg-amber-500 hover:bg-amber-600 text-white flex-shrink-0"
-              onClick={() => window.location.href = createPageUrl('Profile')}
-            >
+            <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white flex-shrink-0"
+              onClick={() => window.location.href = createPageUrl('Profile')}>
               Ir a Mi Perfil
             </Button>
           </div>
         )}
 
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              ¡Hola, {user?.full_name?.split(' ')[0] || 'Estudiante'}! 👋
-            </h1>
-            <p className="text-gray-500 mt-1">
-              Continúa tu aprendizaje en el Nivel {currentLevel}
-            </p>
+        {/* Banner de racha en riesgo */}
+        {gamProfile && getStreakStatus(gamProfile.last_study_date_normalized) === 'at_risk' && (
+          <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 flex items-center gap-3">
+            <Flame className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+            <p className="font-semibold text-yellow-800 flex-1">⚠️ Tu racha está en riesgo. Estudia hoy para mantenerla.</p>
           </div>
-          <div className="flex items-center gap-2 self-start md:self-auto">
-            <Button variant="outline" size="sm" onClick={() => window.location.href = createPageUrl('Profile')}>
-              Mi Perfil
-            </Button>
-            <Badge variant="outline" className="text-sm py-2 px-4">
-              <Star className="w-4 h-4 mr-2 text-amber-500" />
-              {Math.round(totalProgress)}% completado
-            </Badge>
-          </div>
-        </div>
+        )}
 
-        {/* Modal de configuración de meta semanal (solo si el usuario no tiene meta) */}
+        {/* HERO BANNER con saludo, gamificación y CTA principal */}
+        <HeroBanner
+          user={user}
+          gamProfile={gamProfile}
+          nextSubject={nextSubject}
+          onContinue={goToNextSubject}
+        />
+
+        {/* Modal de configuración de meta semanal */}
         {gamProfile && !gamProfile.weekly_goal_target && (
           <WeeklyGoalSetupModal onComplete={() => refetchGamProfile()} />
         )}
+
+        {/* SIGUIENTE PASO destacado */}
+        <NextStepCard nextSubject={nextSubject} onGo={goToNextSubject} />
 
         {/* Meta Semanal */}
         {gamProfile && gamProfile.weekly_goal_target && (
@@ -601,7 +618,7 @@ export default function Dashboard() {
         )}
 
         {/* Stats Overview */}
-        <StatsOverview 
+        <StatsOverview
           currentLevel={currentLevel}
           totalProgress={totalProgress}
           completedSubjects={completedSubjectsCount}
@@ -610,61 +627,53 @@ export default function Dashboard() {
           timeLimitDays={currentLevelConfig?.time_limit_days || 180}
         />
 
-        {/* Current Level Section */}
-        <Card className="border-0 shadow-lg overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-sm">Tu nivel actual</p>
-                <h2 className="text-2xl font-bold mt-1">Nivel {currentLevel}</h2>
-              </div>
-              <div className="flex items-center gap-2 bg-white/20 rounded-full px-4 py-2">
-                <Clock className="w-4 h-4" />
-                <span className="text-sm font-medium">
-                  {daysRemaining !== null ? `${daysRemaining} días restantes` : 'Iniciando progreso...'}
-                </span>
-              </div>
+        {/* Materias del nivel actual */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-blue-600" />
+                {completedSubjectsCount === currentLevelSubjects.length && currentLevelSubjects.length > 0
+                  ? '¡Completaste todas las materias de este nivel!'
+                  : `Te ${currentLevelSubjects.length - completedSubjectsCount === 1 ? 'falta 1 materia' : `faltan ${currentLevelSubjects.length - completedSubjectsCount} materias`} para avanzar`
+                }
+              </h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {daysRemaining !== null ? `${daysRemaining} días restantes en el Nivel ${currentLevel}` : `Nivel ${currentLevel} · En curso`}
+              </p>
             </div>
+            <Button variant="outline" size="sm"
+              onClick={() => window.location.href = createPageUrl(`Level?level=${currentLevel}`)}>
+              Ver nivel completo
+            </Button>
           </div>
-          <CardContent className="p-6">
-            <h3 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
-              <BookOpen className="w-5 h-5" />
-              Materias del Nivel {currentLevel}
-            </h3>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {currentLevelSubjects.map((subject) => {
-                const sp = subjectProgress.find(p => p.subject_id === subject.id);
-                const testStatus = sp?.test_passed ? 'aprobado' : sp?.test_attempts > 0 ? 'no_aprobado' : 'pendiente';
-                return (
-                  <SubjectCard
-                    key={subject.id}
-                    subject={subject}
-                    progress={sp?.progress_percent || 0}
-                    isCompleted={sp?.completed || false}
-                    testStatus={testStatus}
-                    onClick={() => {
-                      if (!profileComplete) {
-                        window.location.href = createPageUrl('Profile');
-                        return;
-                      }
-                      if (currentLevel === 1 && !hasLevel1Folio) {
-                        window.location.href = createPageUrl('UnlockLevel?level=1');
-                        return;
-                      }
-                      window.location.href = createPageUrl(`Subject?id=${subject.id}`);
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {currentLevelSubjects.map((subject) => {
+              const sp = subjectProgress.find(p => p.subject_id === subject.id);
+              const testStatus = sp?.test_passed ? 'aprobado' : sp?.test_attempts > 0 ? 'no_aprobado' : 'pendiente';
+              return (
+                <SubjectCard
+                  key={subject.id}
+                  subject={subject}
+                  progress={sp?.progress_percent || 0}
+                  isCompleted={sp?.test_passed || false}
+                  testStatus={testStatus}
+                  onClick={() => {
+                    if (!profileComplete) { window.location.href = createPageUrl('Profile'); return; }
+                    if (currentLevel === 1 && !hasLevel1Folio) { window.location.href = createPageUrl('UnlockLevel?level=1'); return; }
+                    window.location.href = createPageUrl(`Subject?id=${subject.id}`);
+                  }}
+                />
+              );
+            })}
+          </div>
+        </div>
 
-        {/* All Levels Overview */}
+        {/* Todos los niveles */}
         <div>
           <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
             <GraduationCap className="w-6 h-6" />
-            Todos los Niveles
+            Tu camino completo
           </h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1,2,3,4,5,6].map((levelNum) => {
@@ -676,7 +685,6 @@ export default function Dashboard() {
               const isUnlocked = levelNum <= currentLevel;
               const isCompleted = levelNum < currentLevel;
               const isCurrent = levelNum === currentLevel;
-
               return (
                 <LevelCard
                   key={levelNum}
@@ -688,13 +696,8 @@ export default function Dashboard() {
                   subjects={subjectsByLevel[levelNum] || []}
                   daysRemaining={isCurrent ? daysRemaining : undefined}
                   onClick={() => {
-                    if (!profileComplete) {
-                      window.location.href = createPageUrl('Profile');
-                      return;
-                    }
-                    if (isCurrent) {
-                      window.location.href = createPageUrl(`Level?level=${levelNum}`);
-                    } else if (isCompleted) {
+                    if (!profileComplete) { window.location.href = createPageUrl('Profile'); return; }
+                    if (isCurrent || isCompleted) {
                       window.location.href = createPageUrl(`Level?level=${levelNum}`);
                     } else {
                       window.location.href = createPageUrl(`UnlockLevel?level=${levelNum}`);

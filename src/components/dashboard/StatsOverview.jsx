@@ -17,31 +17,44 @@ export default function StatsOverview({
   daysInLevel,
   timeLimitDays
 }) {
+  const remaining = totalSubjects - completedSubjects;
+  const subjectMsg = remaining === 0
+    ? '¡Todo completado!'
+    : remaining === 1
+    ? 'Te falta 1 materia'
+    : `Te faltan ${remaining} materias`;
+
+  const levelMsg = currentLevel === 1 ? 'Estás comenzando tu camino' : `Nivel ${currentLevel} en curso`;
+
+  const progressMsg = totalProgress === 0 ? 'Vas comenzando' : totalProgress < 50 ? 'Buen inicio' : totalProgress < 90 ? '¡Vas muy bien!' : '¡Casi terminas!';
+
+  const timeMsg = timeLimitDays - daysInLevel <= 7 ? '⚠️ Poco tiempo' : `${timeLimitDays - daysInLevel} días restantes`;
+
   const stats = [
     {
-      label: "Nivel Actual",
-      value: currentLevel,
+      label: levelMsg,
+      value: `Nivel ${currentLevel}`,
       icon: GraduationCap,
       color: "bg-blue-500",
       bgColor: "bg-blue-50"
     },
     {
-      label: "Materias Completadas",
+      label: subjectMsg,
       value: `${completedSubjects}/${totalSubjects}`,
       icon: BookOpen,
       color: "bg-emerald-500",
       bgColor: "bg-emerald-50"
     },
     {
-      label: "Progreso Total",
+      label: progressMsg,
       value: `${Math.round(totalProgress)}%`,
       icon: TrendingUp,
       color: "bg-purple-500",
       bgColor: "bg-purple-50"
     },
     {
-      label: "Tiempo en Nivel",
-      value: `${daysInLevel}/${timeLimitDays} días`,
+      label: timeMsg,
+      value: `${daysInLevel} días`,
       icon: Clock,
       color: "bg-amber-500",
       bgColor: "bg-amber-50"

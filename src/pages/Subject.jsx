@@ -209,31 +209,21 @@ export default function Subject() {
         </div>
 
         {/* Progress Card */}
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-700">Tu Progreso</h3>
-              <span className="text-2xl font-bold text-blue-600">{Math.round(currentProgress)}%</span>
+        <Card className="border-0 shadow-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-violet-600 p-5 text-white">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-lg">Tu progreso</h3>
+              <span className="text-3xl font-bold">{Math.round(currentProgress)}%</span>
             </div>
-            <Progress value={currentProgress} className="h-4 mb-4" />
-            
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-500 mb-3">Actualiza tu avance manualmente:</p>
-              <div className="flex gap-2">
-                {[0, 50, 100].map((val) => (
-                  <Button
-                    key={val}
-                    variant={Math.round(currentProgress) === val ? "default" : "outline"}
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => updateProgressMutation.mutate(val)}
-                  >
-                    {val}%
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
+            <Progress value={currentProgress} className="h-3 bg-white/30 [&>div]:bg-white mb-2" />
+            <p className="text-blue-200 text-sm">
+              {currentProgress === 0 && 'Vas comenzando — ¡da el primer paso!'}
+              {currentProgress > 0 && currentProgress < 30 && 'Buen inicio, sigue así'}
+              {currentProgress >= 30 && currentProgress < 70 && 'Vas a buen ritmo 🔥'}
+              {currentProgress >= 70 && currentProgress < 100 && '¡Casi completas esta materia!'}
+              {currentProgress >= 100 && '¡Contenido completado! Presenta tu prueba'}
+            </p>
+          </div>
         </Card>
 
         {/* Course Content */}

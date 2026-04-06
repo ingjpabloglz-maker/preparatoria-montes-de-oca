@@ -1,17 +1,19 @@
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, BookOpen, ArrowRight } from "lucide-react";
+import { CheckCircle2, ArrowRight, PlayCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const subjectIcons = {
   "Álgebra": "📐",
   "Trigonometría": "📏",
   "Geometría Analítica": "📊",
+  "Geometría": "📊",
   "Precálculo": "🔢",
   "Cálculo Diferencial": "∫",
   "Cálculo Integral": "∑",
+  "Cálculo": "∫",
   "Inglés": "🌐",
   "Química": "🧪",
   "Física": "⚡",
@@ -23,82 +25,118 @@ const subjectIcons = {
   "default": "📖"
 };
 
+function getIcon(name) {
+  for (const [key, icon] of Object.entries(subjectIcons)) {
+    if (name?.toLowerCase().includes(key.toLowerCase())) return icon;
+  }
+  return subjectIcons.default;
+}
+
+function getProgressState(progress, isCompleted) {
+  if (isCompleted) return 'completed';
+  if (progress >= 1) return 'in_progress';
+  return 'pending';
+}
+
+const stateConfig = {
+  completed: {
+    border: 'border-green-300 bg-green-50/60',
+    iconBg: 'bg-green-100',
+    progressColor: '[&>div]:bg-green-500',
+    label: '🟢 Materia completada',
+    labelClass: 'text-green-700',
+    ctaText: 'Ver detalle',
+    ctaClass: 'bg-green-600 hover:bg-green-700 text-white',
+  },
+  in_progress: {
+    border: 'border-yellow-300 bg-yellow-50/40',
+    iconBg: 'bg-yellow-100',
+    progressColor: '[&>div]:bg-yellow-500',
+    label: '🟡 Continúa donde te quedaste',
+    labelClass: 'text-yellow-700',
+    ctaText: 'Continuar',
+    ctaClass: 'bg-yellow-500 hover:bg-yellow-600 text-white',
+  },
+  pending: {
+    border: 'border-gray-200 bg-white',
+    iconBg: 'bg-gray-100 group-hover:bg-blue-100',
+    progressColor: '[&>div]:bg-blue-500',
+    label: '🔴 Empieza esta materia',
+    labelClass: 'text-gray-500',
+    ctaText: 'Empezar',
+    ctaClass: 'bg-blue-600 hover:bg-blue-700 text-white',
+  },
+};
+
 export default function SubjectCard({ subject, progress, isCompleted, testStatus, onClick }) {
-  const getIcon = (name) => {
-    for (const [key, icon] of Object.entries(subjectIcons)) {
-      if (name?.toLowerCase().includes(key.toLowerCase())) {
-        return icon;
-      }
-    }
-    return subjectIcons.default;
+  const state = getProgressState(progress, isCompleted);
+  const cfg = stateConfig[state];
+
+  const progressMsg = () => {
+    if (isCompleted) return 'Materia completada ✓';
+    const rounded = Math.round(progress || 0);
+    if (rounded === 0) return 'Vas comenzando';
+    if (rounded < 30) return `Vas comenzando · ${rounded}%`;
+    if (rounded < 70) return `Buen ritmo · ${rounded}%`;
+    if (rounded < 100) return `¡Casi completas esta materia! · ${rounded}%`;
+    return `${rounded}%`;
   };
 
   return (
-    <Card 
+    <Card
       className={cn(
-        "group cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5",
-        isCompleted && "bg-green-50/50 border-green-200"
+        "group cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 border",
+        cfg.border
       )}
       onClick={onClick}
     >
-      <CardContent className="p-4">
-        <div className="flex items-start gap-4">
-          {/* Icon */}
-          <div className={cn(
-            "w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0",
-            isCompleted ? "bg-green-100" : "bg-gray-100 group-hover:bg-blue-100"
-          )}>
+      <CardContent className="p-4 space-y-3">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 transition-colors", cfg.iconBg)}>
             {getIcon(subject.name)}
           </div>
-
-          {/* Content */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="font-semibold text-gray-900 truncate">{subject.name}</h4>
-              {isCompleted ? (
-                <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-              ) : (
-                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors shrink-0" />
-              )}
-            </div>
-            
-            {subject.description && (
-              <p className="text-sm text-gray-500 mt-1 line-clamp-1">{subject.description}</p>
-            )}
-
-            {/* Test Status Badge */}
-            {testStatus && (
-              <div className="mt-2">
-                {testStatus === 'aprobado' && (
-                  <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">✓ Prueba aprobada</Badge>
-                )}
-                {testStatus === 'no_aprobado' && (
-                  <Badge className="bg-red-100 text-red-700 border-red-200 text-xs">✗ Prueba no aprobada</Badge>
-                )}
-                {testStatus === 'pendiente' && (
-                  <Badge className="bg-gray-100 text-gray-500 border-gray-200 text-xs">· Prueba pendiente</Badge>
-                )}
-              </div>
-            )}
-
-            {/* Progress */}
-            <div className="mt-3 space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Avance</span>
-                <span className={cn(
-                  "font-medium",
-                  isCompleted ? "text-green-600" : "text-gray-700"
-                )}>
-                  {Math.round(progress || 0)}%
-                </span>
-              </div>
-              <Progress 
-                value={progress || 0} 
-                className={cn("h-1.5", isCompleted && "[&>div]:bg-green-500")}
-              />
-            </div>
+            <h4 className="font-bold text-gray-900 truncate text-base">{subject.name}</h4>
+            <p className={cn("text-xs font-medium mt-0.5", cfg.labelClass)}>{cfg.label}</p>
           </div>
+          {isCompleted ? (
+            <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+          ) : (
+            <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors shrink-0" />
+          )}
         </div>
+
+        {/* Progress bar */}
+        <div className="space-y-1">
+          <Progress
+            value={progress || 0}
+            className={cn("h-3 rounded-full", cfg.progressColor)}
+          />
+          <p className="text-xs text-gray-500">{progressMsg()}</p>
+        </div>
+
+        {/* Test badge */}
+        {testStatus === 'aprobado' && (
+          <p className="text-xs text-green-700 bg-green-100 rounded-lg px-3 py-1 inline-block font-medium">
+            ✓ Prueba aprobada
+          </p>
+        )}
+        {testStatus === 'no_aprobado' && (
+          <p className="text-xs text-red-700 bg-red-100 rounded-lg px-3 py-1 inline-block font-medium">
+            ✗ Prueba no aprobada — Intenta de nuevo
+          </p>
+        )}
+
+        {/* CTA */}
+        <Button
+          size="sm"
+          className={cn("w-full font-semibold gap-1.5", cfg.ctaClass)}
+          onClick={(e) => { e.stopPropagation(); onClick(); }}
+        >
+          <PlayCircle className="w-4 h-4" />
+          {cfg.ctaText}
+        </Button>
       </CardContent>
     </Card>
   );
