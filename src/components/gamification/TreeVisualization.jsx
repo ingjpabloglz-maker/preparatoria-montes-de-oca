@@ -94,9 +94,21 @@ function TreeSVG({ stage, treeEnergy, vitality, animationStrength, rhythmFactor,
     }
     @keyframes dropFall  { 0% { opacity:1; transform:translateY(0); } 100% { opacity:0; transform:translateY(32px); } }
     @keyframes sparkle   { 0%,100% { opacity:0.2; transform:scale(0.8); } 50% { opacity:1; transform:scale(1.1); } }
-    @keyframes leafDrift {
+    @keyframes leafFall {
       0% { opacity:${leafOpacity}; transform:translateY(0) rotate(0deg) translateX(0); }
       100% { opacity:0; transform:translateY(42px) rotate(60deg) translateX(10px); }
+    }
+    @keyframes leafOrg1 {
+      0%,100% { transform: translate(0,0) rotate(0deg); }
+      50%      { transform: translate(6px,-8px) rotate(8deg); }
+    }
+    @keyframes leafOrg2 {
+      0%,100% { transform: translate(0,0) rotate(0deg); }
+      50%      { transform: translate(-5px,-10px) rotate(-10deg); }
+    }
+    @keyframes leafOrg3 {
+      0%,100% { transform: translate(0,0) rotate(0deg); }
+      50%      { transform: translate(8px,-6px) rotate(12deg); }
     }
     @keyframes pulse { 0%,100% { opacity:${glowOpacity * 0.6}; } 50% { opacity:${glowOpacity}; } }
     @keyframes branchSway {
@@ -129,7 +141,7 @@ function TreeSVG({ stage, treeEnergy, vitality, animationStrength, rhythmFactor,
       r={1.5 + (i % 3) * 0.5}
       fill={p.glow}
       opacity={0.7}
-      style={{ animation: `leafDrift ${1.2 + i * 0.3}s ease-in infinite ${i * 0.25}s` }}
+      style={{ animation: `leafFall ${1.2 + i * 0.3}s ease-in infinite ${i * 0.25}s` }}
     />
   ));
 
@@ -238,14 +250,22 @@ function TreeSVG({ stage, treeEnergy, vitality, animationStrength, rhythmFactor,
       <rect x="73" y="70" width="14" height="68" rx="6" fill={p.trunk} />
       <rect x="36" y="96" width="36" height="8" rx="4" fill={p.trunk} transform="rotate(-28 36 96)" />
       <rect x="88" y="92" width="36" height="8" rx="4" fill={p.trunk} transform="rotate(28 88 92)" />
-      <ellipse cx="80" cy="52" rx="52" ry="46" fill={p.leaf3} opacity={leafOpacity * 0.9} />
-      <ellipse cx="80" cy="44" rx="42" ry="38" fill={p.leaf1} opacity={leafOpacity} />
-      <ellipse cx="58" cy="60" rx="22" ry="16" fill={p.leaf3} opacity={leafOpacity * 0.85} />
-      <ellipse cx="102" cy="58" rx="22" ry="16" fill={p.leaf3} opacity={leafOpacity * 0.85} />
-      <ellipse cx="80" cy="34" rx="30" ry="26" fill={p.leaf1} />
-      <ellipse cx="64" cy="44" rx="14" ry="11" fill={p.leaf2} opacity={leafOpacity * 0.85} />
-      <ellipse cx="96" cy="42" rx="14" ry="11" fill={p.leaf2} opacity={leafOpacity * 0.85} />
-      <ellipse cx="80" cy="24" rx="20" ry="18" fill={p.leaf2} opacity={leafOpacity * 0.9} />
+      <g style={{ animation: 'leafOrg2 7s ease-in-out infinite', filter: 'blur(0.3px)' }}>
+        <ellipse cx="80" cy="52" rx="52" ry="46" fill={p.leaf3} opacity={leafOpacity * 0.9} />
+      </g>
+      <g style={{ animation: 'leafOrg1 8s ease-in-out infinite 0.5s', filter: 'blur(0.2px)' }}>
+        <ellipse cx="80" cy="44" rx="42" ry="38" fill={p.leaf1} opacity={leafOpacity} />
+      </g>
+      <g style={{ animation: 'leafOrg3 6s ease-in-out infinite 1s', filter: 'blur(0.2px)' }}>
+        <ellipse cx="58" cy="60" rx="22" ry="16" fill={p.leaf3} opacity={leafOpacity * 0.85} />
+        <ellipse cx="102" cy="58" rx="22" ry="16" fill={p.leaf3} opacity={leafOpacity * 0.85} />
+      </g>
+      <g style={{ animation: 'leafOrg1 9s ease-in-out infinite 0.3s', filter: 'blur(0.1px)' }}>
+        <ellipse cx="80" cy="34" rx="30" ry="26" fill={p.leaf1} />
+        <ellipse cx="64" cy="44" rx="14" ry="11" fill={p.leaf2} opacity={leafOpacity * 0.85} />
+        <ellipse cx="96" cy="42" rx="14" ry="11" fill={p.leaf2} opacity={leafOpacity * 0.85} />
+        <ellipse cx="80" cy="24" rx="20" ry="18" fill={p.leaf2} opacity={leafOpacity * 0.9} />
+      </g>
       {sparkle(68, 30, 3, 0)}
       {sparkle(92, 28, 2.5, 0.5)}
       {sparkle(80, 18, 3, 1)}
@@ -278,14 +298,22 @@ function TreeSVG({ stage, treeEnergy, vitality, animationStrength, rhythmFactor,
           <rect x="98" y="88" width="30" height="7" rx="3" fill={p.bark} transform="rotate(18 98 88)" />
         </>
       )}
-      <ellipse cx="90" cy="58" rx="62" ry="54" fill={p.leaf3} opacity={leafOpacity * 0.9} />
-      <ellipse cx="90" cy="50" rx="50" ry="44" fill={p.leaf1} opacity={leafOpacity} />
-      <ellipse cx="66" cy="68" rx="26" ry="19" fill={p.leaf3} opacity={leafOpacity * 0.85} />
-      <ellipse cx="114" cy="66" rx="26" ry="19" fill={p.leaf3} opacity={leafOpacity * 0.85} />
-      <ellipse cx="90" cy="38" rx="36" ry="30" fill={p.leaf1} />
-      <ellipse cx="72" cy="50" rx="17" ry="13" fill={p.leaf2} opacity={leafOpacity * 0.85} />
-      <ellipse cx="108" cy="48" rx="17" ry="13" fill={p.leaf2} opacity={leafOpacity * 0.85} />
-      <ellipse cx="90" cy="26" rx="24" ry="21" fill={p.leaf2} opacity={leafOpacity * 0.9} />
+      <g style={{ animation: 'leafOrg2 8s ease-in-out infinite', filter: 'blur(0.3px)' }}>
+        <ellipse cx="90" cy="58" rx="62" ry="54" fill={p.leaf3} opacity={leafOpacity * 0.9} />
+      </g>
+      <g style={{ animation: 'leafOrg1 9s ease-in-out infinite 0.6s', filter: 'blur(0.2px)' }}>
+        <ellipse cx="90" cy="50" rx="50" ry="44" fill={p.leaf1} opacity={leafOpacity} />
+      </g>
+      <g style={{ animation: 'leafOrg3 7s ease-in-out infinite 1.2s', filter: 'blur(0.2px)' }}>
+        <ellipse cx="66" cy="68" rx="26" ry="19" fill={p.leaf3} opacity={leafOpacity * 0.85} />
+        <ellipse cx="114" cy="66" rx="26" ry="19" fill={p.leaf3} opacity={leafOpacity * 0.85} />
+      </g>
+      <g style={{ animation: 'leafOrg1 10s ease-in-out infinite 0.4s', filter: 'blur(0.1px)' }}>
+        <ellipse cx="90" cy="38" rx="36" ry="30" fill={p.leaf1} />
+        <ellipse cx="72" cy="50" rx="17" ry="13" fill={p.leaf2} opacity={leafOpacity * 0.85} />
+        <ellipse cx="108" cy="48" rx="17" ry="13" fill={p.leaf2} opacity={leafOpacity * 0.85} />
+        <ellipse cx="90" cy="26" rx="24" ry="21" fill={p.leaf2} opacity={leafOpacity * 0.9} />
+      </g>
       {sparkle(76, 32, 3.5, 0)}
       {sparkle(104, 30, 3, 0.5)}
       {sparkle(90, 18, 3.5, 1)}
@@ -553,8 +581,11 @@ export default function TreeVisualization({ profile, userEmail }) {
   return (
     <div className="flex flex-col items-center gap-4">
       {/* Árbol SVG — simulador visual */}
+      {/* Luz ambiental */}
+      <div className="background-glow" />
+
       <div
-        className={cn('relative w-44 h-44 transition-all duration-500', glowClass)}
+        className={cn('relative w-44 h-44 transition-all duration-500 tree-container', glowClass)}
         style={{ transform: `scale(${treeScale})`, transition: 'transform 0.5s cubic-bezier(.34,1.56,.64,1)' }}
       >
         <TreeSVG
