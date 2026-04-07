@@ -62,22 +62,22 @@ export default function StatsOverview({
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {stats.map((stat, index) => (
-        <Card key={index} className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl ${stat.bgColor} flex items-center justify-center`}>
-                <stat.icon className={`w-5 h-5 ${stat.color.replace('bg-', 'text-')}`} />
+    <Card className="border-0 shadow-sm">
+      <CardContent className="p-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
+          {stats.map((stat, index) => (
+            <div key={index} className="flex items-center gap-2.5 px-3 py-2">
+              <div className={`w-8 h-8 rounded-lg ${stat.bgColor} flex items-center justify-center shrink-0`}>
+                <stat.icon className={`w-4 h-4 ${stat.color.replace('bg-', 'text-')}`} />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                <p className="text-xs text-gray-500">{stat.label}</p>
+              <div className="min-w-0">
+                <p className="text-base font-bold text-gray-900 leading-tight">{stat.value}</p>
+                <p className="text-xs text-gray-500 truncate">{stat.label}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
