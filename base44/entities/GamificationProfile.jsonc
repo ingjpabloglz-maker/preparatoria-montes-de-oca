@@ -79,11 +79,31 @@
     "tree_energy": {
       "type": "number",
       "default": 0,
-      "description": "Energ\u00eda visual del \u00e1rbol: growth_points + (growth_streak * 2). Controla intensidad de animaciones."
+      "description": "Energ\u00eda visual del \u00e1rbol (0\u2013100). Modulador de intensidad visual, limitado estrictamente."
+    },
+    "tree_vitality": {
+      "type": "number",
+      "default": 0,
+      "description": "Vitalidad din\u00e1mica del \u00e1rbol (0\u20131). Controla animaciones continuas: respiraci\u00f3n, brillo, part\u00edculas. Decae con inactividad."
+    },
+    "growth_flow": {
+      "type": "array",
+      "description": "Flujo de actividad reciente: array de {ts, weight} con timestamp ISO y peso del evento. M\u00e1x 20 entradas.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number"
+          }
+        }
+      }
     },
     "last_tree_update": {
       "type": "string",
-      "description": "Fecha ISO de \u00faltima actualizaci\u00f3n del \u00e1rbol"
+      "description": "Fecha ISO de \u00faltima actualizaci\u00f3n del \u00e1rbol (usada para calcular decay)"
     },
     "weekly_goal_target": {
       "type": "number",

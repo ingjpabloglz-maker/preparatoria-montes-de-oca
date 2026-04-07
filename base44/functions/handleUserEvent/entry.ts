@@ -153,16 +153,39 @@ function calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStrea
 // ─── BLOQUE 5: Calcular crecimiento del árbol ────────────────────────────────
 const TREE_THRESHOLDS = [0, 5, 15, 30, 60, 100, 150, 220, 300, 400, 550, 750, 1000];
 
-function updateTreeGrowth(newGrowthPoints, newStreakDays, gam) {
+// Pesos de eventos para el ecosistema del árbol
+const TREE_EVENT_WEIGHTS = {
+  lesson_completed:       1,
+  mini_eval_passed:       3,
+  subject_test_passed:    8,
+  activity_submitted:     0.5,
+  surprise_exam_completed: 2,
+  forum_solution_earned:  1,
+};
+
+function updateTreeGrowth(newGrowthPoints, newStreakDays, gam, event_type, nowIso) {
   let newTreeStage = 0;
   for (let i = TREE_THRESHOLDS.length - 1; i >= 0; i--) {
     if (newGrowthPoints >= TREE_THRESHOLDS[i]) { newTreeStage = i; break; }
   }
-  // growth_streak: días consecutivos con actividad (usamos newStreakDays del bloque 3)
   const newGrowthStreak = newStreakDays;
-  // tree_energy: growth_points + (growth_streak * 2)
-  const newTreeEnergy = newGrowthPoints + (newGrowthStreak * 2);
-  return { newTreeStage, newGrowthStreak, newTreeEnergy };
+
+  // tree_energy: base limitado a 100, modulado por streakDays
+  const streakBonus = Math.min(newGrowthStreak * 2, 40);
+  const rawEnergy = Math.min(100, (gam?.tree_energy ?? 0) + (TREE_EVENT_WEIGHTS[event_type] ?? 1) * 4 + streakBonus * 0.1);
+  const newTreeEnergy = Math.round(Math.min(100, rawEnergy) * 10) / 10;
+
+  // tree_vitality: 0–1, sube con eventos de mayor peso
+  const eventWeight = TREE_EVENT_WEIGHTS[event_type] ?? 1;
+  const vitalityBoost = Math.min(1, (eventWeight / 8) * 0.35);
+  const newVitality = Math.min(1, Math.round(((gam?.tree_vitality ?? 0) + vitalityBoost) * 1000) / 1000);
+
+  // growth_flow: ventana deslizante de últimas 20 entradas
+  const existingFlow = gam?.growth_flow ?? [];
+  const newFlowEntry = { ts: nowIso, weight: eventWeight };
+  const newGrowthFlow = [...existingFlow, newFlowEntry].slice(-20);
+
+  return { newTreeStage, newGrowthStreak, newTreeEnergy, newVitality, newGrowthFlow };
 }
 
 // ─── BLOQUE 6: Gestionar meta semanal ────────────────────────────────────────
@@ -450,7 +473,7 @@ Deno.serve(async (req) => {
     const { newStreakDays, streakBroke, shieldUsed }                     = calculateStreak(gam, matamorosNow, todayString);
     const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays);
     const newGrowthPoints = (gam?.tree_growth_points ?? 0) + baseWater;
-    const { newTreeStage, newGrowthStreak, newTreeEnergy }               = updateTreeGrowth(newGrowthPoints, newStreakDays, gam);
+    const { newTreeStage, newGrowthStreak, newTreeEnergy, newVitality, newGrowthFlow } = updateTreeGrowth(newGrowthPoints, newStreakDays, gam, event_type, nowIso);
     const treeLevelUp                                                    = newTreeStage > (gam?.tree_stage ?? 0);
     const {
       weeklyProgress, weeklyTarget, weeklyStartDate, weeklyCompleted,
@@ -482,6 +505,8 @@ Deno.serve(async (req) => {
       tree_growth_points: newGrowthPoints,
       growth_streak: newGrowthStreak,
       tree_energy: newTreeEnergy,
+      tree_vitality: newVitality,
+      growth_flow: newGrowthFlow,
       last_tree_update: nowIso,
       weekly_goal_progress: weeklyProgress,
       weekly_goal_target: weeklyTarget,
