@@ -43,7 +43,6 @@ import { toast } from 'sonner';
 import { useAssistant } from '@/hooks/useAssistant';
 import AssistantBubble from '@/components/assistant/AssistantBubble';
 import { dispatchAssistantEvent } from '@/lib/assistantEvents';
-import TreeVisualization from '@/components/gamification/TreeVisualization';
 
 function AdminDashboardView({ user }) {
   const [studentSearch, setStudentSearch] = useState('');
@@ -621,19 +620,25 @@ export default function Dashboard() {
           timeLimitDays={currentLevelConfig?.time_limit_days || 180}
         />
 
-        {/* Tus materias */}
+        {/* Materias del nivel actual */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-gray-700" />
-              Tus materias
-            </h2>
-            <button
-              className="text-sm text-blue-600 font-semibold hover:underline flex items-center gap-1"
-              onClick={() => window.location.href = createPageUrl(`Level?level=${currentLevel}`)}
-            >
-              Ver todas las materias <ArrowRight className="w-4 h-4" />
-            </button>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-blue-600" />
+                {completedSubjectsCount === currentLevelSubjects.length && currentLevelSubjects.length > 0
+                  ? '¡Completaste todas las materias de este nivel!'
+                  : `Te ${currentLevelSubjects.length - completedSubjectsCount === 1 ? 'falta 1 materia' : `faltan ${currentLevelSubjects.length - completedSubjectsCount} materias`} para avanzar`
+                }
+              </h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {daysRemaining !== null ? `${daysRemaining} días restantes en el Nivel ${currentLevel}` : `Nivel ${currentLevel} · En curso`}
+              </p>
+            </div>
+            <Button variant="outline" size="sm"
+              onClick={() => window.location.href = createPageUrl(`Level?level=${currentLevel}`)}>
+              Ver nivel completo
+            </Button>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {currentLevelSubjects.map((subject) => {
@@ -657,78 +662,43 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Tu nivel */}
+        {/* Todos los niveles */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <span>👑</span>
-              Tu nivel
-            </h2>
-            <button
-              className="text-sm text-blue-600 font-semibold hover:underline flex items-center gap-1"
-              onClick={() => window.location.href = createPageUrl(`Level?level=${currentLevel}`)}
-            >
-              Ver todos los niveles <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            {/* Nivel actual card */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex items-center gap-5">
-              {/* Shield icon */}
-              <div className="shrink-0 w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center shadow-lg relative">
-                <span className="text-white text-3xl font-extrabold">{currentLevel}</span>
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center">
-                  <span className="text-xs">🏆</span>
-                </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-2xl font-extrabold text-gray-900">Nivel {currentLevel}</h3>
-                <p className="text-purple-600 font-semibold text-sm mt-0.5">
-                  {completedSubjectsCount === 0 ? 'Estás comenzando tu camino' : `${completedSubjectsCount} materia${completedSubjectsCount > 1 ? 's' : ''} completada${completedSubjectsCount > 1 ? 's' : ''}`}
-                </p>
-                <div className="mt-3 space-y-1">
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>{gamProfile?.xp_points || 0} XP / {Math.round(100 * Math.pow((gamProfile?.level || 1) + 1, 1.5))} XP para Nivel {(gamProfile?.level || 1) + 1}</span>
-                  </div>
-                  <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all"
-                      style={{ width: `${Math.min(100, Math.round(((gamProfile?.xp_points || 0) / Math.round(100 * Math.pow((gamProfile?.level || 1) + 1, 1.5))) * 100))}%` }}
-                    />
-                  </div>
-                </div>
-                {gamProfile && (
-                  <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 text-xs text-yellow-700">
-                    💡 <span className="font-medium">Consejo:</span> Completa más clases hoy para mantener tu racha y ganar más XP
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Árbol card */}
-            {gamProfile && (
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex items-center gap-5">
-                <div className="shrink-0 w-24 h-24">
-                  <TreeVisualization profile={gamProfile} userEmail={user?.email} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-gray-500 text-sm font-medium">Tu árbol</p>
-                  <p className="text-2xl font-extrabold text-green-600 mt-0.5">
-                    Nivel {gamProfile?.tree_stage ?? 0}
-                  </p>
-                  <p className="text-sm text-blue-500 font-medium mt-1 flex items-center gap-1">
-                    💧 {gamProfile?.water_tokens ?? 0} fichas de agua
-                  </p>
-                  <button
-                    className="mt-3 text-xs text-blue-600 hover:underline font-medium"
-                    onClick={() => window.location.href = createPageUrl('Rewards')}
-                  >
-                    Ver recompensas →
-                  </button>
-                </div>
-              </div>
-            )}
+          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <GraduationCap className="w-6 h-6" />
+            Tu camino completo
+          </h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1,2,3,4,5,6].map((levelNum) => {
+              const levelConfig = levels.find(l => l.level_number === levelNum) || {
+                level_number: levelNum,
+                name: `Nivel ${levelNum}`,
+                time_limit_days: 180
+              };
+              const isUnlocked = levelNum <= currentLevel;
+              const isCompleted = levelNum < currentLevel;
+              const isCurrent = levelNum === currentLevel;
+              return (
+                <LevelCard
+                  key={levelNum}
+                  level={levelConfig}
+                  isUnlocked={isUnlocked}
+                  isCompleted={isCompleted}
+                  isCurrent={isCurrent}
+                  progress={getLevelProgress(levelNum)}
+                  subjects={subjectsByLevel[levelNum] || []}
+                  daysRemaining={isCurrent ? daysRemaining : undefined}
+                  onClick={() => {
+                    if (!profileComplete) { window.location.href = createPageUrl('Profile'); return; }
+                    if (isCurrent || isCompleted) {
+                      window.location.href = createPageUrl(`Level?level=${levelNum}`);
+                    } else {
+                      window.location.href = createPageUrl(`UnlockLevel?level=${levelNum}`);
+                    }
+                  }}
+                />
+              );
+            })}
           </div>
         </div>
       </div>
