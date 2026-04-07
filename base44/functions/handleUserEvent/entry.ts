@@ -151,13 +151,18 @@ function calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStrea
 }
 
 // ─── BLOQUE 5: Calcular crecimiento del árbol ────────────────────────────────
-function updateTreeGrowth(newWater) {
-  const TREE_THRESHOLDS = [0, 5, 15, 30, 60, 100];
+const TREE_THRESHOLDS = [0, 5, 15, 30, 60, 100, 150, 220, 300, 400, 550, 750, 1000];
+
+function updateTreeGrowth(newGrowthPoints, newStreakDays, gam) {
   let newTreeStage = 0;
   for (let i = TREE_THRESHOLDS.length - 1; i >= 0; i--) {
-    if (newWater >= TREE_THRESHOLDS[i]) { newTreeStage = i; break; }
+    if (newGrowthPoints >= TREE_THRESHOLDS[i]) { newTreeStage = i; break; }
   }
-  return { newTreeStage };
+  // growth_streak: días consecutivos con actividad (usamos newStreakDays del bloque 3)
+  const newGrowthStreak = newStreakDays;
+  // tree_energy: growth_points + (growth_streak * 2)
+  const newTreeEnergy = newGrowthPoints + (newGrowthStreak * 2);
+  return { newTreeStage, newGrowthStreak, newTreeEnergy };
 }
 
 // ─── BLOQUE 6: Gestionar meta semanal ────────────────────────────────────────
@@ -444,7 +449,8 @@ Deno.serve(async (req) => {
     const { baseXP, baseStars, baseWater }                               = calculateBaseAwards(event_type, event_data);
     const { newStreakDays, streakBroke, shieldUsed }                     = calculateStreak(gam, matamorosNow, todayString);
     const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays);
-    const { newTreeStage }                                               = updateTreeGrowth(newWater);
+    const newGrowthPoints = (gam?.tree_growth_points ?? 0) + baseWater;
+    const { newTreeStage, newGrowthStreak, newTreeEnergy }               = updateTreeGrowth(newGrowthPoints, newStreakDays, gam);
     const treeLevelUp                                                    = newTreeStage > (gam?.tree_stage ?? 0);
     const {
       weeklyProgress, weeklyTarget, weeklyStartDate, weeklyCompleted,
@@ -473,6 +479,9 @@ Deno.serve(async (req) => {
       email_notifications_enabled: gam?.email_notifications_enabled !== false,
       last_surprise_exam_date_normalized: lastSurpriseExamDate,
       tree_stage: newTreeStage,
+      tree_growth_points: newGrowthPoints,
+      growth_streak: newGrowthStreak,
+      tree_energy: newTreeEnergy,
       last_tree_update: nowIso,
       weekly_goal_progress: weeklyProgress,
       weekly_goal_target: weeklyTarget,

@@ -64,12 +64,22 @@
     "tree_stage": {
       "type": "number",
       "default": 0,
-      "description": "Etapa visual del \u00e1rbol (0-5), calculada desde tree_growth_points"
+      "description": "Etapa visual del \u00e1rbol (0-12), calculada desde tree_growth_points"
     },
     "tree_growth_points": {
       "type": "number",
       "default": 0,
       "description": "Puntos de crecimiento del \u00e1rbol (1 por cada riego manual)"
+    },
+    "growth_streak": {
+      "type": "number",
+      "default": 0,
+      "description": "D\u00edas consecutivos con actividad acad\u00e9mica (cualquier evento que otorgue tokens)"
+    },
+    "tree_energy": {
+      "type": "number",
+      "default": 0,
+      "description": "Energ\u00eda visual del \u00e1rbol: growth_points + (growth_streak * 2). Controla intensidad de animaciones."
     },
     "last_tree_update": {
       "type": "string",

@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
-const STAGE_THRESHOLDS = [0, 5, 15, 30, 60, 100];
+const STAGE_THRESHOLDS = [0, 5, 15, 30, 60, 100, 150, 220, 300, 400, 550, 750, 1000];
 
 function calcStage(growthPoints) {
   let stage = 0;
