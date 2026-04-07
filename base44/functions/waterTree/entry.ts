@@ -49,23 +49,34 @@ Deno.serve(async (req) => {
   const newFlowEntry = { ts: nowIso, weight: 2 };
   const newGrowthFlow = [...existingFlow, newFlowEntry].slice(-20);
 
+  const lastChangeEvent = {
+    type: 'watered',
+    intensity: Math.min(1, (newVitality - (gam.tree_vitality ?? 0)) / 0.2 + 0.4),
+    source: 'user',
+    timestamp: nowIso,
+  };
+
   await base44.asServiceRole.entities.GamificationProfile.update(gam.id, {
-    water_tokens:      newWaterTokens,
+    water_tokens:       newWaterTokens,
     tree_growth_points: newGrowthPoints,
-    tree_stage:        newStage,
-    tree_energy:       newTreeEnergy,
-    tree_vitality:     newVitality,
-    growth_flow:       newGrowthFlow,
-    last_tree_update:  nowIso,
+    tree_stage:         newStage,
+    tree_energy:        newTreeEnergy,
+    tree_vitality:      newVitality,
+    growth_flow:        newGrowthFlow,
+    last_tree_update:   nowIso,
+    last_sync_timestamp: nowIso,
+    last_change_event:  lastChangeEvent,
   });
 
   return Response.json({
     success: true,
-    water_tokens:      newWaterTokens,
+    water_tokens:       newWaterTokens,
     tree_growth_points: newGrowthPoints,
-    tree_stage:        newStage,
-    tree_energy:       newTreeEnergy,
-    tree_vitality:     newVitality,
-    tree_level_up:     treeLevelUp,
+    tree_stage:         newStage,
+    tree_energy:        newTreeEnergy,
+    tree_vitality:      newVitality,
+    tree_level_up:      treeLevelUp,
+    last_sync_timestamp: nowIso,
+    last_change_event:  lastChangeEvent,
   });
 });

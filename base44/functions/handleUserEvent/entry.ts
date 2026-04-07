@@ -488,6 +488,24 @@ Deno.serve(async (req) => {
     const leveledUp  = finalLevel > (gam?.level || 1);
 
     // ─── 7. PERSISTIR GamificationProfile ────────────────────────────────────
+    // Calcular intensidad del evento (0–1) para last_change_event
+    const EVENT_INTENSITY_MAP = {
+      lesson_completed:        0.3,
+      mini_eval_passed:        0.6,
+      subject_test_passed:     1.0,
+      activity_submitted:      0.1,
+      surprise_exam_completed: 0.5,
+      forum_thread_created:    0.15,
+      forum_post_created:      0.1,
+      forum_solution_earned:   0.3,
+    };
+    const lastChangeEvent = {
+      type:      event_type,
+      intensity: EVENT_INTENSITY_MAP[event_type] ?? 0.2,
+      source:    'user',
+      timestamp: nowIso,
+    };
+
     const gamUpdate = {
       user_email,
       streak_days: newStreakDays,
@@ -508,6 +526,8 @@ Deno.serve(async (req) => {
       tree_vitality: newVitality,
       growth_flow: newGrowthFlow,
       last_tree_update: nowIso,
+      last_sync_timestamp: nowIso,
+      last_change_event: lastChangeEvent,
       weekly_goal_progress: weeklyProgress,
       weekly_goal_target: weeklyTarget,
       weekly_goal_start_date: weeklyStartDate,

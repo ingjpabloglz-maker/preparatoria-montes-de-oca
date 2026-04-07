@@ -329,9 +329,11 @@ export default function TreeVisualization({ profile, userEmail }) {
 
   // ── Estado del simulador ──────────────────────────────────────────────────
   const [stage, setStage]           = useState(null);
-  const [simEnergy, setSimEnergy]   = useState(0);   // estado interno del simulador (puede diferir del backend durante decay)
+  const [simEnergy, setSimEnergy]   = useState(0);
   const [simVitality, setSimVitality] = useState(0);
   const [simFlow, setSimFlow]       = useState([]);
+  const lastSyncRef = useRef(null); // ISO del último rebase autoritativo
+  const [activeEffect, setActiveEffect] = useState(null); // 'user_lesson' | 'user_eval' | 'user_exam' | 'watered' | 'decay' | null
 
   // ── Estado optimista para agua/puntos ────────────────────────────────────
   const [optimistic, setOptimistic] = useState(null);
@@ -367,14 +369,51 @@ export default function TreeVisualization({ profile, userEmail }) {
     return () => clearInterval(simTickRef.current);
   }, [startSimTick]);
 
-  // ── Sincronizar simulador con perfil del backend ──────────────────────────
+  // ── Lerp helper ──────────────────────────────────────────────────────────
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  // ── Sincronizar simulador con perfil del backend (LERP suavizado) ─────────
+  // Rol del frontend: solo predicción visual. Backend es la verdad absoluta.
+  // Usamos last_sync_timestamp para detectar escrituras autoritativas.
+  // En lugar de overwrite directo, hacemos soft-sync con lerp(local, server, 0.2).
   useEffect(() => {
     if (!profile) return;
+
+    // Siempre sincronizar stage y flow (no visualmente críticos)
     if (profile.tree_stage != null) setStage(profile.tree_stage);
-    setSimEnergy(Math.min(100, profile.tree_energy ?? 0));
-    setSimVitality(Math.min(1, profile.tree_vitality ?? 0));
     setSimFlow(profile.growth_flow ?? []);
-  }, [profile?.tree_stage, profile?.tree_energy, profile?.tree_vitality, profile?.growth_flow]);
+
+    const serverSync = profile.last_sync_timestamp;
+    const isNewSync  = serverSync && serverSync !== lastSyncRef.current;
+
+    if (isNewSync) {
+      lastSyncRef.current = serverSync;
+      // Soft sync: converger al valor del backend sin salto brusco
+      setSimEnergy(e  => lerp(e,  Math.min(100, profile.tree_energy   ?? 0), 0.2));
+      setSimVitality(v => lerp(v, Math.min(1,   profile.tree_vitality ?? 0), 0.2));
+
+      // Disparar efecto visual basado en last_change_event
+      const ev = profile.last_change_event;
+      if (ev) {
+        if (ev.source === 'decay') {
+          setActiveEffect('decay');
+        } else if (ev.type === 'watered') {
+          setActiveEffect('watered');
+        } else if (ev.intensity >= 0.8) {
+          setActiveEffect('user_exam');
+        } else if (ev.intensity >= 0.5) {
+          setActiveEffect('user_eval');
+        } else {
+          setActiveEffect('user_lesson');
+        }
+        setTimeout(() => setActiveEffect(null), 2500);
+      }
+    } else if (!serverSync) {
+      // Perfil sin last_sync_timestamp (usuarios legacy): overwrite directo solo una vez
+      setSimEnergy(Math.min(100, profile.tree_energy   ?? 0));
+      setSimVitality(Math.min(1, profile.tree_vitality ?? 0));
+    }
+  }, [profile?.tree_stage, profile?.tree_energy, profile?.tree_vitality, profile?.growth_flow, profile?.last_sync_timestamp, profile?.last_change_event]);
 
   // ── Animación de cambio de stage ─────────────────────────────────────────
   useEffect(() => {
@@ -402,22 +441,25 @@ export default function TreeVisualization({ profile, userEmail }) {
       const WEIGHTS = { lesson_completed: 1, mini_eval_passed: 3, exam_passed: 8 };
       const weight = WEIGHTS[event_type] ?? 1;
 
-      // Impulso inmediato en el simulador
-      setSimEnergy(en  => Math.min(100, en + weight * 4));
-      setSimVitality(v => Math.min(1, v + (weight / 8) * 0.35));
+      // Impulso inmediato en simulador — predicción visual (no escribe backend)
+      setSimEnergy(en  => Math.min(100, lerp(en, en + weight * 4, 0.6)));
+      setSimVitality(v => Math.min(1,   lerp(v,  v  + (weight / 8) * 0.35, 0.6)));
       setSimFlow(fl => [...fl, { ts: new Date().toISOString(), weight }].slice(-20));
 
       if (event_type === 'lesson_completed') {
+        setActiveEffect('user_lesson');
         setAnimationType('lesson');
         setTreeScale(1.04);
-        setTimeout(() => { setTreeScale(1); setAnimationType(null); }, 1500);
+        setTimeout(() => { setTreeScale(1); setAnimationType(null); setActiveEffect(null); }, 2000);
       } else if (event_type === 'mini_eval_passed') {
+        setActiveEffect('user_eval');
         setIsWatering(true);
         setTreeScale(1.06);
-        setTimeout(() => { setTreeScale(1); setIsWatering(false); }, 1800);
+        setTimeout(() => { setTreeScale(1); setIsWatering(false); setActiveEffect(null); }, 2500);
       } else if (event_type === 'exam_passed') {
+        setActiveEffect('user_exam');
         setTreeScale(1.1);
-        setTimeout(() => setTreeScale(1), 700);
+        setTimeout(() => { setTreeScale(1); setActiveEffect(null); }, 3000);
         confetti({
           particleCount: 120, spread: 90,
           colors: ['#fbbf24', '#f59e0b', '#4ade80', '#86efac'],
@@ -440,9 +482,11 @@ export default function TreeVisualization({ profile, userEmail }) {
     setTreeScale(1.06);
     setTimeout(() => setTreeScale(1), 400);
 
-    // Impulso inmediato en el simulador
-    setSimEnergy(e => Math.min(100, e + 2));
-    setSimVitality(v => Math.min(1, v + 0.088));
+    // Impulso inmediato en el simulador (predicción visual, no escribe backend)
+    setSimEnergy(e => Math.min(100, lerp(e, e + 2, 0.6)));
+    setSimVitality(v => Math.min(1, lerp(v, v + 0.088, 0.6)));
+    setActiveEffect('watered');
+    setTimeout(() => setActiveEffect(null), 2500);
 
     try {
       const res = await base44.functions.invoke('waterTree', {});
@@ -450,9 +494,9 @@ export default function TreeVisualization({ profile, userEmail }) {
         setOptimistic(prevOptimistic);
       } else {
         setOptimistic({ tree_growth_points: res.data.tree_growth_points, water_tokens: res.data.water_tokens });
-        // Sincronizar con backend
-        setSimEnergy(Math.min(100, res.data.tree_energy ?? simEnergy));
-        if (res.data.tree_vitality != null) setSimVitality(res.data.tree_vitality);
+        // Soft sync con LERP — backend es la verdad
+        if (res.data.tree_energy   != null) setSimEnergy(e  => lerp(e,  res.data.tree_energy,   0.2));
+        if (res.data.tree_vitality != null) setSimVitality(v => lerp(v, res.data.tree_vitality, 0.2));
         dispatchAssistantEvent('tree_watered', { new_stage: res.data.tree_stage });
       }
       queryClient.invalidateQueries(['gamificationProfile', userEmail]);
@@ -489,8 +533,18 @@ export default function TreeVisualization({ profile, userEmail }) {
     ? '🔥 Racha legendaria'
     : growthStreak >= 3 ? '✨ En racha' : null;
 
-  // Glow de árbol proporcional a vitalidad + energía
-  const glowClass = animationStrength > 0.6
+  // Glow causal: activeEffect define el color; fallback a intensidad de animación
+  const glowClass = activeEffect === 'user_exam'
+    ? 'drop-shadow-[0_0_32px_rgba(251,191,36,0.85)]'   // dorado — examen
+    : activeEffect === 'user_eval'
+    ? 'drop-shadow-[0_0_24px_rgba(96,165,250,0.8)]'    // azul — evaluación
+    : activeEffect === 'user_lesson'
+    ? 'drop-shadow-[0_0_18px_rgba(96,165,250,0.55)]'   // azul suave — lección
+    : activeEffect === 'watered'
+    ? 'drop-shadow-[0_0_22px_rgba(34,211,238,0.75)]'   // cian — riego
+    : activeEffect === 'decay'
+    ? 'drop-shadow-[0_0_10px_rgba(156,163,175,0.4)]'   // gris — decay
+    : animationStrength > 0.6
     ? 'drop-shadow-[0_0_28px_rgba(74,222,128,0.75)]'
     : animationStrength > 0.3
     ? 'drop-shadow-[0_0_16px_rgba(74,222,128,0.5)]'

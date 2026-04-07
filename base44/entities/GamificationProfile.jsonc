@@ -74,21 +74,21 @@
     "growth_streak": {
       "type": "number",
       "default": 0,
-      "description": "D\u00edas consecutivos con actividad acad\u00e9mica (cualquier evento que otorgue tokens)"
+      "description": "D\u00edas consecutivos con actividad acad\u00e9mica"
     },
     "tree_energy": {
       "type": "number",
       "default": 0,
-      "description": "Energ\u00eda visual del \u00e1rbol (0\u2013100). Modulador de intensidad visual, limitado estrictamente."
+      "description": "Energ\u00eda visual del \u00e1rbol (0\u2013100). Truth layer. Decae con inactividad."
     },
     "tree_vitality": {
       "type": "number",
       "default": 0,
-      "description": "Vitalidad din\u00e1mica del \u00e1rbol (0\u20131). Controla animaciones continuas: respiraci\u00f3n, brillo, part\u00edculas. Decae con inactividad."
+      "description": "Vitalidad din\u00e1mica del \u00e1rbol (0\u20131). Truth layer. Decae con inactividad."
     },
     "growth_flow": {
       "type": "array",
-      "description": "Flujo de actividad reciente: array de {ts, weight} con timestamp ISO y peso del evento. M\u00e1x 20 entradas.",
+      "description": "Flujo de actividad reciente: array de {ts, weight}. M\u00e1x 20 entradas.",
       "items": {
         "type": "object",
         "properties": {
@@ -105,6 +105,32 @@
       "type": "string",
       "description": "Fecha ISO de \u00faltima actualizaci\u00f3n del \u00e1rbol (usada para calcular decay)"
     },
+    "last_sync_timestamp": {
+      "type": "string",
+      "description": "ISO timestamp de la \u00faltima escritura autoritativa al \u00e1rbol desde cualquier funci\u00f3n de backend. Usado por el frontend para detectar rebase."
+    },
+    "last_change_event": {
+      "type": "object",
+      "description": "Evento estructurado que describe el \u00faltimo cambio significativo al \u00e1rbol.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "lesson_completed | mini_eval_passed | subject_test_passed | watered | decay | surprise_exam_completed"
+        },
+        "intensity": {
+          "type": "number",
+          "description": "Magnitud normalizada del impacto (0\u20131)"
+        },
+        "source": {
+          "type": "string",
+          "description": "user | system | decay"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO timestamp del evento"
+        }
+      }
+    },
     "weekly_goal_target": {
       "type": "number",
       "description": "Meta semanal de lecciones completadas (null = no configurada a\u00fan)"
@@ -116,7 +142,7 @@
     },
     "weekly_goal_start_date": {
       "type": "string",
-      "description": "Fecha de inicio de la semana actual YYYY-MM-DD (basada en cuando el usuario configur\u00f3 su meta)"
+      "description": "Fecha de inicio de la semana actual YYYY-MM-DD"
     },
     "weekly_goal_completed": {
       "type": "boolean",

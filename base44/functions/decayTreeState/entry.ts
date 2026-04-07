@@ -68,11 +68,21 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    const decayIntensity = Math.min(1, (energyDelta / 100) * 0.5 + (vitalityDelta / 1) * 0.5);
+    const lastChangeEvent = {
+      type: 'decay',
+      intensity: Math.round(decayIntensity * 1000) / 1000,
+      source: 'decay',
+      timestamp: nowIso,
+    };
+
     await base44.asServiceRole.entities.GamificationProfile.update(gam.id, {
-      tree_energy:    Math.round(newEnergy * 10) / 10,
-      tree_vitality:  Math.round(newVitality * 1000) / 1000,
-      growth_flow:    prunedFlow,
-      last_tree_update: nowIso,
+      tree_energy:       Math.round(newEnergy * 10) / 10,
+      tree_vitality:     Math.round(newVitality * 1000) / 1000,
+      growth_flow:       prunedFlow,
+      last_tree_update:  nowIso,
+      last_sync_timestamp: nowIso,
+      last_change_event: lastChangeEvent,
     });
 
     updated++;
