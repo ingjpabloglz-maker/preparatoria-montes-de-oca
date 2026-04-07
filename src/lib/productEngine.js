@@ -437,11 +437,13 @@ export function buildReactiveDecision(eventType, payload, ctx) {
       if (ctx?.xpToNextLevel > 0) text += ` Faltan ${ctx.xpToNextLevel} XP para el Nivel ${ctx?.level + 1}.`;
       break;
     }
-    case 'level_up':
+    case 'level_up': {
+      const totalXp = payload?.xp ?? ctx?.xp;
       text = payload?.level
-        ? `🎉 ¡SUBISTE AL NIVEL ${payload.level}! Con ${ctx?.xp || '??'} XP acumulados.`
+        ? `🎉 ¡SUBISTE AL NIVEL ${payload.level}!${totalXp != null ? ` Con ${totalXp} XP acumulados.` : ''}`
         : `🎉 ¡NUEVO NIVEL! Sigue así.`;
       break;
+    }
     case 'tree_watered':
       text = payload?.stage !== undefined
         ? `💧 ¡Árbol en Etapa ${payload.stage}! Sigue regando para verlo florecer 🌳`
