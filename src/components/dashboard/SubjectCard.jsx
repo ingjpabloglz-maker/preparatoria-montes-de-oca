@@ -70,14 +70,14 @@ const stateConfig = {
 
 // Paleta de colores por índice (fondo claro + borde oscuro del mismo tono)
 const COLOR_PALETTE = [
-  { bg: 'bg-blue-50',    border: 'border-blue-400',   iconBg: 'bg-blue-100',   progress: '[&>div]:bg-blue-500'   },
-  { bg: 'bg-purple-50',  border: 'border-purple-400', iconBg: 'bg-purple-100', progress: '[&>div]:bg-purple-500' },
-  { bg: 'bg-rose-50',    border: 'border-rose-400',   iconBg: 'bg-rose-100',   progress: '[&>div]:bg-rose-500'   },
-  { bg: 'bg-amber-50',   border: 'border-amber-400',  iconBg: 'bg-amber-100',  progress: '[&>div]:bg-amber-500'  },
-  { bg: 'bg-teal-50',    border: 'border-teal-400',   iconBg: 'bg-teal-100',   progress: '[&>div]:bg-teal-500'   },
-  { bg: 'bg-orange-50',  border: 'border-orange-400', iconBg: 'bg-orange-100', progress: '[&>div]:bg-orange-500' },
-  { bg: 'bg-indigo-50',  border: 'border-indigo-400', iconBg: 'bg-indigo-100', progress: '[&>div]:bg-indigo-500' },
-  { bg: 'bg-cyan-50',    border: 'border-cyan-400',   iconBg: 'bg-cyan-100',   progress: '[&>div]:bg-cyan-500'   },
+  { bg: 'bg-blue-50',    border: 'border-blue-400',   iconBg: 'bg-blue-100',   progressColor: '#3b82f6' },
+  { bg: 'bg-purple-50',  border: 'border-purple-400', iconBg: 'bg-purple-100', progressColor: '#a855f7' },
+  { bg: 'bg-rose-50',    border: 'border-rose-400',   iconBg: 'bg-rose-100',   progressColor: '#f43f5e' },
+  { bg: 'bg-amber-50',   border: 'border-amber-400',  iconBg: 'bg-amber-100',  progressColor: '#f59e0b' },
+  { bg: 'bg-teal-50',    border: 'border-teal-400',   iconBg: 'bg-teal-100',   progressColor: '#14b8a6' },
+  { bg: 'bg-orange-50',  border: 'border-orange-400', iconBg: 'bg-orange-100', progressColor: '#f97316' },
+  { bg: 'bg-indigo-50',  border: 'border-indigo-400', iconBg: 'bg-indigo-100', progressColor: '#6366f1' },
+  { bg: 'bg-cyan-50',    border: 'border-cyan-400',   iconBg: 'bg-cyan-100',   progressColor: '#06b6d4' },
 ];
 
 export default function SubjectCard({ subject, progress, isCompleted, testStatus, onClick, index = 0 }) {
@@ -124,7 +124,8 @@ export default function SubjectCard({ subject, progress, isCompleted, testStatus
         <div className="space-y-1">
           <Progress
             value={progress || 0}
-            className={cn("h-3 rounded-full", color.progress)}
+            className="h-3 rounded-full"
+            indicatorStyle={{ backgroundColor: color.progressColor }}
           />
           <p className="text-xs text-gray-500">{progressMsg()}</p>
         </div>
