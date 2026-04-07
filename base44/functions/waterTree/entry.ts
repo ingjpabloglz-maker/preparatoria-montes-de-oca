@@ -35,10 +35,15 @@ Deno.serve(async (req) => {
   const newStage = calcStage(newGrowthPoints);
   const treeLevelUp = newStage > prevStage;
 
+  // Fix #3: tree_energy limitado a 100
+  const growthStreak = gam.growth_streak ?? 0;
+  const newTreeEnergy = Math.min(100, newGrowthPoints + growthStreak * 2);
+
   await base44.asServiceRole.entities.GamificationProfile.update(gam.id, {
     water_tokens: newWaterTokens,
     tree_growth_points: newGrowthPoints,
     tree_stage: newStage,
+    tree_energy: newTreeEnergy,
     last_tree_update: new Date().toISOString(),
   });
 
@@ -47,6 +52,7 @@ Deno.serve(async (req) => {
     water_tokens: newWaterTokens,
     tree_growth_points: newGrowthPoints,
     tree_stage: newStage,
+    tree_energy: newTreeEnergy,
     tree_level_up: treeLevelUp,
   });
 });

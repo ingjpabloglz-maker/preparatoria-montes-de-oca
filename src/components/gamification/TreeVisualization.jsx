@@ -298,17 +298,16 @@ export default function TreeVisualization({ profile, userEmail }) {
 
   const growthPoints = optimistic?.tree_growth_points ?? profile?.tree_growth_points ?? 0;
   const water = optimistic?.water_tokens ?? profile?.water_tokens ?? 0;
-  const treeEnergy = optimistic?.tree_energy ?? profile?.tree_energy ?? 0;
+  // Fix #3: tree_energy siempre limitado a 100
+  const treeEnergy = Math.min(100, optimistic?.tree_energy ?? profile?.tree_energy ?? 0);
   const growthStreak = profile?.growth_streak ?? 0;
 
-  // ─── Hidratación desde perfil real (sin reset a 0) ───────────────────────
+  // ─── Fix #1: stage SOLO desde backend (perfil real), optimistic solo para water_tokens/growth_points ──
   useEffect(() => {
-    if (optimistic?.tree_stage != null) {
-      setStage(optimistic.tree_stage);
-    } else if (profile?.tree_stage != null) {
+    if (profile?.tree_stage != null) {
       setStage(profile.tree_stage);
     }
-  }, [profile?.tree_stage, optimistic?.tree_stage]);
+  }, [profile?.tree_stage]);
 
   // ─── Animación al cambiar de stage (solo en cambios reales) ─────────────
   useEffect(() => {
@@ -379,41 +378,27 @@ export default function TreeVisualization({ profile, userEmail }) {
 
     const prevOptimistic = optimistic;
     const newGrowth = growthPoints + 1;
-    const newStage = (() => {
-      let s = 0;
-      for (let i = STAGE_THRESHOLDS.length - 1; i >= 0; i--) {
-        if (newGrowth >= STAGE_THRESHOLDS[i]) { s = i; break; }
-      }
-      return s;
-    })();
-    const levelUp = newStage > stage;
-
+    // Fix #1: optimistic NO toca tree_stage, solo tokens/points para UI inmediata
     setOptimistic({
-      tree_stage: newStage,
       tree_growth_points: newGrowth,
       water_tokens: water - 1,
-      tree_energy: newGrowth + (growthStreak * 2),
+      tree_energy: Math.min(100, newGrowth + (growthStreak * 2)),
     });
     setWatering(true);
     setIsWatering(true);
     setTreeScale(1.06);
     setTimeout(() => setTreeScale(1), 400);
 
-    if (levelUp) {
-      setIsGlowing(true);
-      setTimeout(() => setIsGlowing(false), 2500);
-    }
-
     try {
       const res = await base44.functions.invoke('waterTree', {});
       if (!res.data?.success) {
         setOptimistic(prevOptimistic);
       } else {
+        // Fix #3: tree_energy del backend (ya viene limitado)
         setOptimistic({
-          tree_stage: res.data.tree_stage,
           tree_growth_points: res.data.tree_growth_points,
           water_tokens: res.data.water_tokens,
-          tree_energy: res.data.tree_growth_points + (growthStreak * 2),
+          tree_energy: res.data.tree_energy ?? Math.min(100, res.data.tree_growth_points + growthStreak * 2),
         });
         dispatchAssistantEvent('tree_watered', { new_stage: res.data.tree_stage });
       }
@@ -426,7 +411,14 @@ export default function TreeVisualization({ profile, userEmail }) {
     }
   };
 
-  if (stage === null) return null;
+  // Fix #5: Skeleton en lugar de null para evitar flash en mount
+  if (stage === null) return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-44 h-44 rounded-full bg-gray-100 animate-pulse" />
+      <div className="h-4 w-28 bg-gray-100 rounded animate-pulse" />
+      <div className="w-full h-2.5 bg-gray-100 rounded-full animate-pulse" />
+    </div>
+  );
 
   // Intensidad visual basada en energy
   const glowIntensity = treeEnergy > 60
