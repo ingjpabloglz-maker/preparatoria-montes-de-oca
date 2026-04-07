@@ -139,23 +139,24 @@ export default function TreeVisualization({ profile, userEmail }) {
 
   // Estado optimista local
   const [optimistic, setOptimistic] = useState(null);
+  const [stage, setStage] = useState(null);
   const [isWatering, setIsWatering] = useState(false);
   const [isGlowing, setIsGlowing] = useState(false);
   const [treeScale, setTreeScale] = useState(1);
   const [watering, setWatering] = useState(false);
-  const prevStage = useRef(profile?.tree_stage ?? 0);
+  const prevStage = useRef(null);
 
-  const stage = optimistic?.tree_stage ?? profile?.tree_stage ?? 0;
   const growthPoints = optimistic?.tree_growth_points ?? profile?.tree_growth_points ?? 0;
   const water = optimistic?.water_tokens ?? profile?.water_tokens ?? 0;
 
-  // Reacción a cambio de etapa (desde perfil real)
+  // Sincronizar stage con el perfil real (evita render en etapa 0)
   useEffect(() => {
-    const currentStage = profile?.tree_stage ?? 0;
-    if (prevStage.current !== currentStage) {
-      prevStage.current = currentStage;
+    if (optimistic?.tree_stage != null) {
+      setStage(optimistic.tree_stage);
+    } else if (profile?.tree_stage != null) {
+      setStage(profile.tree_stage);
     }
-  }, [profile?.tree_stage]);
+  }, [profile?.tree_stage, optimistic?.tree_stage]);
 
   const currentStageInfo = TREE_STAGES[stage] || TREE_STAGES[0];
   const nextThreshold = stage < 5 ? STAGE_THRESHOLDS[stage + 1] : STAGE_THRESHOLDS[5];
@@ -218,6 +219,8 @@ export default function TreeVisualization({ profile, userEmail }) {
       setTimeout(() => setIsWatering(false), 1200);
     }
   };
+
+  if (stage === null) return null;
 
   return (
     <div className="flex flex-col items-center gap-4">
