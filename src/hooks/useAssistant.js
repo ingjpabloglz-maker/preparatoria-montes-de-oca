@@ -206,8 +206,9 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
 
   // ── handleCTA ─────────────────────────────────────────────────────────────
   const handleCTA = useCallback((msg) => {
-    if (!msg?.payload?.callToAction?.route) return;
-    navigate(msg.payload.callToAction.route);
+    const route = msg?.callToAction?.route || msg?.payload?.callToAction?.route;
+    if (!route) return;
+    navigate(route);
 
     // Log clicked
     if (userEmail && msg.decision_instance_id) {

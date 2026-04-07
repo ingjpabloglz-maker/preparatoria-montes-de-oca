@@ -182,6 +182,7 @@ export function evaluateUserState({ profile, behavior, flags = {} }) {
       priorityKey: 'AMBIENT', priority: PRIORITY.AMBIENT,
       reason: 'no_profile',
       text: '¡Tu aventura de aprendizaje empieza ahora! 🚀',
+      callToAction: { label: 'Ir al inicio', route: '/Dashboard' },
       userState: 'neutral',
     })];
   }
@@ -321,6 +322,7 @@ export function evaluateUserState({ profile, behavior, flags = {} }) {
       priorityKey: 'AMBIENT', priority: PRIORITY.AMBIENT,
       reason: 'active_streak',
       text: `🔥 ¡${ctx.streakDays} días de racha! La constancia es tu superpoder.`,
+      callToAction: { label: 'Continuar aprendiendo', route: '/Dashboard' },
     }));
   }
 
@@ -337,6 +339,7 @@ export function evaluateUserState({ profile, behavior, flags = {} }) {
     priorityKey: 'AMBIENT', priority: PRIORITY.AMBIENT,
     reason: 'time_based_greeting',
     text: greetText,
+    callToAction: { label: 'Continuar aprendiendo', route: '/Dashboard' },
   }));
 
   // Ordenar por score DESC (scoring completo: priority * urgency * engagement * timeFactor)
@@ -368,6 +371,7 @@ export function buildLoginDecision({ name, profile, behavior }) {
       priorityKey: 'AMBIENT', priority: PRIORITY.AMBIENT,
       reason: 'login_no_profile',
       text: 'Bienvenido de nuevo. ¡Sigue avanzando hoy! 🚀',
+      callToAction: { label: 'Continuar aprendiendo', route: '/Dashboard' },
       isReactive: true,
       duration: 10000,
       userState: 'neutral',
@@ -412,6 +416,7 @@ const REACTIVE_DURATION = {
 
 export function buildReactiveDecision(eventType, payload, ctx) {
   let text = null;
+  let callToAction = { label: 'Continuar aprendiendo', route: '/Dashboard' };
 
   switch (eventType) {
     case 'lesson_completed': {
@@ -441,6 +446,7 @@ export function buildReactiveDecision(eventType, payload, ctx) {
       text = payload?.stage !== undefined
         ? `💧 ¡Árbol en Etapa ${payload.stage}! Sigue regando para verlo florecer 🌳`
         : `💧 ¡Tu árbol ha crecido!`;
+      callToAction = { label: 'Ver mi árbol', route: '/Rewards' };
       break;
     case 'streak_updated':
       text = payload?.streak_days
@@ -462,6 +468,7 @@ export function buildReactiveDecision(eventType, payload, ctx) {
       text = payload?.name
         ? `🏆 Logro desbloqueado: "${payload.name}" ✨`
         : `🏆 ¡Nuevo logro desbloqueado!`;
+      callToAction = { label: 'Ver mis logros', route: '/Rewards' };
       break;
     default:
       return null;
@@ -474,6 +481,7 @@ export function buildReactiveDecision(eventType, payload, ctx) {
     priorityKey: 'URGENT', priority: PRIORITY.URGENT,
     reason: `reactive_${eventType}`,
     text,
+    callToAction,
     isReactive: true,
     duration: REACTIVE_DURATION[eventType] || REACTIVE_DURATION.default,
     ctx: ctx || {},
@@ -517,6 +525,7 @@ export function groupQueuedDecisions(queue, ctx) {
       priorityKey: 'URGENT', priority: PRIORITY.URGENT,
       reason: 'queued_events_summary',
       text,
+      callToAction: { label: 'Continuar aprendiendo', route: '/Dashboard' },
       isReactive: true,
       duration: 10000,
       ctx: ctx || {},
