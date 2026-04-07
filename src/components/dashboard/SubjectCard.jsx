@@ -42,7 +42,7 @@ const stateConfig = {
   completed: {
     border: 'border-green-300 bg-green-50/60',
     iconBg: 'bg-green-100',
-    progressColor: '[&>div]:bg-green-500',
+    progressColor: '#22c55e',
     label: '🟢 Materia completada',
     labelClass: 'text-green-700',
     ctaText: 'Ver detalle',
@@ -51,7 +51,7 @@ const stateConfig = {
   in_progress: {
     border: 'border-yellow-300 bg-yellow-50/40',
     iconBg: 'bg-yellow-100',
-    progressColor: '[&>div]:bg-yellow-500',
+    progressColor: '#f59e0b',
     label: '🟡 Continúa donde te quedaste',
     labelClass: 'text-yellow-700',
     ctaText: 'Continuar',
@@ -60,7 +60,7 @@ const stateConfig = {
   pending: {
     border: 'border-gray-200 bg-white',
     iconBg: 'bg-gray-100 group-hover:bg-blue-100',
-    progressColor: '[&>div]:bg-blue-500',
+    progressColor: '#ef4444',
     label: '🔴 Empieza esta materia',
     labelClass: 'text-gray-500',
     ctaText: 'Empezar',
@@ -125,7 +125,7 @@ export default function SubjectCard({ subject, progress, isCompleted, testStatus
           <Progress
             value={progress || 0}
             className="h-3 rounded-full"
-            indicatorStyle={{ backgroundColor: color.progressColor }}
+            indicatorStyle={{ backgroundColor: cfg.progressColor }}
           />
           <p className="text-xs text-gray-500">{progressMsg()}</p>
         </div>
