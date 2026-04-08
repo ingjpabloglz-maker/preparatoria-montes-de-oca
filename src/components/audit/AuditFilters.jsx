@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Filter, X } from 'lucide-react';
+import StudentSearchInput from './StudentSearchInput';
 
 const EMPTY = {
-  user_email: '',
+  student: null,       // { user_email, full_name }
   subject_id: '',
   type: '',
   date_from: '',
@@ -28,7 +29,7 @@ export default function AuditFilters({ subjects, onFilter }) {
 
   function apply() {
     const out = {};
-    if (f.user_email.trim()) out.user_email = f.user_email.trim();
+    if (f.student?.user_email) out.user_email = f.student.user_email;
     if (f.subject_id && f.subject_id !== 'all') out.subject_id = f.subject_id;
     if (f.type && f.type !== 'all') out.type = f.type;
     if (f.date_from) out.date_from = f.date_from;
@@ -54,12 +55,10 @@ export default function AuditFilters({ subjects, onFilter }) {
         </div>
 
         <div className="space-y-1">
-          <Label className="text-xs text-gray-500">Alumno (email o nombre)</Label>
-          <Input
-            placeholder="buscar alumno..."
-            value={f.user_email}
-            onChange={e => set('user_email', e.target.value)}
-            className="h-8 text-sm"
+          <Label className="text-xs text-gray-500">Alumno</Label>
+          <StudentSearchInput
+            value={f.student}
+            onChange={student => set('student', student)}
           />
         </div>
 

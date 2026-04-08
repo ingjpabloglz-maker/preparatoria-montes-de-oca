@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format, differenceInSeconds } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, CheckCircle2, XCircle, Clock, User, ClipboardCheck, Download, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Clock, User, ClipboardCheck, Download, AlertTriangle, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
 
@@ -32,6 +32,16 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
 
   const canReview = (userRole === 'admin' || userRole === 'teacher') &&
     (attempt.requires_manual_review || attempt.passed === null || attempt.passed === undefined);
+
+  const studentName = attempt.full_name || attempt.user_email;
+
+  // Academic breadcrumb: Materia › Unidad › Módulo › Lección
+  const academicPath = [
+    attempt.subject_title,
+    attempt.unit_title,
+    attempt.module_title,
+    attempt.lesson_title,
+  ].filter(Boolean);
 
   // Load question text for each answer
   useEffect(() => {
@@ -63,8 +73,13 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
       doc.text('Evidencia de Evaluación — Auditoría SEP', 14, y); y += 10;
 
       doc.setFontSize(10);
-      doc.text(`Alumno: ${attempt.user_email}`, 14, y); y += 6;
-      doc.text(`Materia: ${attempt.subject_name || attempt.subject_id}`, 14, y); y += 6;
+      doc.text(`Alumno: ${studentName}`, 14, y); y += 6;
+      if (academicPath.length > 0) {
+        doc.text(`Materia: ${attempt.subject_title || '—'}`, 14, y); y += 6;
+        if (attempt.unit_title) { doc.text(`Unidad: ${attempt.unit_title}`, 14, y); y += 6; }
+        if (attempt.module_title) { doc.text(`Módulo: ${attempt.module_title}`, 14, y); y += 6; }
+        if (attempt.lesson_title) { doc.text(`Lección: ${attempt.lesson_title}`, 14, y); y += 6; }
+      }
       doc.text(`Tipo: ${TYPE_LABELS[attempt.type] || attempt.type}`, 14, y); y += 6;
       doc.text(`Intento #: ${attempt.attempt_number}`, 14, y); y += 6;
       doc.text(`Score: ${attempt.score ?? '—'}%`, 14, y); y += 6;
@@ -83,13 +98,14 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
       (attempt.answers || []).forEach((ans, idx) => {
         if (y > 270) { doc.addPage(); y = 20; }
         const q = questions[ans.question_id];
-        const qText = q ? `P${idx + 1}: ${q.question}` : `P${idx + 1}: (ID ${ans.question_id})`;
+        const qText = q ? `P${idx + 1}: ${q.question}` : `P${idx + 1}`;
         const lines = doc.splitTextToSize(qText, 180);
         doc.text(lines, 14, y); y += lines.length * 5;
         doc.text(`  Respuesta: ${ans.user_answer || '—'}  |  Correcta: ${q?.correct_answer || '—'}  |  ${ans.correct ? '✓' : '✗'} ${ans.points_obtained ?? 0} pts`, 14, y); y += 7;
       });
 
-      doc.save(`auditoria_${attempt.user_email}_${attempt.id?.slice(0, 8)}.pdf`);
+      const safeName = studentName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      doc.save(`auditoria_${safeName}_${attempt.id?.slice(0, 8)}.pdf`);
     } catch (e) {
       console.error(e);
     } finally {
@@ -116,20 +132,49 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
             <User className="w-4 h-4 text-indigo-600" /> Información general
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Alumno */}
+          <div>
+            <p className="text-xs text-gray-400 mb-0.5">Alumno</p>
+            <p className="font-semibold text-gray-900 text-base">{studentName}</p>
+            <p className="text-xs text-gray-400">{attempt.user_email}</p>
+          </div>
+
+          {/* Contexto académico */}
+          {academicPath.length > 0 && (
+            <div className="bg-indigo-50 rounded-lg p-3 space-y-1.5 border border-indigo-100">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 mb-2">
+                <BookOpen className="w-3.5 h-3.5" /> Contexto académico
+              </div>
+              {attempt.subject_title && (
+                <div className="flex gap-3 text-sm">
+                  <span className="text-gray-400 w-16 shrink-0 text-xs">Materia</span>
+                  <span className="font-medium text-gray-800">{attempt.subject_title}</span>
+                </div>
+              )}
+              {attempt.unit_title && (
+                <div className="flex gap-3 text-sm">
+                  <span className="text-gray-400 w-16 shrink-0 text-xs">Unidad</span>
+                  <span className="text-gray-700">{attempt.unit_title}</span>
+                </div>
+              )}
+              {attempt.module_title && (
+                <div className="flex gap-3 text-sm">
+                  <span className="text-gray-400 w-16 shrink-0 text-xs">Módulo</span>
+                  <span className="text-gray-700">{attempt.module_title}</span>
+                </div>
+              )}
+              {attempt.lesson_title && (
+                <div className="flex gap-3 text-sm">
+                  <span className="text-gray-400 w-16 shrink-0 text-xs">Lección</span>
+                  <span className="text-gray-700">{attempt.lesson_title}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Métricas */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <p className="text-xs text-gray-400 mb-1">Alumno</p>
-              <p className="font-medium text-gray-800 break-all">{attempt.user_email}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 mb-1">Materia</p>
-              <p className="font-medium text-gray-800">{attempt.subject_name || attempt.subject_id}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 mb-1">Lección ID</p>
-              <p className="text-gray-600 text-xs break-all">{attempt.lesson_id || '—'}</p>
-            </div>
             <div>
               <p className="text-xs text-gray-400 mb-1">Tipo</p>
               <Badge variant="outline">{TYPE_LABELS[attempt.type] || attempt.type}</Badge>
@@ -214,7 +259,7 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
                       )}>
                         <td className="py-2 pr-3 text-gray-400">{idx + 1}</td>
                         <td className="py-2 pr-3 text-gray-700 max-w-[200px]">
-                          {q ? q.question : <span className="text-gray-400 italic">ID: {ans.question_id}</span>}
+                          {q ? q.question : <span className="text-gray-400 italic">Pregunta {idx + 1}</span>}
                         </td>
                         <td className="py-2 pr-3 font-medium text-gray-800">{ans.user_answer || <em className="text-gray-400">—</em>}</td>
                         <td className="py-2 pr-3 text-gray-500">{q ? q.correct_answer : '—'}</td>

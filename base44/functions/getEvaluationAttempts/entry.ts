@@ -24,19 +24,44 @@ Deno.serve(async (req) => {
     limit = 200,
   } = body;
 
-  // Fetch subjects to enrich with names
-  const [attempts, subjects] = await Promise.all([
+  // Fetch all needed data in parallel
+  const [attempts, subjects, lessons, modules, units, users] = await Promise.all([
     base44.asServiceRole.entities.EvaluationAttempt.list('-submitted_at', limit),
     base44.asServiceRole.entities.Subject.list(),
+    base44.asServiceRole.entities.CourseLesson.list(),
+    base44.asServiceRole.entities.CourseModule.list(),
+    base44.asServiceRole.entities.CourseUnit.list(),
+    base44.asServiceRole.entities.User.list(),
   ]);
 
+  // Build lookup maps
   const subjectMap = {};
   for (const s of subjects) subjectMap[s.id] = s.name;
 
+  const lessonMap = {};
+  for (const l of lessons) lessonMap[l.id] = l;
+
+  const moduleMap = {};
+  for (const m of modules) moduleMap[m.id] = m;
+
+  const unitMap = {};
+  for (const u of units) unitMap[u.id] = u;
+
+  const userMap = {};
+  for (const u of users) {
+    const apellidoP = u.apellido_paterno || '';
+    const apellidoM = u.apellido_materno || '';
+    const nombres = u.nombres || '';
+    const parts = [apellidoP, apellidoM, nombres].filter(Boolean);
+    userMap[u.email] = parts.length > 0 ? parts.join(' ') : (u.full_name || u.email);
+  }
+
+  // Filter
   const filtered = attempts.filter(a => {
     if (user_email) {
       const q = user_email.toLowerCase();
-      if (!a.user_email?.toLowerCase().includes(q)) return false;
+      const fullName = (userMap[a.user_email] || '').toLowerCase();
+      if (!a.user_email?.toLowerCase().includes(q) && !fullName.includes(q)) return false;
     }
     if (subject_id && a.subject_id !== subject_id) return false;
     if (lesson_id && a.lesson_id !== lesson_id) return false;
@@ -51,11 +76,21 @@ Deno.serve(async (req) => {
     return true;
   });
 
-  // Enrich with subject name
-  const enriched = filtered.map(a => ({
-    ...a,
-    subject_name: subjectMap[a.subject_id] || a.subject_id,
-  }));
+  // Enrich each attempt with full academic context
+  const enriched = filtered.map(a => {
+    const lesson = lessonMap[a.lesson_id] || {};
+    const mod = moduleMap[lesson.module_id] || {};
+    const unit = unitMap[mod.unit_id] || {};
+
+    return {
+      ...a,
+      full_name: userMap[a.user_email] || a.user_email,
+      subject_title: subjectMap[a.subject_id] || a.subject_id,
+      lesson_title: lesson.title || null,
+      module_title: mod.title || null,
+      unit_title: unit.title || null,
+    };
+  });
 
   return Response.json({ status: 'ok', attempts: enriched, total: enriched.length });
 });

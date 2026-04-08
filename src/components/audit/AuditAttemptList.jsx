@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CheckCircle2, XCircle, Clock, AlertCircle, AlertTriangle, ChevronRight } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, AlertCircle, AlertTriangle, ChevronRight, BookOpen } from 'lucide-react';
 
 const TYPE_LABELS = {
   lesson: 'Lección',
@@ -54,14 +54,26 @@ export default function AuditAttemptList({ attempts, loading, onSelect }) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex-1 min-w-0">
+                {/* Nombre del alumno */}
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="font-semibold text-sm text-gray-800 truncate">{attempt.user_email}</span>
+                  <span className="font-semibold text-sm text-gray-800 truncate">
+                    {attempt.full_name || attempt.user_email}
+                  </span>
                   <Badge variant="outline" className="text-xs">{TYPE_LABELS[attempt.type] || attempt.type}</Badge>
                   <Badge variant="outline" className="text-xs">Intento #{attempt.attempt_number}</Badge>
                 </div>
-                {attempt.subject_name && (
-                  <p className="text-xs text-indigo-600 font-medium mb-1">{attempt.subject_name}</p>
-                )}
+
+                {/* Contexto académico */}
+                <div className="flex items-start gap-1.5 text-xs text-gray-500 mb-1.5">
+                  <BookOpen className="w-3 h-3 mt-0.5 shrink-0 text-indigo-400" />
+                  <span className="truncate">
+                    {[attempt.subject_title, attempt.unit_title, attempt.module_title, attempt.lesson_title]
+                      .filter(Boolean)
+                      .join(' › ')}
+                  </span>
+                </div>
+
+                {/* Badges de estado */}
                 <div className="flex flex-wrap gap-1 mt-1">
                   {attempt.requires_manual_review && (
                     <Badge className="bg-yellow-100 text-yellow-700 gap-1 text-xs">
@@ -84,12 +96,14 @@ export default function AuditAttemptList({ attempts, loading, onSelect }) {
                     </Badge>
                   )}
                 </div>
+
                 <p className="text-xs text-gray-400 mt-1">
                   {attempt.submitted_at
                     ? format(new Date(attempt.submitted_at), "dd MMM yyyy HH:mm", { locale: es })
                     : '—'}
                 </p>
               </div>
+
               <div className="flex items-center gap-3 shrink-0">
                 <div className="text-right">
                   <div className="text-lg font-bold text-gray-800">{attempt.score ?? '—'}%</div>
