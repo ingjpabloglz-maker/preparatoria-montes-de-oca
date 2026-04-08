@@ -1,39 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPageUrl } from '@/utils';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  ArrowLeft,
-  BookOpen,
-  CheckCircle2,
-  Clock,
-  FileText,
-  Lock,
-  Trophy,
-  AlertCircle
+import {
+  ArrowLeft, BookOpen, CheckCircle2, FileText,
+  Lock, Trophy, AlertCircle, AlertTriangle, Loader2, Map
 } from "lucide-react";
 import SubjectTest from '../components/tests/SubjectTest';
 import ExtraordinaryFolioValidator from '../components/payment/ExtraordinaryFolioValidator';
-import { Map } from "lucide-react";
 
 export default function Subject() {
   const urlParams = new URLSearchParams(window.location.search);
   const subjectId = urlParams.get('id');
-  
+
   const [user, setUser] = useState(null);
   const [takingTest, setTakingTest] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUser = async () => {
-      const userData = await base44.auth.me();
-      setUser(userData);
-    };
-    loadUser();
+    base44.auth.me().then(setUser);
   }, []);
 
   const { data: subject } = useQuery({
@@ -45,89 +34,25 @@ export default function Subject() {
     enabled: !!subjectId,
   });
 
-  const { data: progressData } = useQuery({
-    queryKey: ['subjectProgress', user?.email, subjectId],
+  // ─── Estado de evaluación: fuente de verdad es el BACKEND ────────────────────
+  const { data: evalStatus, isLoading: evalLoading, refetch: refetchEvalStatus } = useQuery({
+    queryKey: ['evalStatus', user?.email, subjectId],
     queryFn: async () => {
-      const progress = await base44.entities.SubjectProgress.filter({ 
-        user_email: user?.email,
-        subject_id: subjectId
-      });
-      return progress[0];
+      const res = await base44.functions.invoke('getEvaluationStatus', { subject_id: subjectId });
+      return res.data;
     },
     enabled: !!user?.email && !!subjectId,
   });
 
-  const updateAnalyticsMutation = useMutation({
-    mutationFn: async (analyticsData) => {
-      if (progressData) {
-        await base44.entities.SubjectProgress.update(progressData.id, {
-          ...analyticsData,
-          last_activity: new Date().toISOString()
-        });
-      } else {
-        await base44.entities.SubjectProgress.create({
-          user_email: user.email,
-          subject_id: subjectId,
-          progress_percent: 0,
-          completed: false,
-          last_activity: new Date().toISOString(),
-          ...analyticsData
-        });
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['subjectProgress']);
-    }
-  });
-
-  // Progreso desde SubjectProgress.progress_percent (fuente única de verdad)
-  const currentProgress = progressData?.progress_percent || 0;
-  const isCompleted = currentProgress >= 100 || progressData?.completed || false;
-  const testPassed = progressData?.test_passed || false;
-  const testAttempts = progressData?.test_attempts || 0;
-  const finalGrade = progressData?.final_grade;
-  const attemptsLeft = 3 - testAttempts;
-  const testBlocked = testAttempts >= 3 && !testPassed;
-  const testAvailable = isCompleted && !testPassed && !testBlocked;
-
-  const handleTestComplete = async (score, passed) => {
-    const newAttempts = testAttempts + 1;
-    const updateData = {
-      test_attempts: newAttempts,
-      test_passed: passed,
-      last_activity: new Date().toISOString(),
-    };
-    updateData.final_grade = score;
-    if (passed) {
-      updateData.completed = true;
-    }
-    if (progressData) {
-      await base44.entities.SubjectProgress.update(progressData.id, updateData);
-    } else {
-      await base44.entities.SubjectProgress.create({
-        user_email: user.email,
-        subject_id: subjectId,
-        progress_percent: currentProgress,
-        completed: isCompleted,
-        ...updateData
-      });
-    }
+  const handleTestComplete = useCallback(async () => {
     setTakingTest(false);
-    queryClient.invalidateQueries(['subjectProgress']);
-  };
+    await refetchEvalStatus();
+    queryClient.invalidateQueries(['subject']);
+  }, [refetchEvalStatus, queryClient]);
 
-  const handleExtraordinaryUnlocked = async () => {
-    // Reiniciar conteo de intentos para dar 3 nuevos intentos
-    const extraUsed = (progressData?.extraordinary_attempts_used || 0) + 1;
-    if (progressData) {
-      await base44.entities.SubjectProgress.update(progressData.id, {
-        test_attempts: 0,
-        extraordinary_attempts_used: extraUsed,
-        last_activity: new Date().toISOString(),
-      });
-    }
-    queryClient.invalidateQueries(['subjectProgress']);
-  };
+  const handleExtraordinaryUnlocked = useCallback(async () => {
+    await refetchEvalStatus();
+  }, [refetchEvalStatus]);
 
   if (!subject) {
     return (
@@ -155,13 +80,25 @@ export default function Subject() {
     );
   }
 
+  // Extraer estado del backend — el frontend SOLO refleja, no calcula
+  const progress = evalStatus?.progress_percent || 0;
+  const isCompleted = evalStatus?.is_completed || false;
+  const testPassed = evalStatus?.test_passed || false;
+  const finalGrade = evalStatus?.final_grade ?? null;
+  const testAttempts = evalStatus?.test_attempts || 0;
+  const attemptsLeft = evalStatus?.attempts_left ?? 3;
+  const isBlocked = evalStatus?.is_blocked || false;
+  const canTakeExam = evalStatus?.can_take_exam || false;
+  const requiresReinforcement = evalStatus?.requires_reinforcement || false;
+  const errorsNoted = evalStatus?.errors_noted || [];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
             onClick={() => window.location.href = createPageUrl(`Level?level=${subject.level}`)}
           >
@@ -191,18 +128,38 @@ export default function Subject() {
           <div className="bg-gradient-to-r from-blue-600 to-violet-600 p-5 text-white">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold text-lg">Tu progreso</h3>
-              <span className="text-3xl font-bold">{Math.round(currentProgress)}%</span>
+              <span className="text-3xl font-bold">{Math.round(progress)}%</span>
             </div>
-            <Progress value={currentProgress} className="h-3 bg-white/30 [&>div]:bg-white mb-2" />
+            <Progress value={progress} className="h-3 bg-white/30 [&>div]:bg-white mb-2" />
             <p className="text-blue-200 text-sm">
-              {currentProgress === 0 && 'Vas comenzando — ¡da el primer paso!'}
-              {currentProgress > 0 && currentProgress < 30 && 'Buen inicio, sigue así'}
-              {currentProgress >= 30 && currentProgress < 70 && 'Vas a buen ritmo 🔥'}
-              {currentProgress >= 70 && currentProgress < 100 && '¡Casi completas esta materia!'}
-              {currentProgress >= 100 && '¡Contenido completado! Presenta tu prueba'}
+              {progress === 0 && 'Vas comenzando — ¡da el primer paso!'}
+              {progress > 0 && progress < 30 && 'Buen inicio, sigue así'}
+              {progress >= 30 && progress < 70 && 'Vas a buen ritmo 🔥'}
+              {progress >= 70 && progress < 100 && '¡Casi completas esta materia!'}
+              {progress >= 100 && '¡Contenido completado! Presenta tu prueba'}
             </p>
           </div>
         </Card>
+
+        {/* Señal de refuerzo académico (mini_eval) */}
+        {requiresReinforcement && (
+          <Card className="border-yellow-300 bg-yellow-50/60 border-0 shadow">
+            <CardContent className="p-4 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-yellow-800 text-sm">Señal de refuerzo académico</p>
+                <p className="text-yellow-700 text-xs mt-0.5">
+                  Has presentado varias veces las mini evaluaciones sin aprobar. Te recomendamos repasar el contenido antes de continuar.
+                </p>
+                {errorsNoted.length > 0 && (
+                  <p className="text-yellow-700 text-xs mt-1">
+                    Temas a reforzar: <span className="font-medium">{errorsNoted.join(', ')}</span>
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Course Content */}
         <Card className="border-0 shadow-lg overflow-hidden">
@@ -231,7 +188,7 @@ export default function Subject() {
           </CardContent>
         </Card>
 
-        {/* Prueba de la materia */}
+        {/* Prueba Final */}
         <Card className={`border-0 shadow-lg ${testPassed ? 'border-green-200 bg-green-50/50' : ''}`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -240,7 +197,12 @@ export default function Subject() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {testPassed ? (
+            {evalLoading ? (
+              <div className="flex items-center gap-2 text-gray-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Verificando estado...</span>
+              </div>
+            ) : testPassed ? (
               <div className="flex items-center gap-3 text-green-700">
                 <Trophy className="w-8 h-8 text-green-500" />
                 <div>
@@ -248,7 +210,7 @@ export default function Subject() {
                   <p className="text-sm">Calificación final: <span className="font-bold">{finalGrade}%</span></p>
                 </div>
               </div>
-            ) : testBlocked ? (
+            ) : isBlocked ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3 text-red-700 bg-red-50 rounded-lg p-4">
                   <AlertCircle className="w-8 h-8 text-red-400 flex-shrink-0" />
@@ -259,7 +221,6 @@ export default function Subject() {
                 </div>
                 <ExtraordinaryFolioValidator
                   subjectId={subjectId}
-                  userEmail={user?.email}
                   onUnlocked={handleExtraordinaryUnlocked}
                 />
               </div>
@@ -273,12 +234,14 @@ export default function Subject() {
                 <p className="text-sm text-gray-600">
                   La prueba tiene 3 intentos máximo. Necesitas al menos 70% para aprobar.
                 </p>
-                {testAttempts > 0 && finalGrade !== undefined && (
+                {testAttempts > 0 && finalGrade !== null && (
                   <p className="text-sm text-orange-700 font-medium">
-                    Última calificación obtenida: <span className="font-bold">{finalGrade}%</span> — Intento {testAttempts} de 3
+                    Última calificación: <span className="font-bold">{finalGrade}%</span> — Intento {testAttempts} de 3
                   </p>
                 )}
-                <p className="text-sm text-gray-500">Intentos restantes: <span className="font-semibold">{attemptsLeft}</span></p>
+                <p className="text-sm text-gray-500">
+                  Intentos restantes: <span className="font-semibold">{attemptsLeft}</span>
+                </p>
                 <Button className="w-full" onClick={() => setTakingTest(true)}>
                   Iniciar Prueba
                 </Button>
@@ -286,8 +249,6 @@ export default function Subject() {
             )}
           </CardContent>
         </Card>
-
-
 
         {/* Description */}
         {subject.description && (

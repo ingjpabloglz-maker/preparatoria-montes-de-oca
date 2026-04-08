@@ -1,0 +1,96 @@
+{
+  "name": "SubjectProgress",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "ID de la materia"
+    },
+    "progress_percent": {
+      "type": "number",
+      "description": "Porcentaje de avance en la materia",
+      "default": 0
+    },
+    "completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el contenido de la materia est\u00e1 al 100%"
+    },
+    "test_attempts": {
+      "type": "number",
+      "description": "N\u00famero de intentos realizados en la prueba final",
+      "default": 0
+    },
+    "test_passed": {
+      "type": "boolean",
+      "description": "Si la prueba final fue aprobada",
+      "default": false
+    },
+    "final_grade": {
+      "type": "number",
+      "description": "Calificaci\u00f3n final obtenida en la prueba"
+    },
+    "final_exam_unlocked": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el examen final fue desbloqueado con folio extraordinario (se consume tras cada intento)"
+    },
+    "extraordinary_attempts_used": {
+      "type": "number",
+      "description": "N\u00famero de veces que se ha desbloqueado con folio extraordinario",
+      "default": 0
+    },
+    "requires_reinforcement": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se\u00f1al acad\u00e9mica: el alumno fall\u00f3 3 veces en mini_eval \u2014 no bloquea pero genera riesgo acad\u00e9mico"
+    },
+    "errors_noted": {
+      "type": "array",
+      "description": "Temas donde el alumno report\u00f3 dificultades o fall\u00f3 reiteradamente",
+      "items": {
+        "type": "string"
+      }
+    },
+    "last_activity": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima actividad en la materia"
+    },
+    "time_spent_minutes": {
+      "type": "number",
+      "description": "Tiempo total invertido en minutos",
+      "default": 0
+    },
+    "sessions": {
+      "type": "array",
+      "description": "Historial de sesiones de estudio",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "duration_minutes": {
+            "type": "number"
+          },
+          "progress_at_end": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "difficulty_rating": {
+      "type": "number",
+      "description": "Calificaci\u00f3n de dificultad del alumno (1-5)"
+    }
+  },
+  "required": [
+    "user_email",
+    "subject_id"
+  ]
+}

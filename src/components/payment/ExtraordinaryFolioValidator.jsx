@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, Loader2, KeyRound, CheckCircle2 } from "lucide-react";
 
-export default function ExtraordinaryFolioValidator({ subjectId, userEmail, onUnlocked }) {
+// Toda la validación ocurre en el backend (unlockFinalExamWithFolio).
+// Este componente solo captura el folio y llama al endpoint.
+export default function ExtraordinaryFolioValidator({ subjectId, onUnlocked }) {
   const [folio, setFolio] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -17,44 +19,18 @@ export default function ExtraordinaryFolioValidator({ subjectId, userEmail, onUn
     setLoading(true);
     setError('');
 
-    // Buscar folio de tipo extraordinary_test disponible
-    const results = await base44.entities.Payment.filter({ folio: folio.trim().toUpperCase() });
-    const record = results[0];
-
-    if (!record) {
-      setError('Folio no encontrado.');
-      setLoading(false);
-      return;
-    }
-    if (record.folio_type !== 'extraordinary_test') {
-      setError('Este folio no es válido para pruebas extraordinarias.');
-      setLoading(false);
-      return;
-    }
-    if (record.status !== 'available') {
-      setError('Este folio ya fue utilizado o está expirado.');
-      setLoading(false);
-      return;
-    }
-
-    // Verificar que el folio esté asignado a este alumno
-    if (record.user_email && record.user_email !== userEmail) {
-      setError('Este folio está asignado a otro alumno.');
-      setLoading(false);
-      return;
-    }
-
-    // Marcar folio como usado
-    await base44.entities.Payment.update(record.id, {
-      status: 'used',
-      user_email: userEmail,
-      used_date: new Date().toISOString(),
+    const response = await base44.functions.invoke('unlockFinalExamWithFolio', {
+      folio: folio.trim().toUpperCase(),
       subject_id: subjectId,
     });
 
-    setSuccess(true);
+    if (response.data?.unlocked) {
+      setSuccess(true);
+      setTimeout(() => onUnlocked(), 1000);
+    } else {
+      setError(response.data?.error || 'No se pudo validar el folio. Intenta de nuevo.');
+    }
     setLoading(false);
-    setTimeout(() => onUnlocked(), 1000);
   };
 
   if (success) {
@@ -96,8 +72,12 @@ export default function ExtraordinaryFolioValidator({ subjectId, userEmail, onUn
             Acude presencialmente a la administración escolar del plantel, realiza tu pago y te será entregado tu folio extraordinario.
           </p>
         </div>
-        <Button className="w-full bg-orange-600 hover:bg-orange-700" onClick={handleValidate} disabled={loading || !folio.trim()}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+        <Button
+          className="w-full bg-orange-600 hover:bg-orange-700"
+          onClick={handleValidate}
+          disabled={loading || !folio.trim()}
+        >
+          {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
           Validar Folio Extraordinario
         </Button>
       </CardContent>
