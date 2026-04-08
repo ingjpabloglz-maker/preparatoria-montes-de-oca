@@ -23,7 +23,8 @@ import {
   Users,
   FileText,
   BarChart2,
-  MessageCircle
+  MessageCircle,
+  Shield
 } from "lucide-react";
 import GamificationHUD from "@/components/gamification/GamificationHUD";
 import AchievementToast from "@/components/gamification/AchievementToast";
@@ -133,6 +134,15 @@ export default function Layout({ children, currentPageName }) {
                     >
                       <Settings className="w-4 h-4 mr-2" />
                       Administradores
+                    </Button>
+                  </Link>
+                  <Link to="/AuditDashboard">
+                    <Button
+                      variant={currentPageName === 'AuditDashboard' ? 'secondary' : 'ghost'}
+                      size="sm"
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      Auditoría
                     </Button>
                   </Link>
                 </>

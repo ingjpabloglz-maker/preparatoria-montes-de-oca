@@ -1,0 +1,84 @@
+{
+  "name": "CourseActivity",
+  "type": "object",
+  "properties": {
+    "lesson_id": {
+      "type": "string",
+      "description": "ID de la lecci\u00f3n a la que pertenece"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "multiple_choice",
+        "true_false",
+        "fill_blank",
+        "solve",
+        "match",
+        "order_steps"
+      ],
+      "description": "Tipo de actividad"
+    },
+    "question": {
+      "type": "string",
+      "description": "Enunciado de la pregunta"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Opciones de respuesta"
+    },
+    "correct_answer": {
+      "type": "string",
+      "description": "Respuesta correcta principal (texto o \u00edndice)"
+    },
+    "accepted_answers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Respuestas alternativas v\u00e1lidas (para solve/fill_blank)"
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Explicaci\u00f3n de la respuesta correcta"
+    },
+    "points": {
+      "type": "number",
+      "default": 10,
+      "description": "Puntos que otorga esta actividad"
+    },
+    "order": {
+      "type": "number",
+      "description": "Orden dentro de la lecci\u00f3n"
+    },
+    "grading_type": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "manual",
+        "hybrid"
+      ],
+      "default": "auto",
+      "description": "auto=comparaci\u00f3n directa, manual=requiere docente, hybrid=auto+revisi\u00f3n"
+    },
+    "tolerance": {
+      "type": "number",
+      "default": 0,
+      "description": "Margen de error permitido para respuestas num\u00e9ricas"
+    },
+    "requires_manual_review": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si siempre debe ser revisada manualmente"
+    }
+  },
+  "required": [
+    "lesson_id",
+    "type",
+    "question",
+    "correct_answer",
+    "order"
+  ]
+}

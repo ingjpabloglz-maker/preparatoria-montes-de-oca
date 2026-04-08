@@ -14,6 +14,7 @@ import Forum from './pages/Forum';
 import ForumThread from './pages/ForumThread';
 import { useInactivityLogout } from '@/hooks/useInactivityLogout';
 import InactivityWarningModal from '@/components/common/InactivityWarningModal';
+import AuditDashboard from './pages/AuditDashboard';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -72,6 +73,7 @@ const AuthenticatedApp = () => {
       <Route path="/SurpriseExam" element={<LayoutWrapper currentPageName="SurpriseExam"><SurpriseExam /></LayoutWrapper>} />
       <Route path="/Forum" element={<LayoutWrapper currentPageName="Forum"><Forum /></LayoutWrapper>} />
       <Route path="/Forum/thread/:id" element={<LayoutWrapper currentPageName="ForumThread"><ForumThread /></LayoutWrapper>} />
+      <Route path="/AuditDashboard" element={<LayoutWrapper currentPageName="AuditDashboard"><AuditDashboard /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
     </>

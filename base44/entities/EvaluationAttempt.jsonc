@@ -1,0 +1,99 @@
+{
+  "name": "EvaluationAttempt",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario que realiz\u00f3 el intento"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "ID de la materia asociada"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "ID de la lecci\u00f3n/mini-evaluaci\u00f3n"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "lesson",
+        "mini_eval",
+        "final_exam",
+        "surprise_exam"
+      ],
+      "description": "Tipo de evaluaci\u00f3n"
+    },
+    "answers": {
+      "type": "array",
+      "description": "Respuestas del usuario con resultado calculado en backend",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question_id": {
+            "type": "string"
+          },
+          "user_answer": {
+            "type": "string"
+          },
+          "correct": {
+            "type": "boolean"
+          },
+          "points_obtained": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "score": {
+      "type": "number",
+      "description": "Puntuaci\u00f3n total (0-100), calculada en backend"
+    },
+    "passed": {
+      "type": "boolean",
+      "description": "\u00bfAprob\u00f3? score >= 80"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de inicio"
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de env\u00edo"
+    },
+    "attempt_number": {
+      "type": "number",
+      "description": "N\u00famero de intento para esta lecci\u00f3n/usuario"
+    },
+    "requires_manual_review": {
+      "type": "boolean",
+      "default": false,
+      "description": "Requiere revisi\u00f3n manual por docente"
+    },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Email del docente/admin revisor"
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de la revisi\u00f3n"
+    },
+    "feedback": {
+      "type": "string",
+      "description": "Comentarios de revisi\u00f3n manual"
+    }
+  },
+  "required": [
+    "user_email",
+    "subject_id",
+    "lesson_id",
+    "type",
+    "answers",
+    "started_at",
+    "submitted_at",
+    "attempt_number"
+  ]
+}

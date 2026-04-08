@@ -59,8 +59,11 @@ async function initializeUserProgress(base44, user_email, nowIso) {
 }
 
 // ─── BLOQUE 2: Calcular recompensas base por evento ──────────────────────────
+// SEGURIDAD: score siempre viene del campo calculado_score (calculado en backend por submitEvaluation)
+// NUNCA del event_data.score enviado por frontend
 function calculateBaseAwards(event_type, event_data) {
-  const score = event_data.score || 0;
+  // Se usa calculated_score si existe (enviado desde submitEvaluation), de lo contrario 0
+  const score = event_data.calculated_score ?? 0;
   const XP_MAP = {
     lesson_completed: 20,
     mini_eval_passed: 40,
@@ -457,6 +460,12 @@ Deno.serve(async (req) => {
         event_data.activity_duration_seconds < MIN_DURATION_SECONDS) {
       return Response.json({ error: 'Activity too short' }, { status: 400 });
     }
+
+    // ─── SEGURIDAD: Ignorar score/correct_answers del frontend ───────────────
+    // Para eventos de evaluación, el score debe venir de submitEvaluation (calculated_score)
+    // Se ignoran explícitamente event_data.score y event_data.correct_answers
+    delete event_data.score;
+    delete event_data.correct_answers;
 
     // ─── 4. CREAR/OBTENER UserProgress ───────────────────────────────────────
     await initializeUserProgress(base44, user_email, nowIso);
