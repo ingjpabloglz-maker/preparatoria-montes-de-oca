@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AuditAttemptDetail from '@/components/audit/AuditAttemptDetail';
-import { ClipboardCheck, Clock, CheckCircle2, XCircle, MessageCircle, User, BookOpen, RefreshCw } from 'lucide-react';
-import { format } from 'date-fns';
+import { ClipboardCheck, Clock, CheckCircle2, XCircle, MessageCircle, User, BookOpen, RefreshCw, AlertTriangle } from 'lucide-react';
+import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
 import { hasPermission } from '@/lib/permissions';
@@ -46,8 +46,12 @@ export default function TeacherDashboard() {
           limit: 20,
         }),
       ]);
-      setPendingAttempts(pendRes.data?.attempts || []);
-      // Filtrar solo los que ya fueron revisados por un docente
+      // Ordenar pendientes: más antiguos primero (mayor tiempo de espera)
+      const pending = (pendRes.data?.attempts || []).sort((a, b) =>
+        new Date(a.submitted_at) - new Date(b.submitted_at)
+      );
+      setPendingAttempts(pending);
+      // Filtrar solo los que ya fueron revisados
       const reviewed = (reviewedRes.data?.attempts || []).filter(a => a.reviewed_by);
       setReviewedAttempts(reviewed);
     } catch (e) {
@@ -61,8 +65,8 @@ export default function TeacherDashboard() {
     if (user) loadAttempts();
   }, [user, loadAttempts]);
 
-  async function handleReview({ attempt_id, score, passed, feedback }) {
-    await base44.functions.invoke('reviewEvaluationAttempt', { attempt_id, score, passed, feedback });
+  async function handleReview({ attempt_id, score, passed, feedback, review_started_at }) {
+    await base44.functions.invoke('reviewEvaluationAttempt', { attempt_id, score, passed, feedback, review_started_at });
     setSelectedAttempt(null);
     loadAttempts();
   }
@@ -220,10 +224,19 @@ function AttemptCard({ attempt, onSelect, showDecision = false }) {
   const isPending = attempt.requires_manual_review;
   const approved = attempt.passed === true;
 
+  const hoursWaiting = attempt.submitted_at
+    ? differenceInHours(new Date(), new Date(attempt.submitted_at))
+    : 0;
+  const isUrgent = isPending && hoursWaiting >= 48;
+
+  const waitingLabel = attempt.submitted_at
+    ? formatDistanceToNow(new Date(attempt.submitted_at), { addSuffix: true, locale: es })
+    : null;
+
   return (
     <Card
       className="cursor-pointer hover:shadow-md transition-shadow border-l-4"
-      style={{ borderLeftColor: isPending ? '#f59e0b' : approved ? '#22c55e' : '#ef4444' }}
+      style={{ borderLeftColor: isUrgent ? '#dc2626' : isPending ? '#f59e0b' : approved ? '#22c55e' : '#ef4444' }}
       onClick={() => onSelect(attempt)}
     >
       <CardContent className="p-4 flex items-center gap-4">
@@ -231,9 +244,14 @@ function AttemptCard({ attempt, onSelect, showDecision = false }) {
           <User className="w-5 h-5 text-gray-500" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <p className="font-semibold text-gray-900 truncate">{attempt.full_name || attempt.user_email}</p>
-            {isPending && (
+            {isUrgent && (
+              <Badge className="bg-red-100 text-red-700 gap-1 text-xs shrink-0">
+                <AlertTriangle className="w-3 h-3" /> Urgente
+              </Badge>
+            )}
+            {isPending && !isUrgent && (
               <Badge className="bg-yellow-100 text-yellow-700 gap-1 text-xs shrink-0">
                 <Clock className="w-3 h-3" /> Pendiente
               </Badge>
@@ -244,13 +262,21 @@ function AttemptCard({ attempt, onSelect, showDecision = false }) {
                 : <Badge className="bg-red-100 text-red-700 gap-1 text-xs shrink-0"><XCircle className="w-3 h-3" /> Rechazado</Badge>
             )}
           </div>
-          <div className="flex gap-3 text-xs text-gray-500">
+          <div className="flex flex-wrap gap-2 text-xs text-gray-500">
             <span>{attempt.subject_title || 'Materia'}</span>
             <span>·</span>
             <span>Intento #{attempt.attempt_number}</span>
             <span>·</span>
             <span>{attempt.score ?? '—'}%</span>
-            {attempt.submitted_at && (
+            {waitingLabel && isPending && (
+              <>
+                <span>·</span>
+                <span className={isUrgent ? 'text-red-600 font-medium' : 'text-gray-400'}>
+                  Enviado {waitingLabel}
+                </span>
+              </>
+            )}
+            {attempt.submitted_at && !isPending && (
               <>
                 <span>·</span>
                 <span>{format(new Date(attempt.submitted_at), "d MMM yyyy HH:mm", { locale: es })}</span>
@@ -261,6 +287,7 @@ function AttemptCard({ attempt, onSelect, showDecision = false }) {
             <p className="text-xs text-gray-400 mt-1">
               Revisado por: {attempt.reviewer_name || attempt.reviewed_by}
               {attempt.reviewed_at && ` — ${format(new Date(attempt.reviewed_at), "d MMM yyyy", { locale: es })}`}
+              {attempt.review_duration_seconds && ` (${Math.round(attempt.review_duration_seconds / 60)} min)`}
             </p>
           )}
         </div>

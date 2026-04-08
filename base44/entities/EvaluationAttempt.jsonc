@@ -76,14 +76,70 @@
       "type": "string",
       "description": "Email del docente/admin revisor"
     },
+    "reviewer_id": {
+      "type": "string",
+      "description": "ID del usuario revisor (trazabilidad SEP)"
+    },
+    "reviewer_name": {
+      "type": "string",
+      "description": "Nombre completo del revisor"
+    },
+    "reviewer_role": {
+      "type": "string",
+      "description": "Rol del revisor al momento de la revisi\u00f3n (docente | admin)"
+    },
+    "review_decision": {
+      "type": "string",
+      "enum": [
+        "approved",
+        "rejected"
+      ],
+      "description": "Decisi\u00f3n expl\u00edcita del revisor"
+    },
     "reviewed_at": {
       "type": "string",
       "format": "date-time",
       "description": "Timestamp de la revisi\u00f3n"
     },
+    "review_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp en que el docente abri\u00f3 el intento para revisi\u00f3n"
+    },
+    "review_duration_seconds": {
+      "type": "number",
+      "description": "Segundos transcurridos entre review_started_at y reviewed_at"
+    },
     "feedback": {
       "type": "string",
       "description": "Comentarios de revisi\u00f3n manual"
+    },
+    "review_history": {
+      "type": "array",
+      "description": "Historial completo de todas las revisiones (inmutable, no se sobrescribe)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "reviewer_id": {
+            "type": "string"
+          },
+          "reviewer_name": {
+            "type": "string"
+          },
+          "reviewer_role": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "feedback": {
+            "type": "string"
+          },
+          "reviewed_at": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "required": [

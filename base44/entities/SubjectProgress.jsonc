@@ -34,6 +34,18 @@
       "type": "number",
       "description": "Calificaci\u00f3n final obtenida en la prueba"
     },
+    "final_exam_status": {
+      "type": "string",
+      "enum": [
+        "not_started",
+        "pending_review",
+        "approved",
+        "rejected",
+        "blocked"
+      ],
+      "default": "not_started",
+      "description": "Estado expl\u00edcito del examen final para trazabilidad SEP"
+    },
     "final_exam_unlocked": {
       "type": "boolean",
       "default": false,

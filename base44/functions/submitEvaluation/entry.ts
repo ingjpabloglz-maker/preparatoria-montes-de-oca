@@ -215,12 +215,15 @@ Deno.serve(async (req) => {
   if (isFinalExam) {
     // ⚠️ CRÍTICO: final_exam NO actualiza test_passed ni completed
     // Eso lo hace reviewEvaluationAttempt cuando el docente aprueba
-    const newTestAttempts = (sp?.test_attempts || 0) + 1;
+    // test_attempts se controla SOLO desde backend (no confiar en frontend)
+    const currentAttempts = sp?.test_attempts || 0;
+    const newTestAttempts = currentAttempts + 1;
     const spUpdate = {
       test_attempts: newTestAttempts,
       final_grade: score,
       last_activity: submitted_at,
-      final_exam_unlocked: false, // consumir unlock
+      final_exam_unlocked: false, // consumir unlock tras cada intento
+      final_exam_status: 'pending_review',
       // test_passed y completed NO se tocan — el docente decide
     };
 
