@@ -56,19 +56,17 @@ Deno.serve(async (req) => {
   const session_token = generateSessionToken();
   const session_expires_at = new Date(now.getTime() + 60 * 60 * 1000).toISOString(); // +1 hora
 
-  // Marcar token como usado
+  // ✅ CAMBIO CRÍTICO: NO marcar como usado aquí
+  // El token se consume en submitEvaluation cuando type === 'final_exam'
+  // Solo guardar session_token para la sesión
   await base44.asServiceRole.entities.PresentialExamToken.update(token.id, {
-    used: true,
-    used_by: user.email,
-    used_by_name: user.full_name,
-    used_at: now.toISOString(),
     session_token,
     session_expires_at,
   });
 
-  console.log('TOKEN VALIDATED', {
+  console.log('TOKEN VALIDATED (NOT CONSUMED)', {
     token_code,
-    used_by: user.email,
+    validated_by: user.email,
     subject_id: token.subject_id || subject_id,
   });
 
@@ -78,5 +76,6 @@ Deno.serve(async (req) => {
     session_expires_at,
     subject_id: token.subject_id || subject_id,
     generated_by: token.created_by_name,
+    token_id: token.id,
   });
 });

@@ -72,6 +72,34 @@
       "default": false,
       "description": "Requiere revisi\u00f3n manual por docente"
     },
+    "presential_token_id": {
+      "type": "string",
+      "description": "ID del PresentialExamToken usado (solo final_exam)"
+    },
+    "token_code": {
+      "type": "string",
+      "description": "C\u00f3digo del token para auditor\u00eda visible (solo final_exam)"
+    },
+    "validated_by": {
+      "type": "string",
+      "description": "ID del docente que gener\u00f3 el token (trazabilidad SEP)"
+    },
+    "validated_by_name": {
+      "type": "string",
+      "description": "Nombre completo del docente que gener\u00f3 el token"
+    },
+    "validation_method": {
+      "type": "string",
+      "enum": [
+        "token"
+      ],
+      "description": "M\u00e9todo de validaci\u00f3n presencial: token"
+    },
+    "token_validated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp exacto cuando el alumno valid\u00f3 el token"
+    },
     "reviewed_by": {
       "type": "string",
       "description": "Email del docente/admin revisor (\u00faltima revisi\u00f3n)"

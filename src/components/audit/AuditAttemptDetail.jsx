@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format, differenceInSeconds } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, CheckCircle2, XCircle, Clock, User, ClipboardCheck, Download, AlertTriangle, BookOpen, History, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Clock, User, ClipboardCheck, Download, AlertTriangle, BookOpen, History, ShieldCheck, ShieldAlert, KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
 import { hasPermission } from '@/lib/permissions';
@@ -290,6 +290,41 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
           </div>
         </CardContent>
       </Card>
+
+      {/* Sección 1.5: Auditoría presencial (solo final_exam) */}
+      {attempt.type === 'final_exam' && attempt.presential_token_id && (
+       <Card className="border-purple-200 bg-purple-50">
+         <CardHeader className="pb-2">
+           <CardTitle className="text-base flex items-center gap-2">
+             <KeyRound className="w-4 h-4 text-purple-600" /> Validación presencial
+           </CardTitle>
+         </CardHeader>
+         <CardContent className="space-y-3">
+           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+             <div>
+               <p className="text-xs text-gray-400 mb-1">Código del token</p>
+               <p className="font-mono font-bold text-gray-800">{attempt.token_code}</p>
+             </div>
+             <div>
+               <p className="text-xs text-gray-400 mb-1">Docente (generador)</p>
+               <p className="font-medium text-gray-800">{attempt.validated_by_name || attempt.validated_by || '—'}</p>
+             </div>
+             <div>
+               <p className="text-xs text-gray-400 mb-1">Método</p>
+               <Badge className="bg-purple-100 text-purple-700 gap-1 text-xs">
+                 <KeyRound className="w-3 h-3" /> {attempt.validation_method || 'token'}
+               </Badge>
+             </div>
+             <div>
+               <p className="text-xs text-gray-400 mb-1">Validado en</p>
+               <p className="text-xs text-gray-700">
+                 {attempt.token_validated_at ? format(new Date(attempt.token_validated_at), "dd MMM yyyy HH:mm:ss", { locale: es }) : '—'}
+               </p>
+             </div>
+           </div>
+         </CardContent>
+       </Card>
+      )}
 
       {/* Sección 2: Respuestas */}
       <Card>

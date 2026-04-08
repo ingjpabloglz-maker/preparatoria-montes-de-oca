@@ -64,6 +64,7 @@ Deno.serve(async (req) => {
   const submitted_at = new Date().toISOString();
 
   // ─── 0.A VALIDACIÓN DE TOKEN PRESENCIAL (solo final_exam) ───────────────────
+  let tokenRecord = null;
   if (type === 'final_exam') {
     if (!session_token) {
       return Response.json({
@@ -86,11 +87,37 @@ Deno.serve(async (req) => {
       }, { status: 403 });
     }
 
-    const tokenRecord = tokenRecords[0];
+    tokenRecord = tokenRecords[0];
+    
+    // Validar expiración de session_token
     if (new Date() > new Date(tokenRecord.session_expires_at)) {
       return Response.json({
         error: 'SESSION_TOKEN_EXPIRED',
         message: 'Tu sesión de examen ha expirado. Solicita un nuevo código.',
+        is_blocked: true,
+      }, { status: 403 });
+    }
+
+    // ✅ VALIDACIÓN 1: Verificar que la materia coincida
+    if (tokenRecord.subject_id && tokenRecord.subject_id !== subject_id) {
+      return Response.json({
+        error: 'INVALID_SUBJECT_FOR_TOKEN',
+        message: 'Este código de examen no es válido para esta materia.',
+        is_blocked: true,
+      }, { status: 403 });
+    }
+
+    // ✅ VALIDACIÓN 2: Evitar reutilización del mismo token por el mismo alumno
+    // Buscar intentos previos con este token
+    const prevAttempts = await base44.asServiceRole.entities.EvaluationAttempt.filter({
+      user_email,
+      subject_id,
+      presential_token_id: tokenRecord.id,
+    });
+    if (prevAttempts.length > 0) {
+      return Response.json({
+        error: 'TOKEN_ALREADY_USED_BY_USER',
+        message: 'Ya has usado este código para esta materia. Solicita uno nuevo.',
         is_blocked: true,
       }, { status: 403 });
     }
@@ -183,6 +210,17 @@ Deno.serve(async (req) => {
 
   // ─── 5. GUARDAR EvaluationAttempt (registro auditable) ──────────────────────
   console.log("EvaluationAttempt CREATED", { user_email, lesson_id, type, score, requiresManualReview });
+  
+  // ✅ Preparar datos de auditoría presencial si aplica (final_exam)
+  const auditData = isFinalExam && tokenRecord ? {
+    presential_token_id: tokenRecord.id,
+    token_code: tokenRecord.token_code,
+    validated_by: tokenRecord.created_by,
+    validated_by_name: tokenRecord.created_by_name,
+    validation_method: 'token',
+    token_validated_at: new Date().toISOString(),
+  } : {};
+
   const attemptRecord = await base44.asServiceRole.entities.EvaluationAttempt.create({
     user_email,
     subject_id,
@@ -195,6 +233,7 @@ Deno.serve(async (req) => {
     submitted_at,
     attempt_number,
     requires_manual_review: requiresManualReview,
+    ...auditData,
   });
 
   // ─── 6. ACTUALIZAR LessonProgress (resumen UI) ────────────────────────────────
@@ -266,6 +305,21 @@ Deno.serve(async (req) => {
     } else {
       await base44.asServiceRole.entities.SubjectProgress.create({
         user_email, subject_id, progress_percent: 0, completed: false, ...spUpdate,
+      });
+    }
+
+    // ✅ CONSUMIR TOKEN: Marcar como usado SOLO cuando el examen es enviado
+    if (tokenRecord) {
+      await base44.asServiceRole.entities.PresentialExamToken.update(tokenRecord.id, {
+        used: true,
+        used_by: user_email,
+        used_by_name: user.full_name,
+        used_at: submitted_at,
+      });
+      console.log('TOKEN CONSUMED', {
+        token_code: tokenRecord.token_code,
+        used_by: user_email,
+        attempt_id: attemptRecord.id,
       });
     }
   } else if (type === 'mini_eval') {
