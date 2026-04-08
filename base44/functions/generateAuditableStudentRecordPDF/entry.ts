@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
-import jsPDF from 'npm:jspdf@4.0.0';
+import { jsPDF } from 'npm:jspdf@4.0.0';
 
 const crypto = globalThis.crypto;
 
