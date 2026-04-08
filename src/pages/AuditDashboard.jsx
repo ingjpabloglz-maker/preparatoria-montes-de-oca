@@ -4,6 +4,7 @@ import AuditFilters from '@/components/audit/AuditFilters';
 import AuditAttemptList from '@/components/audit/AuditAttemptList';
 import AuditAttemptDetail from '@/components/audit/AuditAttemptDetail';
 import { Shield, AlertTriangle } from 'lucide-react';
+import AuditKPIs from '@/components/audit/AuditKPIs';
 
 export default function AuditDashboard() {
   const [user, setUser] = useState(null);
@@ -71,6 +72,8 @@ export default function AuditDashboard() {
           <p className="text-sm text-gray-500">Revisión y validación de evaluaciones almacenadas</p>
         </div>
       </div>
+
+      <AuditKPIs attempts={attempts} />
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar filtros */}
