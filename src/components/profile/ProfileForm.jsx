@@ -71,7 +71,7 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
   const isValid = () => {
     const requiredOk = form.nombres && form.apellido_paterno && form.telefono_personal && form.correo_contacto;
     const phonesOk = validatePhone(form.telefono_personal) && validatePhone(form.telefono_tutor);
-    const curpOk = !validateCurp(form.curp);
+    const curpOk = form.curp.length === 18 && !validateCurp(form.curp);
     return requiredOk && phonesOk && curpOk;
   };
 
@@ -140,7 +140,7 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
           {/* CURP Field */}
           <div className="space-y-1 sm:col-span-2">
             <Label>
-              CURP <span className="text-gray-400 font-normal text-xs">(opcional)</span>
+              CURP <span className="text-red-500 ml-1">*</span>
             </Label>
             <div className="flex gap-2">
               <div className="flex-1">
