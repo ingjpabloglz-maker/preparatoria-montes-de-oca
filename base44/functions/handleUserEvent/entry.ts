@@ -557,10 +557,8 @@ Deno.serve(async (req) => {
     // ─── 9. ACTUALIZAR MÉTRICAS ───────────────────────────────────────────────
     await updateUserMetrics(base44, user_email, metrics, currentMinute, todayString, streakBroke, nowIso);
 
-    // ─── 10. SINCRONIZAR SubjectProgress (si aplica) ──────────────────────────
-    if (event_type === 'lesson_completed' || event_type === 'mini_eval_passed') {
-      await updateSubjectProgressPercent(base44, user_email, event_data);
-    }
+    // NOTA: SubjectProgress y LessonProgress ya son actualizados por submitEvaluation.
+    // handleUserEvent es EXCLUSIVAMENTE para gamificación (XP, racha, árbol, logros).
 
     // ─── 10. CONSTRUIR RESPUESTA ──────────────────────────────────────────────
     const { minXP: finalMinXP, nextLevelXP: finalNextXP } = getLevelXPRange(finalLevel);

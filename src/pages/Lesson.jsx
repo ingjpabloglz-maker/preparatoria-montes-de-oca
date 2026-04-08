@@ -76,56 +76,45 @@ export default function Lesson() {
     refetchOnWindowFocus: false,
   });
 
+  const [lessonStartedAt] = useState(new Date().toISOString());
+
   const saveProgressMutation = useMutation({
-    mutationFn: async ({ correct, total, score, passed }) => {
-      const data = {
-        user_email: user.email,
+    mutationFn: async ({ answersPayload }) => {
+      // submitEvaluation es la ÚNICA fuente de verdad — crea EvaluationAttempt + actualiza LessonProgress + SubjectProgress
+      const res = await base44.functions.invoke('submitEvaluation', {
         lesson_id: lessonId,
-        module_id: lesson.module_id,
         subject_id: lesson.subject_id,
-        completed: true,
-        score,
-        passed,
-        correct_answers: correct,
-        total_questions: total,
-        completed_at: new Date().toISOString(),
-      };
-      if (existingProgress) {
-        await base44.entities.LessonProgress.update(existingProgress.id, data);
-      } else {
-        await base44.entities.LessonProgress.create(data);
-      }
+        type: lesson.is_mini_eval ? 'mini_eval' : 'lesson',
+        answers: answersPayload,
+        started_at: lessonStartedAt,
+      });
+      return res.data;
     },
-    onSuccess: async (_, vars) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries(['lessonProgress']);
       queryClient.invalidateQueries(['lessonProgressItem']);
 
-      // Disparar evento de gamificación (useUserEvent ya invalida gamificationProfile y userAchievements)
+      const score = data?.score ?? 0;
+      const passed = data?.passed ?? false;
+
+      // Gamificación — handleUserEvent SOLO para XP/streak/árbol, no para guardar progreso
       const eventType = lesson?.is_mini_eval
-        ? (vars.passed ? 'mini_eval_passed' : 'activity_submitted')
+        ? (passed ? 'mini_eval_passed' : 'activity_submitted')
         : 'lesson_completed';
 
       const result = await dispatchUserEvent(eventType, {
         lesson_id: lessonId,
-        score: vars.score,
-        passed: vars.passed,
-        activity_duration_seconds: 30, // mínimo válido
+        score,
+        passed,
+        activity_duration_seconds: 30,
       });
 
       // Eventos del asistente
-      dispatchAssistantEvent('lesson_completed', { score: vars.score });
-      if (result?.xp_earned) {
-        dispatchAssistantEvent('xp_gained', { xp: result.xp_earned });
-      }
-      if (result?.leveled_up) {
-        dispatchAssistantEvent('level_up', { level: result.level });
-      }
-      if (result?.streak_days > 1) {
-        dispatchAssistantEvent('streak_updated', { streak_days: result.streak_days });
-      }
-      if (result?.newly_unlocked_achievements?.length > 0) {
-        dispatchAssistantEvent('achievement_unlocked', {});
-      }
+      dispatchAssistantEvent('lesson_completed', { score });
+      if (result?.xp_earned) dispatchAssistantEvent('xp_gained', { xp: result.xp_earned });
+      if (result?.leveled_up) dispatchAssistantEvent('level_up', { level: result.level });
+      if (result?.streak_days > 1) dispatchAssistantEvent('streak_updated', { streak_days: result.streak_days });
+      if (result?.newly_unlocked_achievements?.length > 0) dispatchAssistantEvent('achievement_unlocked', {});
 
       // Feedback visual
       if (result?.leveled_up) {
@@ -148,27 +137,22 @@ export default function Lesson() {
     },
   });
 
-  const handleActivityAnswer = (activityId, isCorrect, points) => {
-    setAnswers(prev => [...prev, { activityId, correct: isCorrect, points: isCorrect ? points : 0 }]);
+  // answers guarda: { activityId, userAnswer, correct (optimista), points }
+  const handleActivityAnswer = (activityId, isCorrect, points, userAnswer) => {
+    setAnswers(prev => [...prev, { activityId, correct: isCorrect, points: isCorrect ? points : 0, userAnswer }]);
   };
 
   const handleNextActivity = () => {
     if (currentActivityIndex < activities.length - 1) {
       setCurrentActivityIndex(prev => prev + 1);
     } else {
-      // Terminar lección
-      const correctCount = answers.filter(a => a.correct).length;
-      const totalPoints = activities.reduce((s, a) => s + (a.points || 10), 0);
-      const earnedPoints = answers.reduce((s, a) => s + a.points, 0);
-      const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
-      const passed = lesson?.is_mini_eval ? score >= 80 : score >= 60;
+      // Construir payload para submitEvaluation (fuente de verdad en backend)
+      const answersPayload = answers.map(a => ({
+        question_id: a.activityId,
+        user_answer: a.userAnswer ?? '',
+      }));
 
-      saveProgressMutation.mutate({
-        correct: correctCount,
-        total: activities.length,
-        score,
-        passed,
-      });
+      saveProgressMutation.mutate({ answersPayload });
       setPhase('results');
     }
   };

@@ -38,7 +38,7 @@ export default function ActivityCard({ activity, activityNumber, totalActivities
     const correct = checkAnswer(answer, activity.correct_answer, activity.type);
     setIsCorrect(correct);
     setSubmitted(true);
-    onAnswer(activity.id, correct, activity.points || 10);
+    onAnswer(activity.id, correct, activity.points || 10, answer);
     playSound(correct ? 'correct_answer' : 'incorrect_answer');
   };
 

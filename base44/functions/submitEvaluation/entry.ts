@@ -124,7 +124,8 @@ Deno.serve(async (req) => {
   const passThreshold = type === 'final_exam' ? 70 : 80;
   const passed = requires_any_manual_review ? null : score >= passThreshold;
 
-  // ─── 5. GUARDAR EvaluationAttempt (registro auditabe) ────────────────────────
+  // ─── 5. GUARDAR EvaluationAttempt (registro auditable) ──────────────────────
+  console.log("EvaluationAttempt CREATED", { user_email, lesson_id, type, score });
   const attemptRecord = await base44.asServiceRole.entities.EvaluationAttempt.create({
     user_email,
     subject_id,
