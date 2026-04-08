@@ -56,7 +56,7 @@
     "started_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Timestamp de inicio"
+      "description": "Timestamp de inicio del examen"
     },
     "submitted_at": {
       "type": "string",
@@ -74,7 +74,7 @@
     },
     "reviewed_by": {
       "type": "string",
-      "description": "Email del docente/admin revisor"
+      "description": "Email del docente/admin revisor (\u00faltima revisi\u00f3n)"
     },
     "reviewer_id": {
       "type": "string",
@@ -94,12 +94,12 @@
         "approved",
         "rejected"
       ],
-      "description": "Decisi\u00f3n expl\u00edcita del revisor"
+      "description": "Decisi\u00f3n de la \u00faltima revisi\u00f3n"
     },
     "reviewed_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Timestamp de la revisi\u00f3n"
+      "description": "Timestamp de la \u00faltima revisi\u00f3n"
     },
     "review_started_at": {
       "type": "string",
@@ -108,15 +108,24 @@
     },
     "review_duration_seconds": {
       "type": "number",
-      "description": "Segundos transcurridos entre review_started_at y reviewed_at"
+      "description": "Segundos entre review_started_at y reviewed_at"
     },
     "feedback": {
       "type": "string",
-      "description": "Comentarios de revisi\u00f3n manual"
+      "description": "Comentarios de la \u00faltima revisi\u00f3n manual"
+    },
+    "review_locked_by": {
+      "type": "string",
+      "description": "ID del docente que tiene el intento bloqueado para revisi\u00f3n"
+    },
+    "review_locked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp del bloqueo activo"
     },
     "review_history": {
       "type": "array",
-      "description": "Historial completo de todas las revisiones (inmutable, no se sobrescribe)",
+      "description": "Historial completo e inmutable de todas las revisiones",
       "items": {
         "type": "object",
         "properties": {
@@ -137,6 +146,9 @@
           },
           "reviewed_at": {
             "type": "string"
+          },
+          "review_duration_seconds": {
+            "type": "number"
           }
         }
       }

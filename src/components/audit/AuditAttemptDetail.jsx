@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,10 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format, differenceInSeconds } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, CheckCircle2, XCircle, Clock, User, ClipboardCheck, Download, AlertTriangle, BookOpen } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Clock, User, ClipboardCheck, Download, AlertTriangle, BookOpen, History, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
 import { hasPermission } from '@/lib/permissions';
+
+const MIN_REVIEW_SECONDS = 45;
 
 const TYPE_LABELS = {
   lesson: 'Lección',
@@ -26,6 +28,10 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
   const [submitting, setSubmitting] = useState(false);
   const [questions, setQuestions] = useState({});
   const [exporting, setExporting] = useState(false);
+  const [reviewStartedAt, setReviewStartedAt] = useState(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [lockError, setLockError] = useState(null);
+  const timerRef = useRef(null);
 
   const duration = attempt.started_at && attempt.submitted_at
     ? differenceInSeconds(new Date(attempt.submitted_at), new Date(attempt.started_at))
@@ -33,6 +39,9 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
 
   const canReview = hasPermission({ role: userRole }, 'exam.review') &&
     (attempt.requires_manual_review || attempt.passed === null || attempt.passed === undefined);
+
+  const reviewReady = elapsedSeconds >= MIN_REVIEW_SECONDS;
+  const remainingSeconds = Math.max(0, MIN_REVIEW_SECONDS - elapsedSeconds);
 
   const studentName = attempt.full_name || attempt.user_email;
 
@@ -57,9 +66,38 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
     });
   }, [attempt.id]);
 
+  // Iniciar lock y timer cuando el panel de revisión se monta
+  useEffect(() => {
+    if (!canReview) return;
+    let cancelled = false;
+    base44.functions.invoke('lockReviewAttempt', { attempt_id: attempt.id })
+      .then(res => {
+        if (cancelled) return;
+        const startedAt = res.data?.review_started_at || new Date().toISOString();
+        setReviewStartedAt(startedAt);
+        timerRef.current = setInterval(() => {
+          setElapsedSeconds(Math.round((Date.now() - new Date(startedAt)) / 1000));
+        }, 1000);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setLockError(err?.response?.data?.message || 'Este intento ya está siendo revisado por otro docente.');
+      });
+    return () => {
+      cancelled = true;
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [attempt.id, canReview]);
+
   async function handleSubmitReview() {
     setSubmitting(true);
-    await onReview({ attempt_id: attempt.id, score: Number(reviewScore), passed: reviewPassed, feedback: reviewFeedback });
+    await onReview({
+      attempt_id: attempt.id,
+      score: Number(reviewScore),
+      passed: reviewPassed,
+      feedback: reviewFeedback,
+      review_started_at: reviewStartedAt,
+    });
     setSubmitting(false);
   }
 
@@ -306,7 +344,7 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
         </CardContent>
       </Card>
 
-      {/* Panel docente */}
+      {/* Panel docente — revisión con timer */}
       {canReview && (
         <Card className="border-indigo-200">
           <CardHeader className="pb-2">
@@ -315,44 +353,150 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label className="text-xs">Score final (0-100)</Label>
-                <Input
-                  type="number" min={0} max={100}
-                  value={reviewScore}
-                  onChange={e => {
-                    const v = Number(e.target.value);
-                    setReviewScore(v);
-                    setReviewPassed(v >= 80);
-                  }}
-                />
+            {/* Lock error */}
+            {lockError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2 text-sm text-red-700">
+                <AlertTriangle className="w-4 h-4 shrink-0" /> {lockError}
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">¿Aprobado?</Label>
-                <div className="flex gap-2 mt-1">
-                  <Button size="sm" variant={reviewPassed ? 'default' : 'outline'} onClick={() => setReviewPassed(true)} className="flex-1">Sí</Button>
-                  <Button size="sm" variant={!reviewPassed ? 'destructive' : 'outline'} onClick={() => setReviewPassed(false)} className="flex-1">No</Button>
+            )}
+
+            {/* Timer de revisión mínima */}
+            {!lockError && (
+              <div className={cn(
+                "rounded-lg p-3 flex items-center gap-3 border",
+                reviewReady
+                  ? "bg-green-50 border-green-200 text-green-700"
+                  : "bg-yellow-50 border-yellow-200 text-yellow-700"
+              )}>
+                <Clock className="w-5 h-5 shrink-0" />
+                <div className="flex-1">
+                  {reviewReady ? (
+                    <p className="text-sm font-medium">✅ Tiempo de revisión cumplido — puedes calificar</p>
+                  ) : (
+                    <p className="text-sm font-medium">
+                      Debes revisar al menos {MIN_REVIEW_SECONDS}s antes de calificar —
+                      <span className="font-bold ml-1">{remainingSeconds}s restantes</span>
+                    </p>
+                  )}
+                  <div className="mt-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className={cn("h-full rounded-full transition-all", reviewReady ? "bg-green-500" : "bg-yellow-400")}
+                      style={{ width: `${Math.min(100, (elapsedSeconds / MIN_REVIEW_SECONDS) * 100)}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Comentarios (opcional)</Label>
-              <Textarea
-                placeholder="Retroalimentación para el alumno..."
-                value={reviewFeedback}
-                onChange={e => setReviewFeedback(e.target.value)}
-                rows={3}
-              />
-            </div>
-            <Button onClick={handleSubmitReview} disabled={submitting} className="w-full bg-indigo-600 hover:bg-indigo-700">
-              {submitting ? 'Guardando...' : 'Guardar revisión'}
-            </Button>
+            )}
+
+            {!lockError && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Score final (0-100)</Label>
+                    <Input
+                      type="number" min={0} max={100}
+                      value={reviewScore}
+                      disabled={!reviewReady}
+                      onChange={e => {
+                        const v = Number(e.target.value);
+                        setReviewScore(v);
+                        setReviewPassed(v >= 70);
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">¿Aprobado?</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Button size="sm" variant={reviewPassed ? 'default' : 'outline'} onClick={() => setReviewPassed(true)} className="flex-1" disabled={!reviewReady}>Sí</Button>
+                      <Button size="sm" variant={!reviewPassed ? 'destructive' : 'outline'} onClick={() => setReviewPassed(false)} className="flex-1" disabled={!reviewReady}>No</Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Comentarios (opcional)</Label>
+                  <Textarea
+                    placeholder="Retroalimentación para el alumno..."
+                    value={reviewFeedback}
+                    onChange={e => setReviewFeedback(e.target.value)}
+                    rows={3}
+                    disabled={!reviewReady}
+                  />
+                </div>
+                <Button
+                  onClick={handleSubmitReview}
+                  disabled={submitting || !reviewReady}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {submitting ? 'Guardando...' : !reviewReady ? `Espera ${remainingSeconds}s...` : 'Guardar revisión'}
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {attempt.feedback && !canReview && (
+      {/* Historial de revisiones — visible para todos (admin y docente) */}
+      {Array.isArray(attempt.review_history) && attempt.review_history.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <History className="w-4 h-4 text-gray-600" /> Historial de revisiones
+              <Badge variant="outline" className="ml-auto text-xs">{attempt.review_history.length} revisión{attempt.review_history.length > 1 ? 'es' : ''}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[...attempt.review_history].reverse().map((rev, idx) => {
+              const isValid = (rev.review_duration_seconds || 0) >= 60;
+              return (
+                <div key={idx} className={cn(
+                  "rounded-lg p-3 border space-y-2",
+                  rev.decision === 'approved' ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
+                )}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      {rev.decision === 'approved'
+                        ? <Badge className="bg-green-100 text-green-700 gap-1 text-xs"><CheckCircle2 className="w-3 h-3" /> Aprobado</Badge>
+                        : <Badge className="bg-red-100 text-red-700 gap-1 text-xs"><XCircle className="w-3 h-3" /> Rechazado</Badge>
+                      }
+                      {isValid
+                        ? <span className="text-xs text-green-600 flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Revisión válida</span>
+                        : <span className="text-xs text-orange-600 flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Revisión rápida</span>
+                      }
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {rev.reviewed_at ? format(new Date(rev.reviewed_at), "dd MMM yyyy HH:mm", { locale: es }) : '—'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-400">Docente: </span>
+                      <span className="font-medium text-gray-700">{rev.reviewer_name || rev.reviewer_id}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Rol: </span>
+                      <span className="text-gray-700 capitalize">{rev.reviewer_role || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Duración: </span>
+                      <span className={cn("font-medium", isValid ? "text-green-600" : "text-orange-600")}>
+                        {rev.review_duration_seconds != null
+                          ? `${Math.floor(rev.review_duration_seconds / 60)}m ${rev.review_duration_seconds % 60}s`
+                          : '—'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                  {rev.feedback && (
+                    <p className="text-xs text-gray-600 italic border-t border-gray-200 pt-2">"{rev.feedback}"</p>
+                  )}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {attempt.feedback && !canReview && !attempt.review_history?.length && (
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-gray-400 mb-1">Retroalimentación del docente</p>
