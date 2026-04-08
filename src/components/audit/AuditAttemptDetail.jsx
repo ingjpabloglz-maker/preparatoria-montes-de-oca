@@ -299,11 +299,12 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
              <KeyRound className="w-4 h-4 text-purple-600" /> Validación presencial
            </CardTitle>
          </CardHeader>
-         <CardContent className="space-y-3">
-           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+         <CardContent className="space-y-4">
+           {/* Fila 1: Token y Docente */}
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
              <div>
                <p className="text-xs text-gray-400 mb-1">Código del token</p>
-               <p className="font-mono font-bold text-gray-800">{attempt.token_code}</p>
+               <p className="font-mono font-bold text-gray-800 text-lg">{attempt.token_code}</p>
              </div>
              <div>
                <p className="text-xs text-gray-400 mb-1">Docente (generador)</p>
@@ -316,12 +317,67 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
                </Badge>
              </div>
              <div>
-               <p className="text-xs text-gray-400 mb-1">Validado en</p>
+               <p className="text-xs text-gray-400 mb-1">Token validado</p>
                <p className="text-xs text-gray-700">
-                 {attempt.token_validated_at ? format(new Date(attempt.token_validated_at), "dd MMM yyyy HH:mm:ss", { locale: es }) : '—'}
+                 {attempt.token_validated_at ? format(new Date(attempt.token_validated_at), "HH:mm:ss", { locale: es }) : '—'}
                </p>
              </div>
            </div>
+
+           {/* Fila 2: Inicio real y Duración */}
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t border-purple-200 pt-3">
+             <div>
+               <p className="text-xs text-gray-400 mb-1">Inicio real</p>
+               <p className="text-xs text-gray-700">
+                 {attempt.exam_started_at ? format(new Date(attempt.exam_started_at), "HH:mm:ss", { locale: es }) : '—'}
+               </p>
+             </div>
+             <div>
+               <p className="text-xs text-gray-400 mb-1">Envío</p>
+               <p className="text-xs text-gray-700">
+                 {attempt.submitted_at ? format(new Date(attempt.submitted_at), "HH:mm:ss", { locale: es }) : '—'}
+               </p>
+             </div>
+             <div>
+               <p className="text-xs text-gray-400 mb-1">Duración examen</p>
+               <p className="font-medium text-gray-800">
+                 {attempt.duration_seconds !== null && attempt.duration_seconds !== undefined
+                   ? `${Math.floor(attempt.duration_seconds / 60)}m ${attempt.duration_seconds % 60}s`
+                   : '—'}
+               </p>
+             </div>
+             <div>
+               <p className="text-xs text-gray-400 mb-1">Espacio de tiempo</p>
+               <p className="text-xs text-gray-700">
+                 {attempt.token_validated_at && attempt.exam_started_at
+                   ? (() => {
+                       const gap = Math.round((new Date(attempt.exam_started_at).getTime() - new Date(attempt.token_validated_at).getTime()) / 1000);
+                       return gap >= 0 ? `+${gap}s` : 'Sincrónico';
+                     })()
+                   : '—'}
+               </p>
+             </div>
+           </div>
+
+           {/* Fila 3: Auditoría soft (IP + Device) */}
+           {(attempt.ip_address || attempt.device_info) && (
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm border-t border-purple-200 pt-3">
+               {attempt.ip_address && (
+                 <div>
+                   <p className="text-xs text-gray-400 mb-1">Dirección IP</p>
+                   <p className="font-mono text-xs text-gray-700">{attempt.ip_address}</p>
+                 </div>
+               )}
+               {attempt.device_info && (
+                 <div>
+                   <p className="text-xs text-gray-400 mb-1">Dispositivo</p>
+                   <p className="text-xs text-gray-700 truncate" title={attempt.device_info}>
+                     {attempt.device_info.substring(0, 50)}...
+                   </p>
+                 </div>
+               )}
+             </div>
+           )}
          </CardContent>
        </Card>
       )}

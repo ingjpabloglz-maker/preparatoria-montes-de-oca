@@ -62,6 +62,28 @@
       "type": "string",
       "format": "date-time",
       "description": "Expiraci\u00f3n del session_token"
+    },
+    "session_status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "expired",
+        "completed"
+      ],
+      "description": "Estado de la sesi\u00f3n: active = validado pero sin submit, completed = examen enviado, expired = inactivo >60min"
+    },
+    "ip_address": {
+      "type": "string",
+      "description": "IP desde donde se valid\u00f3 el token (auditor\u00eda soft)"
+    },
+    "device_info": {
+      "type": "string",
+      "description": "User Agent del navegador/dispositivo (auditor\u00eda soft)"
+    },
+    "validated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de validaci\u00f3n inicial del token"
     }
   },
   "required": [

@@ -44,12 +44,13 @@ Deno.serve(async (req) => {
 
   const body = await req.json();
   const {
-    lesson_id,
-    subject_id,
-    type = 'lesson',   // 'lesson' | 'mini_eval' | 'final_exam' | 'surprise_exam'
-    answers = [],
-    started_at,
-    session_token,
+   lesson_id,
+   subject_id,
+   type = 'lesson',   // 'lesson' | 'mini_eval' | 'final_exam' | 'surprise_exam'
+   answers = [],
+   started_at,
+   exam_started_at,  // Nuevo: timestamp real cuando alumno inicia examen
+   session_token,
   } = body;
 
   // Ignorar score/correct_answers del frontend — nunca confiar
@@ -107,19 +108,23 @@ Deno.serve(async (req) => {
       }, { status: 403 });
     }
 
-    // ✅ VALIDACIÓN 2: Evitar reutilización del mismo token por el mismo alumno
-    // Buscar intentos previos con este token
+    // ✅ VALIDACIÓN 2: Evitar reutilización indirecta del token
+    // Buscar intentos COMPLETADOS (submitted) con este MISMO token
     const prevAttempts = await base44.asServiceRole.entities.EvaluationAttempt.filter({
       user_email,
       subject_id,
       presential_token_id: tokenRecord.id,
     });
+    // Si hay un intento previo aprobado O que fue enviado: BLOQUEAR
     if (prevAttempts.length > 0) {
-      return Response.json({
-        error: 'TOKEN_ALREADY_USED_BY_USER',
-        message: 'Ya has usado este código para esta materia. Solicita uno nuevo.',
-        is_blocked: true,
-      }, { status: 403 });
+      const prevApprovedOrSubmitted = prevAttempts.some(a => a.passed === true || a.submitted_at);
+      if (prevApprovedOrSubmitted) {
+        return Response.json({
+          error: 'FINAL_EXAM_ALREADY_SUBMITTED_WITH_TOKEN',
+          message: 'Ya has enviado un examen con este código. Solicita uno nuevo al docente.',
+          is_blocked: true,
+        }, { status: 403 });
+      }
     }
   }
 
@@ -210,16 +215,30 @@ Deno.serve(async (req) => {
 
   // ─── 5. GUARDAR EvaluationAttempt (registro auditable) ──────────────────────
   console.log("EvaluationAttempt CREATED", { user_email, lesson_id, type, score, requiresManualReview });
-  
+
   // ✅ Preparar datos de auditoría presencial si aplica (final_exam)
-  const auditData = isFinalExam && tokenRecord ? {
-    presential_token_id: tokenRecord.id,
-    token_code: tokenRecord.token_code,
-    validated_by: tokenRecord.created_by,
-    validated_by_name: tokenRecord.created_by_name,
-    validation_method: 'token',
-    token_validated_at: new Date().toISOString(),
-  } : {};
+  let auditData = {};
+  let duration_seconds = null;
+
+  if (isFinalExam && tokenRecord) {
+   // NUEVO: Calcular duración real del examen
+   if (exam_started_at && submitted_at) {
+     duration_seconds = Math.round((new Date(submitted_at).getTime() - new Date(exam_started_at).getTime()) / 1000);
+   }
+
+   auditData = {
+     presential_token_id: tokenRecord.id,
+     token_code: tokenRecord.token_code,
+     validated_by: tokenRecord.created_by,
+     validated_by_name: tokenRecord.created_by_name,
+     validation_method: 'token',
+     token_validated_at: tokenRecord.validated_at || new Date().toISOString(),
+     exam_started_at: exam_started_at || submitted_at,  // Nuevo: registro real de inicio
+     duration_seconds,  // Nuevo: duración calculada
+     ip_address: tokenRecord.ip_address || null,  // Nuevo: auditoría soft
+     device_info: tokenRecord.device_info || null,  // Nuevo: auditoría soft
+   };
+  }
 
   const attemptRecord = await base44.asServiceRole.entities.EvaluationAttempt.create({
     user_email,
@@ -309,19 +328,21 @@ Deno.serve(async (req) => {
     }
 
     // ✅ CONSUMIR TOKEN: Marcar como usado SOLO cuando el examen es enviado
-    if (tokenRecord) {
-      await base44.asServiceRole.entities.PresentialExamToken.update(tokenRecord.id, {
-        used: true,
-        used_by: user_email,
-        used_by_name: user.full_name,
-        used_at: submitted_at,
-      });
-      console.log('TOKEN CONSUMED', {
-        token_code: tokenRecord.token_code,
-        used_by: user_email,
-        attempt_id: attemptRecord.id,
-      });
-    }
+     if (tokenRecord) {
+       await base44.asServiceRole.entities.PresentialExamToken.update(tokenRecord.id, {
+         used: true,
+         used_by: user_email,
+         used_by_name: user.full_name,
+         used_at: submitted_at,
+         session_status: 'completed',  // Marcar sesión como completada
+       });
+       console.log('TOKEN CONSUMED', {
+         token_code: tokenRecord.token_code,
+         used_by: user_email,
+         exam_duration: duration_seconds,
+         attempt_id: attemptRecord.id,
+       });
+     }
   } else if (type === 'mini_eval') {
     // Señal de refuerzo
     const failedMiniEvals = existingAttempts.filter(a => a.type === 'mini_eval' && a.passed === false);

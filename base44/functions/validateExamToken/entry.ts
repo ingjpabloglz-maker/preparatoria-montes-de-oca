@@ -56,12 +56,21 @@ Deno.serve(async (req) => {
   const session_token = generateSessionToken();
   const session_expires_at = new Date(now.getTime() + 60 * 60 * 1000).toISOString(); // +1 hora
 
+  // ✅ Capturar auditoría soft: IP y device info
+  const forwardedFor = req.headers.get('x-forwarded-for') || '';
+  const ip_address = forwardedFor.split(',')[0].trim() || req.ip || '0.0.0.0';
+  const device_info = req.headers.get('user-agent') || 'unknown';
+
   // ✅ CAMBIO CRÍTICO: NO marcar como usado aquí
   // El token se consume en submitEvaluation cuando type === 'final_exam'
   // Solo guardar session_token para la sesión
   await base44.asServiceRole.entities.PresentialExamToken.update(token.id, {
     session_token,
     session_expires_at,
+    session_status: 'active',
+    ip_address,
+    device_info,
+    validated_at: now.toISOString(),
   });
 
   console.log('TOKEN VALIDATED (NOT CONSUMED)', {
@@ -77,5 +86,7 @@ Deno.serve(async (req) => {
     subject_id: token.subject_id || subject_id,
     generated_by: token.created_by_name,
     token_id: token.id,
+    ip_address,
+    device_info,
   });
 });

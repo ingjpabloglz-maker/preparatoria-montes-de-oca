@@ -56,12 +56,21 @@
     "started_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Timestamp de inicio del examen"
+      "description": "Timestamp de inicio del examen (frontend)"
+    },
+    "exam_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp real cuando alumno inicia el examen (despu\u00e9s de validar token) \u2014 solo final_exam"
     },
     "submitted_at": {
       "type": "string",
       "format": "date-time",
       "description": "Timestamp de env\u00edo"
+    },
+    "duration_seconds": {
+      "type": "number",
+      "description": "Duraci\u00f3n real del examen: submitted_at - exam_started_at (solo final_exam)"
     },
     "attempt_number": {
       "type": "number",
@@ -99,6 +108,14 @@
       "type": "string",
       "format": "date-time",
       "description": "Timestamp exacto cuando el alumno valid\u00f3 el token"
+    },
+    "ip_address": {
+      "type": "string",
+      "description": "Direcci\u00f3n IP desde donde se valid\u00f3 el token (auditor\u00eda soft)"
+    },
+    "device_info": {
+      "type": "string",
+      "description": "User Agent / descripci\u00f3n del dispositivo (auditor\u00eda soft)"
     },
     "reviewed_by": {
       "type": "string",
