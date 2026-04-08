@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import AuditFilters from '@/components/audit/AuditFilters';
 import AuditAttemptList from '@/components/audit/AuditAttemptList';
@@ -13,6 +13,10 @@ export default function AuditDashboard() {
   const [selectedAttempt, setSelectedAttempt] = useState(null);
   const [filters, setFilters] = useState({});
   const [subjects, setSubjects] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const listRef = useRef(null);
 
   useEffect(() => {
     base44.auth.me().then(u => setUser(u)).catch(() => {});
@@ -27,14 +31,20 @@ export default function AuditDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    loadAttempts();
+    loadAttempts(1);
+    setCurrentPage(1);
   }, [user, filters]);
 
-  async function loadAttempts() {
+  async function loadAttempts(page = currentPage) {
     setLoading(true);
     try {
-      const res = await base44.functions.invoke('getEvaluationAttempts', filters);
+      const res = await base44.functions.invoke('getEvaluationAttempts', { ...filters, page, limit: 20 });
       setAttempts(res.data?.attempts || []);
+      setTotalCount(res.data?.total_count || 0);
+      setTotalPages(res.data?.total_pages || 1);
+      setCurrentPage(page);
+      // Scroll to list top
+      if (listRef.current) listRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
       console.error(e);
     } finally {
@@ -85,7 +95,7 @@ export default function AuditDashboard() {
         )}
 
         {/* Contenido principal */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0" ref={listRef}>
           {selectedAttempt ? (
             <AuditAttemptDetail
               attempt={selectedAttempt}
@@ -98,6 +108,10 @@ export default function AuditDashboard() {
               attempts={attempts}
               loading={loading}
               onSelect={setSelectedAttempt}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              onPageChange={loadAttempts}
             />
           )}
         </div>

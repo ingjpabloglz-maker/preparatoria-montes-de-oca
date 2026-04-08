@@ -21,12 +21,16 @@ Deno.serve(async (req) => {
     score_max,
     date_from,
     date_to,
-    limit = 200,
+    page = 1,
+    limit = 20,
   } = body;
+
+  const safePage = Math.max(1, Number(page));
+  const safeLimit = Math.min(20, Math.max(1, Number(limit)));
 
   // Fetch all needed data in parallel
   const [attempts, subjects, lessons, modules, units, users] = await Promise.all([
-    base44.asServiceRole.entities.EvaluationAttempt.list('-submitted_at', limit),
+    base44.asServiceRole.entities.EvaluationAttempt.list('-submitted_at', 2000),
     base44.asServiceRole.entities.Subject.list(),
     base44.asServiceRole.entities.CourseLesson.list(),
     base44.asServiceRole.entities.CourseModule.list(),
@@ -76,8 +80,13 @@ Deno.serve(async (req) => {
     return true;
   });
 
-  // Enrich each attempt with full academic context
-  const enriched = filtered.map(a => {
+  const total_count = filtered.length;
+  const total_pages = Math.ceil(total_count / safeLimit);
+  const offset = (safePage - 1) * safeLimit;
+  const paginated = filtered.slice(offset, offset + safeLimit);
+
+  // Enrich only the current page records
+  const enriched = paginated.map(a => {
     const lesson = lessonMap[a.lesson_id] || {};
     const mod = moduleMap[lesson.module_id] || {};
     const unit = unitMap[mod.unit_id] || {};
@@ -92,5 +101,11 @@ Deno.serve(async (req) => {
     };
   });
 
-  return Response.json({ status: 'ok', attempts: enriched, total: enriched.length });
+  return Response.json({
+    status: 'ok',
+    attempts: enriched,
+    total_count,
+    page: safePage,
+    total_pages,
+  });
 });

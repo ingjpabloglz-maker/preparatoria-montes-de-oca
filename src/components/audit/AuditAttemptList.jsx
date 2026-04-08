@@ -1,9 +1,10 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CheckCircle2, XCircle, Clock, AlertCircle, AlertTriangle, ChevronRight, BookOpen } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, AlertCircle, AlertTriangle, ChevronRight, BookOpen, ChevronLeft } from 'lucide-react';
 
 const TYPE_LABELS = {
   lesson: 'Lección',
@@ -20,7 +21,9 @@ function borderColor(attempt) {
   return '#d1d5db';
 }
 
-export default function AuditAttemptList({ attempts, loading, onSelect }) {
+export default function AuditAttemptList({ attempts, loading, onSelect, currentPage, totalPages, totalCount, onPageChange }) {
+  const from = totalCount === 0 ? 0 : (currentPage - 1) * 20 + 1;
+  const to = Math.min(currentPage * 20, totalCount);
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16 text-gray-400">
@@ -43,7 +46,38 @@ export default function AuditAttemptList({ attempts, loading, onSelect }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-gray-500 mb-3">{attempts.length} intento(s) encontrado(s)</p>
+      {/* Contador y paginación superior */}
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <p className="text-sm text-gray-500">
+          {totalCount === 0
+            ? 'Sin resultados'
+            : `Mostrando ${from}–${to} de ${totalCount} intento(s)`}
+        </p>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm" variant="outline"
+              disabled={currentPage <= 1 || loading}
+              onClick={() => onPageChange(currentPage - 1)}
+              className="gap-1 h-7 text-xs"
+            >
+              <ChevronLeft className="w-3 h-3" /> Anterior
+            </Button>
+            <span className="text-xs text-gray-600 px-1">
+              Página {currentPage} de {totalPages}
+            </span>
+            <Button
+              size="sm" variant="outline"
+              disabled={currentPage >= totalPages || loading}
+              onClick={() => onPageChange(currentPage + 1)}
+              className="gap-1 h-7 text-xs"
+            >
+              Siguiente <ChevronRight className="w-3 h-3" />
+            </Button>
+          </div>
+        )}
+      </div>
+
       {attempts.map(attempt => (
         <Card
           key={attempt.id}
@@ -115,6 +149,31 @@ export default function AuditAttemptList({ attempts, loading, onSelect }) {
           </CardContent>
         </Card>
       ))}
+
+      {/* Paginación inferior */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-4 border-t">
+          <Button
+            size="sm" variant="outline"
+            disabled={currentPage <= 1 || loading}
+            onClick={() => onPageChange(currentPage - 1)}
+            className="gap-1 h-7 text-xs"
+          >
+            <ChevronLeft className="w-3 h-3" /> Anterior
+          </Button>
+          <span className="text-xs text-gray-600 px-2">
+            Página {currentPage} de {totalPages}
+          </span>
+          <Button
+            size="sm" variant="outline"
+            disabled={currentPage >= totalPages || loading}
+            onClick={() => onPageChange(currentPage + 1)}
+            className="gap-1 h-7 text-xs"
+          >
+            Siguiente <ChevronRight className="w-3 h-3" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
