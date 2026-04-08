@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowRight, Trophy, XCircle, Loader2, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import RichContentRenderer from '../common/RichContentRenderer';
+import PresentialTokenModal from './PresentialTokenModal';
 
 function shuffleAndPick(arr, n) {
   const shuffled = [...arr].sort(() => Math.random() - 0.5);
@@ -30,6 +31,8 @@ export default function SubjectTest({ subject, onComplete, onExit }) {
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
   const [pendingTeacherReview, setPendingTeacherReview] = useState(false);
+  const [showTokenModal, setShowTokenModal] = useState(true); // Pide token antes de empezar
+  const [sessionToken, setSessionToken] = useState(null);
 
   useEffect(() => {
     const loadQuestions = async () => {
@@ -94,13 +97,18 @@ export default function SubjectTest({ subject, onComplete, onExit }) {
       setTextAnswer('');
     } else {
       let correct = 0;
+      const answersPayload = questions.map((q, idx) => ({
+        question_id: q.id,
+        user_answer: q.options[answers[idx]] ?? '',
+      }));
       questions.forEach((q, idx) => {
         if (answers[idx] === q.correct) correct++;
       });
       const finalScore = Math.round((correct / questions.length) * 100);
       const passed = finalScore >= 70;
       setScore(finalScore);
-      const result = await onComplete?.(finalScore, passed);
+      // Pasar answers y session_token al padre para que haga el submit real al backend
+      const result = await onComplete?.(finalScore, passed, sessionToken, answersPayload);
       // Si el backend indica que está pendiente de revisión docente
       if (result?.pending_teacher_review) {
         setPendingTeacherReview(true);
@@ -111,6 +119,20 @@ export default function SubjectTest({ subject, onComplete, onExit }) {
 
   const progress = questions.length > 0 ? ((currentQuestion + 1) / questions.length) * 100 : 0;
   const passed = score >= 70;
+
+  // Modal de token presencial (siempre primero para examen final)
+  if (showTokenModal && !sessionToken) {
+    return (
+      <PresentialTokenModal
+        subjectId={subject?.id}
+        onValidated={(token) => {
+          setSessionToken(token);
+          setShowTokenModal(false);
+        }}
+        onCancel={onExit}
+      />
+    );
+  }
 
   if (loading) {
     return (

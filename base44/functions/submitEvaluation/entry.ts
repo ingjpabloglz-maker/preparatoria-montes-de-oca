@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
     type = 'lesson',   // 'lesson' | 'mini_eval' | 'final_exam' | 'surprise_exam'
     answers = [],
     started_at,
+    session_token,
   } = body;
 
   // Ignorar score/correct_answers del frontend — nunca confiar
@@ -61,6 +62,39 @@ Deno.serve(async (req) => {
 
   const user_email = user.email;
   const submitted_at = new Date().toISOString();
+
+  // ─── 0.A VALIDACIÓN DE TOKEN PRESENCIAL (solo final_exam) ───────────────────
+  if (type === 'final_exam') {
+    if (!session_token) {
+      return Response.json({
+        error: 'PRESENTIAL_TOKEN_REQUIRED',
+        message: 'El examen final requiere un código de acceso presencial generado por el docente.',
+        is_blocked: true,
+      }, { status: 403 });
+    }
+
+    // Buscar el token por session_token
+    const tokenRecords = await base44.asServiceRole.entities.PresentialExamToken.filter({
+      session_token,
+    });
+
+    if (tokenRecords.length === 0) {
+      return Response.json({
+        error: 'INVALID_SESSION_TOKEN',
+        message: 'Sesión de examen no válida. Solicita un nuevo código al docente.',
+        is_blocked: true,
+      }, { status: 403 });
+    }
+
+    const tokenRecord = tokenRecords[0];
+    if (new Date() > new Date(tokenRecord.session_expires_at)) {
+      return Response.json({
+        error: 'SESSION_TOKEN_EXPIRED',
+        message: 'Tu sesión de examen ha expirado. Solicita un nuevo código.',
+        is_blocked: true,
+      }, { status: 403 });
+    }
+  }
 
   // ─── 0. BLOQUEO GLOBAL POST-EGRESO ─────────────────────────────────────────
   const upCheck = await base44.asServiceRole.entities.UserProgress.filter({ user_email });

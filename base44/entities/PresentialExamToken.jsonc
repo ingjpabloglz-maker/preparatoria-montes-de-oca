@@ -1,0 +1,72 @@
+{
+  "name": "PresentialExamToken",
+  "type": "object",
+  "properties": {
+    "token_code": {
+      "type": "string",
+      "description": "C\u00f3digo \u00fanico de 6-8 caracteres generado por docente"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "ID del docente que gener\u00f3 el token"
+    },
+    "created_by_name": {
+      "type": "string",
+      "description": "Nombre del docente"
+    },
+    "created_by_email": {
+      "type": "string",
+      "description": "Email del docente"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de expiraci\u00f3n (2 horas por defecto)"
+    },
+    "used": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el token ya fue utilizado"
+    },
+    "used_by": {
+      "type": "string",
+      "description": "Email del alumno que us\u00f3 el token"
+    },
+    "used_by_name": {
+      "type": "string",
+      "description": "Nombre del alumno que us\u00f3 el token"
+    },
+    "used_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de uso del token"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "ID de materia asociada (opcional)"
+    },
+    "subject_name": {
+      "type": "string",
+      "description": "Nombre de materia asociada (opcional)"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el token est\u00e1 activo (puede ser desactivado manualmente)"
+    },
+    "session_token": {
+      "type": "string",
+      "description": "Session token generado al validar el c\u00f3digo (v\u00e1lido 1 hora)"
+    },
+    "session_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Expiraci\u00f3n del session_token"
+    }
+  },
+  "required": [
+    "token_code",
+    "created_by",
+    "expires_at"
+  ]
+}

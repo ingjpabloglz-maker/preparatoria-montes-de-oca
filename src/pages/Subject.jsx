@@ -44,11 +44,20 @@ export default function Subject() {
     enabled: !!user?.email && !!subjectId,
   });
 
-  const handleTestComplete = useCallback(async () => {
+  const handleTestComplete = useCallback(async (score, passed, sessionToken, answers, lessonId) => {
+    const res = await base44.functions.invoke('submitEvaluation', {
+      lesson_id: lessonId || subjectId,
+      subject_id: subjectId,
+      type: 'final_exam',
+      answers: answers || [],
+      started_at: new Date().toISOString(),
+      session_token: sessionToken,
+    });
     setTakingTest(false);
     await refetchEvalStatus();
     queryClient.invalidateQueries(['subject']);
-  }, [refetchEvalStatus, queryClient]);
+    return res?.data;
+  }, [refetchEvalStatus, queryClient, subjectId]);
 
   const handleExtraordinaryUnlocked = useCallback(async () => {
     await refetchEvalStatus();

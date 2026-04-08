@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AuditAttemptDetail from '@/components/audit/AuditAttemptDetail';
-import { ClipboardCheck, Clock, CheckCircle2, XCircle, MessageCircle, User, BookOpen, RefreshCw, AlertTriangle } from 'lucide-react';
+import { ClipboardCheck, Clock, CheckCircle2, XCircle, MessageCircle, User, BookOpen, RefreshCw, AlertTriangle, KeyRound } from 'lucide-react';
+import ExamTokenGenerator from '@/components/teacher/ExamTokenGenerator';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
@@ -149,6 +150,10 @@ export default function TeacherDashboard() {
               <CheckCircle2 className="w-4 h-4" />
               Revisados
             </TabsTrigger>
+            <TabsTrigger value="tokens" className="gap-2">
+              <KeyRound className="w-4 h-4" />
+              Códigos de examen
+            </TabsTrigger>
             <TabsTrigger value="forum" className="gap-2">
               <MessageCircle className="w-4 h-4" />
               Foro
@@ -198,6 +203,13 @@ export default function TeacherDashboard() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          {/* Tokens de examen presencial */}
+          <TabsContent value="tokens">
+            <div className="max-w-md">
+              <ExamTokenGenerator />
+            </div>
           </TabsContent>
 
           {/* Foro */}
