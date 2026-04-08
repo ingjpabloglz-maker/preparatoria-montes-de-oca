@@ -22,6 +22,7 @@ export default function StudentRecord() {
   const [error, setError] = useState(null);
   const [selectedAttempt, setSelectedAttempt] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [verifyingIntegrity, setVerifyingIntegrity] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(u => setCurrentUser(u)).catch(() => {});
@@ -198,7 +199,6 @@ export default function StudentRecord() {
   }
 
   // Función para verificar integridad del snapshot
-  const [verifyingIntegrity, setVerifyingIntegrity] = useState(false);
   async function handleVerifyIntegrity() {
     setVerifyingIntegrity(true);
     try {
