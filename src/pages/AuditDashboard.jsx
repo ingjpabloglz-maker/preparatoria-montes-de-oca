@@ -5,6 +5,7 @@ import AuditAttemptList from '@/components/audit/AuditAttemptList';
 import AuditAttemptDetail from '@/components/audit/AuditAttemptDetail';
 import AuditKPIs from '@/components/audit/AuditKPIs';
 import { Shield, AlertTriangle } from 'lucide-react';
+import { hasPermission } from '@/lib/permissions';
 
 export default function AuditDashboard() {
   const [user, setUser] = useState(null);
@@ -60,7 +61,7 @@ export default function AuditDashboard() {
 
   if (!user) return null;
 
-  if (user.role !== 'admin' && user.role !== 'teacher') {
+  if (!hasPermission(user, 'audit.access')) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center">
         <AlertTriangle className="w-12 h-12 text-red-400" />

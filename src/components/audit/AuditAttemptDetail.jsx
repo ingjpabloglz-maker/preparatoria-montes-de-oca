@@ -10,6 +10,7 @@ import { es } from 'date-fns/locale';
 import { ArrowLeft, CheckCircle2, XCircle, Clock, User, ClipboardCheck, Download, AlertTriangle, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
+import { hasPermission } from '@/lib/permissions';
 
 const TYPE_LABELS = {
   lesson: 'Lección',
@@ -30,7 +31,7 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
     ? differenceInSeconds(new Date(attempt.submitted_at), new Date(attempt.started_at))
     : null;
 
-  const canReview = (userRole === 'admin' || userRole === 'teacher') &&
+  const canReview = hasPermission({ role: userRole }, 'exam.review') &&
     (attempt.requires_manual_review || attempt.passed === null || attempt.passed === undefined);
 
   const studentName = attempt.full_name || attempt.user_email;

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import LevelAccessGuard from "@/components/common/LevelAccessGuard";
+import { hasPermission } from "@/lib/permissions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,8 +80,7 @@ export default function Forum() {
       return true;
     });
 
-  return (
-    <LevelAccessGuard>
+  const forumContent = (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -160,6 +160,12 @@ export default function Forum() {
         )}
       </div>
     </div>
-    </LevelAccessGuard>
   );
+
+  // Docentes tienen acceso directo al foro sin LevelAccessGuard (no son alumnos)
+  if (hasPermission(user, 'forum.access') && user?.role !== 'user') {
+    return forumContent;
+  }
+
+  return <LevelAccessGuard>{forumContent}</LevelAccessGuard>;
 }

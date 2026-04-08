@@ -6,9 +6,10 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Solo teacher o admin pueden revisar
-  if (user.role !== 'admin' && user.role !== 'teacher') {
-    return Response.json({ error: 'Forbidden: admin or teacher role required' }, { status: 403 });
+  // Permitir: admin, docente (rol nuevo), teacher (compatibilidad)
+  const allowedRoles = ['admin', 'docente', 'teacher'];
+  if (!allowedRoles.includes(user.role)) {
+    return Response.json({ error: 'Forbidden: exam.review permission required' }, { status: 403 });
   }
 
   const body = await req.json();

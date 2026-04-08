@@ -4,8 +4,10 @@ Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  if (user.role !== 'admin' && user.role !== 'teacher') {
-    return Response.json({ error: 'Forbidden' }, { status: 403 });
+  // Permitir: admin, docente (rol nuevo)
+  const allowedRoles = ['admin', 'docente', 'teacher'];
+  if (!allowedRoles.includes(user.role)) {
+    return Response.json({ error: 'Forbidden: audit.access required' }, { status: 403 });
   }
 
   const body = await req.json();

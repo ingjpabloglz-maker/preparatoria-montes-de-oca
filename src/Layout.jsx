@@ -26,6 +26,7 @@ import {
   MessageCircle,
   Shield
 } from "lucide-react";
+import { hasPermission } from '@/lib/permissions';
 import GamificationHUD from "@/components/gamification/GamificationHUD";
 import AchievementToast from "@/components/gamification/AchievementToast";
 import { cn } from "@/lib/utils";
@@ -47,13 +48,14 @@ export default function Layout({ children, currentPageName }) {
   }, []);
 
   const isAdmin = user?.role === 'admin';
+  const isDocente = user?.role === 'docente';
   const isAdminPage = ['AdminDashboard', 'ManageFolios', 'ManageSubjects', 'StudentDetail'].includes(currentPageName);
   const isImmersivePage = ['Lesson'].includes(currentPageName);
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Achievement Toast monitor (solo estudiantes) */}
-      {user && user.role !== 'admin' && (
+      {user && user.role !== 'admin' && user.role !== 'docente' && (
         <AchievementToast userEmail={user.email} />
       )}
       {/* Header */}
@@ -75,7 +77,7 @@ export default function Layout({ children, currentPageName }) {
 
             {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-1">
-              {!isAdmin && (
+              {!isAdmin && !isDocente && (
                 <>
                   <Link to={createPageUrl('Dashboard')}>
                     <Button 
@@ -102,6 +104,30 @@ export default function Layout({ children, currentPageName }) {
                     >
                       <MessageCircle className="w-4 h-4 mr-2" />
                       Foro
+                    </Button>
+                  </Link>
+                </>
+              )}
+
+              {/* Nav docente */}
+              {isDocente && (
+                <>
+                  <Link to="/Forum">
+                    <Button
+                      variant={currentPageName === 'Forum' || currentPageName === 'ForumThread' ? 'secondary' : 'ghost'}
+                      size="sm"
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Foro
+                    </Button>
+                  </Link>
+                  <Link to="/AuditDashboard">
+                    <Button
+                      variant={currentPageName === 'AuditDashboard' ? 'secondary' : 'ghost'}
+                      size="sm"
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      Revisión de Exámenes
                     </Button>
                   </Link>
                 </>
@@ -150,7 +176,7 @@ export default function Layout({ children, currentPageName }) {
             </nav>
 
             {/* Gamification HUD (solo estudiantes) */}
-            {user && user.role !== 'admin' && (
+            {user && user.role !== 'admin' && user.role !== 'docente' && (
               <GamificationHUD userEmail={user.email} />
             )}
 
@@ -174,7 +200,7 @@ export default function Layout({ children, currentPageName }) {
                       <p className="font-medium truncate">{user.full_name}</p>
                       <p className="text-sm text-gray-500 truncate">{user.email}</p>
                       <Badge variant="outline" className="mt-1 text-xs">
-                        {user.role === 'admin' ? 'Administrador' : 'Estudiante'}
+                        {user.role === 'admin' ? 'Administrador' : user.role === 'docente' ? 'Docente' : 'Estudiante'}
                       </Badge>
                     </div>
                     <DropdownMenuItem

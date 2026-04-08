@@ -6,6 +6,7 @@
       "type": "string",
       "enum": [
         "admin",
+        "docente",
         "user"
       ],
       "default": "user"
