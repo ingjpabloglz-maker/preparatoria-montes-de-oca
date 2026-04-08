@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,74 +7,141 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format, differenceInSeconds } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, CheckCircle2, XCircle, Clock, AlertCircle, User, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Clock, User, ClipboardCheck, Download, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { base44 } from '@/api/base44Client';
+
+const TYPE_LABELS = {
+  lesson: 'Lección',
+  mini_eval: 'Mini Evaluación',
+  final_exam: 'Examen Final',
+  surprise_exam: 'Examen Sorpresa',
+};
 
 export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole }) {
   const [reviewScore, setReviewScore] = useState(attempt.score ?? 0);
   const [reviewPassed, setReviewPassed] = useState(attempt.passed ?? false);
   const [reviewFeedback, setReviewFeedback] = useState(attempt.feedback || '');
   const [submitting, setSubmitting] = useState(false);
+  const [questions, setQuestions] = useState({});
+  const [exporting, setExporting] = useState(false);
 
   const duration = attempt.started_at && attempt.submitted_at
     ? differenceInSeconds(new Date(attempt.submitted_at), new Date(attempt.started_at))
     : null;
 
   const canReview = (userRole === 'admin' || userRole === 'teacher') &&
-    (attempt.requires_manual_review || attempt.passed === null);
+    (attempt.requires_manual_review || attempt.passed === null || attempt.passed === undefined);
+
+  // Load question text for each answer
+  useEffect(() => {
+    const ids = [...new Set((attempt.answers || []).map(a => a.question_id).filter(Boolean))];
+    if (ids.length === 0) return;
+    Promise.all(ids.map(id =>
+      base44.entities.CourseActivity.filter({ id }).then(r => r[0]).catch(() => null)
+    )).then(results => {
+      const map = {};
+      results.forEach(q => { if (q) map[q.id] = q; });
+      setQuestions(map);
+    });
+  }, [attempt.id]);
 
   async function handleSubmitReview() {
     setSubmitting(true);
-    await onReview({
-      attempt_id: attempt.id,
-      score: Number(reviewScore),
-      passed: reviewPassed,
-      feedback: reviewFeedback,
-    });
+    await onReview({ attempt_id: attempt.id, score: Number(reviewScore), passed: reviewPassed, feedback: reviewFeedback });
     setSubmitting(false);
+  }
+
+  async function handleExportPDF() {
+    setExporting(true);
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      let y = 20;
+
+      doc.setFontSize(16);
+      doc.text('Evidencia de Evaluación — Auditoría SEP', 14, y); y += 10;
+
+      doc.setFontSize(10);
+      doc.text(`Alumno: ${attempt.user_email}`, 14, y); y += 6;
+      doc.text(`Materia: ${attempt.subject_name || attempt.subject_id}`, 14, y); y += 6;
+      doc.text(`Tipo: ${TYPE_LABELS[attempt.type] || attempt.type}`, 14, y); y += 6;
+      doc.text(`Intento #: ${attempt.attempt_number}`, 14, y); y += 6;
+      doc.text(`Score: ${attempt.score ?? '—'}%`, 14, y); y += 6;
+      doc.text(`Aprobado: ${attempt.passed ? 'Sí' : 'No'}`, 14, y); y += 6;
+      doc.text(`Inicio: ${attempt.started_at ? format(new Date(attempt.started_at), "dd MMM yyyy HH:mm", { locale: es }) : '—'}`, 14, y); y += 6;
+      doc.text(`Envío: ${attempt.submitted_at ? format(new Date(attempt.submitted_at), "dd MMM yyyy HH:mm", { locale: es }) : '—'}`, 14, y); y += 6;
+      if (duration !== null) { doc.text(`Duración: ${Math.floor(duration / 60)}m ${duration % 60}s`, 14, y); y += 6; }
+      if (attempt.reviewed_by) { doc.text(`Revisado por: ${attempt.reviewed_by}`, 14, y); y += 6; }
+      if (attempt.feedback) { doc.text(`Retroalimentación: ${attempt.feedback}`, 14, y); y += 8; }
+
+      y += 4;
+      doc.setFontSize(12);
+      doc.text('Respuestas del alumno', 14, y); y += 8;
+      doc.setFontSize(9);
+
+      (attempt.answers || []).forEach((ans, idx) => {
+        if (y > 270) { doc.addPage(); y = 20; }
+        const q = questions[ans.question_id];
+        const qText = q ? `P${idx + 1}: ${q.question}` : `P${idx + 1}: (ID ${ans.question_id})`;
+        const lines = doc.splitTextToSize(qText, 180);
+        doc.text(lines, 14, y); y += lines.length * 5;
+        doc.text(`  Respuesta: ${ans.user_answer || '—'}  |  Correcta: ${q?.correct_answer || '—'}  |  ${ans.correct ? '✓' : '✗'} ${ans.points_obtained ?? 0} pts`, 14, y); y += 7;
+      });
+
+      doc.save(`auditoria_${attempt.user_email}_${attempt.id?.slice(0, 8)}.pdf`);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
     <div className="space-y-4">
-      {/* Back */}
-      <Button variant="ghost" size="sm" onClick={onBack} className="gap-2">
-        <ArrowLeft className="w-4 h-4" /> Volver al listado
-      </Button>
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-2">
+          <ArrowLeft className="w-4 h-4" /> Volver al listado
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exporting} className="gap-2">
+          <Download className="w-4 h-4" />
+          {exporting ? 'Exportando...' : 'Exportar PDF'}
+        </Button>
+      </div>
 
-      {/* Header card */}
+      {/* Sección 1: Información general */}
       <Card>
-        <CardContent className="p-5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <User className="w-4 h-4 text-indigo-600" /> Información general
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <p className="text-xs text-gray-400 mb-1 flex items-center gap-1"><User className="w-3 h-3" /> Alumno</p>
+              <p className="text-xs text-gray-400 mb-1">Alumno</p>
               <p className="font-medium text-gray-800 break-all">{attempt.user_email}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-1">Tipo</p>
-              <Badge variant="outline">{attempt.type}</Badge>
+              <p className="text-xs text-gray-400 mb-1">Materia</p>
+              <p className="font-medium text-gray-800">{attempt.subject_name || attempt.subject_id}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-1">Intento</p>
+              <p className="text-xs text-gray-400 mb-1">Lección ID</p>
+              <p className="text-gray-600 text-xs break-all">{attempt.lesson_id || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Tipo</p>
+              <Badge variant="outline">{TYPE_LABELS[attempt.type] || attempt.type}</Badge>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Intento #</p>
               <p className="font-bold text-gray-800">#{attempt.attempt_number}</p>
             </div>
             <div>
               <p className="text-xs text-gray-400 mb-1">Score</p>
               <p className={cn("text-2xl font-bold", attempt.passed ? 'text-green-600' : 'text-red-500')}>
                 {attempt.score ?? '—'}%
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 mb-1">Enviado</p>
-              <p className="text-gray-700">
-                {attempt.submitted_at
-                  ? format(new Date(attempt.submitted_at), "dd MMM yyyy HH:mm", { locale: es })
-                  : '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 mb-1">Duración</p>
-              <p className="text-gray-700">
-                {duration !== null ? `${Math.floor(duration / 60)}m ${duration % 60}s` : '—'}
               </p>
             </div>
             <div>
@@ -86,6 +153,24 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
                   : <Badge className="bg-red-100 text-red-700 gap-1"><XCircle className="w-3 h-3" /> No aprobado</Badge>
               }
             </div>
+            {attempt.requires_reinforcement && (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Riesgo</p>
+                <Badge className="bg-orange-100 text-orange-700 gap-1"><AlertTriangle className="w-3 h-3" /> Refuerzo requerido</Badge>
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Inicio</p>
+              <p className="text-gray-700 text-xs">{attempt.started_at ? format(new Date(attempt.started_at), "dd MMM yyyy HH:mm", { locale: es }) : '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Envío</p>
+              <p className="text-gray-700 text-xs">{attempt.submitted_at ? format(new Date(attempt.submitted_at), "dd MMM yyyy HH:mm", { locale: es }) : '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Duración</p>
+              <p className="text-gray-700">{duration !== null ? `${Math.floor(duration / 60)}m ${duration % 60}s` : '—'}</p>
+            </div>
             {attempt.reviewed_by && (
               <div>
                 <p className="text-xs text-gray-400 mb-1">Revisado por</p>
@@ -96,51 +181,65 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
         </CardContent>
       </Card>
 
-      {/* Answers */}
+      {/* Sección 2: Respuestas */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2">
           <CardTitle className="text-base">Respuestas del alumno</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {(attempt.answers || []).length === 0 && (
+        <CardContent>
+          {(attempt.answers || []).length === 0 ? (
             <p className="text-sm text-gray-400">No hay respuestas registradas.</p>
-          )}
-          {(attempt.answers || []).map((ans, idx) => (
-            <div
-              key={idx}
-              className={cn(
-                "rounded-lg p-3 border text-sm",
-                ans.correct === true && "bg-green-50 border-green-200",
-                ans.correct === false && "bg-red-50 border-red-200",
-                ans.correct === null && "bg-yellow-50 border-yellow-200",
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
-                  <p className="text-xs text-gray-400 mb-1">Pregunta ID: <code className="text-gray-600">{ans.question_id}</code></p>
-                  <p className="font-medium text-gray-800">
-                    Respuesta: <span className="text-gray-600">{ans.user_answer || <em>Sin respuesta</em>}</span>
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {ans.correct === true && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                  {ans.correct === false && <XCircle className="w-4 h-4 text-red-500" />}
-                  {ans.correct === null && <Clock className="w-4 h-4 text-yellow-500" />}
-                  <span className="text-xs text-gray-500">{ans.points_obtained ?? 0} pts</span>
-                </div>
-              </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-xs text-gray-500">
+                    <th className="text-left py-2 pr-3 font-medium">#</th>
+                    <th className="text-left py-2 pr-3 font-medium">Pregunta</th>
+                    <th className="text-left py-2 pr-3 font-medium">Respuesta alumno</th>
+                    <th className="text-left py-2 pr-3 font-medium">Resp. correcta</th>
+                    <th className="text-center py-2 pr-3 font-medium">✓</th>
+                    <th className="text-right py-2 font-medium">Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(attempt.answers || []).map((ans, idx) => {
+                    const q = questions[ans.question_id];
+                    return (
+                      <tr key={idx} className={cn(
+                        "border-b text-xs",
+                        ans.correct === true && "bg-green-50",
+                        ans.correct === false && "bg-red-50",
+                        ans.correct === null && "bg-yellow-50",
+                      )}>
+                        <td className="py-2 pr-3 text-gray-400">{idx + 1}</td>
+                        <td className="py-2 pr-3 text-gray-700 max-w-[200px]">
+                          {q ? q.question : <span className="text-gray-400 italic">ID: {ans.question_id}</span>}
+                        </td>
+                        <td className="py-2 pr-3 font-medium text-gray-800">{ans.user_answer || <em className="text-gray-400">—</em>}</td>
+                        <td className="py-2 pr-3 text-gray-500">{q ? q.correct_answer : '—'}</td>
+                        <td className="py-2 pr-3 text-center">
+                          {ans.correct === true && <CheckCircle2 className="w-4 h-4 text-green-500 mx-auto" />}
+                          {ans.correct === false && <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
+                          {ans.correct === null && <Clock className="w-4 h-4 text-yellow-500 mx-auto" />}
+                        </td>
+                        <td className="py-2 text-right font-medium">{ans.points_obtained ?? 0}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          ))}
+          )}
         </CardContent>
       </Card>
 
-      {/* Revisión manual */}
+      {/* Panel docente */}
       {canReview && (
         <Card className="border-indigo-200">
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <ClipboardCheck className="w-4 h-4 text-indigo-600" />
-              Revisión docente
+              <ClipboardCheck className="w-4 h-4 text-indigo-600" /> Revisión docente
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -148,9 +247,7 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
               <div className="space-y-1">
                 <Label className="text-xs">Score final (0-100)</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  max={100}
+                  type="number" min={0} max={100}
                   value={reviewScore}
                   onChange={e => {
                     const v = Number(e.target.value);
@@ -162,18 +259,8 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
               <div className="space-y-1">
                 <Label className="text-xs">¿Aprobado?</Label>
                 <div className="flex gap-2 mt-1">
-                  <Button
-                    size="sm"
-                    variant={reviewPassed ? 'default' : 'outline'}
-                    onClick={() => setReviewPassed(true)}
-                    className="flex-1"
-                  >Sí</Button>
-                  <Button
-                    size="sm"
-                    variant={!reviewPassed ? 'destructive' : 'outline'}
-                    onClick={() => setReviewPassed(false)}
-                    className="flex-1"
-                  >No</Button>
+                  <Button size="sm" variant={reviewPassed ? 'default' : 'outline'} onClick={() => setReviewPassed(true)} className="flex-1">Sí</Button>
+                  <Button size="sm" variant={!reviewPassed ? 'destructive' : 'outline'} onClick={() => setReviewPassed(false)} className="flex-1">No</Button>
                 </div>
               </div>
             </div>
@@ -186,18 +273,13 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
                 rows={3}
               />
             </div>
-            <Button
-              onClick={handleSubmitReview}
-              disabled={submitting}
-              className="w-full bg-indigo-600 hover:bg-indigo-700"
-            >
+            <Button onClick={handleSubmitReview} disabled={submitting} className="w-full bg-indigo-600 hover:bg-indigo-700">
               {submitting ? 'Guardando...' : 'Guardar revisión'}
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Feedback ya guardado */}
       {attempt.feedback && !canReview && (
         <Card>
           <CardContent className="p-4">

@@ -3,8 +3,8 @@ import { base44 } from '@/api/base44Client';
 import AuditFilters from '@/components/audit/AuditFilters';
 import AuditAttemptList from '@/components/audit/AuditAttemptList';
 import AuditAttemptDetail from '@/components/audit/AuditAttemptDetail';
-import { Shield, AlertTriangle } from 'lucide-react';
 import AuditKPIs from '@/components/audit/AuditKPIs';
+import { Shield, AlertTriangle } from 'lucide-react';
 
 export default function AuditDashboard() {
   const [user, setUser] = useState(null);
@@ -69,19 +69,22 @@ export default function AuditDashboard() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Auditoría Académica</h1>
-          <p className="text-sm text-gray-500">Revisión y validación de evaluaciones almacenadas</p>
+          <p className="text-sm text-gray-500">Trazabilidad completa de evaluaciones — Cumplimiento SEP</p>
         </div>
       </div>
 
-      <AuditKPIs attempts={attempts} />
+      {/* KPIs */}
+      {!selectedAttempt && <AuditKPIs attempts={attempts} />}
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar filtros */}
-        <div className="w-full lg:w-64 shrink-0">
-          <AuditFilters subjects={subjects} onFilter={setFilters} />
-        </div>
+        {!selectedAttempt && (
+          <div className="w-full lg:w-64 shrink-0">
+            <AuditFilters subjects={subjects} onFilter={setFilters} />
+          </div>
+        )}
 
-        {/* Lista */}
+        {/* Contenido principal */}
         <div className="flex-1 min-w-0">
           {selectedAttempt ? (
             <AuditAttemptDetail
