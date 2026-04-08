@@ -4,6 +4,7 @@ import AuditFilters from '@/components/audit/AuditFilters';
 import AuditAttemptList from '@/components/audit/AuditAttemptList';
 import AuditAttemptDetail from '@/components/audit/AuditAttemptDetail';
 import AuditKPIs from '@/components/audit/AuditKPIs';
+import AuditRecordDownload from '@/components/audit/AuditRecordDownload';
 import { Shield, AlertTriangle } from 'lucide-react';
 import { hasPermission } from '@/lib/permissions';
 
@@ -80,14 +81,17 @@ export default function AuditDashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-          <Shield className="w-5 h-5 text-white" />
+      <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+            <Shield className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Auditoría Académica</h1>
+            <p className="text-sm text-gray-500">Trazabilidad completa de evaluaciones — Cumplimiento SEP</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Auditoría Académica</h1>
-          <p className="text-sm text-gray-500">Trazabilidad completa de evaluaciones — Cumplimiento SEP</p>
-        </div>
+        <AuditRecordDownload />
       </div>
 
       {/* KPIs */}

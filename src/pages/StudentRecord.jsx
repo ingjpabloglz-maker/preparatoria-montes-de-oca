@@ -12,6 +12,7 @@ import RecordSummaryCards from '@/components/student/RecordSummaryCards';
 import RecordSubjectTable from '@/components/student/RecordSubjectTable';
 import RecordEvalHistory from '@/components/student/RecordEvalHistory';
 import AuditAttemptDetail from '@/components/audit/AuditAttemptDetail';
+import AuditableRecordExport from '@/components/student/AuditableRecordExport';
 
 export default function StudentRecord() {
   const { user_email } = useParams();
@@ -224,10 +225,11 @@ export default function StudentRecord() {
           <ArrowLeft className="w-4 h-4" /> Volver
         </Button>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exporting} className="gap-2">
-            <Download className="w-4 h-4" />
-            {exporting ? 'Exportando...' : 'Exportar PDF'}
-          </Button>
+           <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exporting} className="gap-2">
+             <Download className="w-4 h-4" />
+             {exporting ? 'Exportando...' : 'Exportar PDF'}
+           </Button>
+           <AuditableRecordExport userEmail={student.email} />
           {currentUser.role === 'admin' && isGraduated && (
             <Button variant="outline" size="sm" onClick={handleVerifyIntegrity} disabled={verifyingIntegrity} className="gap-2">
               <Shield className="w-4 h-4" />
