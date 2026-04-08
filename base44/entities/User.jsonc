@@ -38,6 +38,16 @@
       "type": "string",
       "description": "CURP oficial del alumno (18 caracteres)",
       "maxLength": 18
+    },
+    "curp_validated": {
+      "type": "boolean",
+      "description": "Indica si la CURP fue validada exitosamente contra el nombre del alumno",
+      "default": false
+    },
+    "curp_validated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que la CURP fue validada"
     }
   },
   "required": [

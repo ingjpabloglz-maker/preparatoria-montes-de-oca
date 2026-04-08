@@ -32,7 +32,7 @@ function validatePhone(value) {
   return /^\d{10}$/.test(value);
 }
 
-export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClearField, mode = 'student' }) {
+export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClearField, mode = 'student', targetUserId }) {
   const [form, setForm] = useState({
     nombres: user?.nombres || '',
     apellido_paterno: user?.apellido_paterno || '',
@@ -77,14 +77,32 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
 
   const handleSave = async () => {
     setSaving(true);
+    setCurpError(null);
     const payload = { ...form };
-    if (!payload.curp) delete payload.curp; // don't overwrite with empty string
+
     if (mode === 'admin') {
+      // Admin: llama al backend con target_user_id para validación server-side
+      const res = await base44.functions.invoke('validateAndSaveProfile', {
+        ...payload,
+        target_user_id: targetUserId || user?.id,
+      });
+      if (res.data?.error) {
+        setCurpError(res.data.error);
+        setSaving(false);
+        return;
+      }
       await onAdminUpdate?.(payload);
     } else {
-      await base44.auth.updateMe(payload);
+      // Alumno: llama al backend que valida CURP y luego hace updateMe
+      const res = await base44.functions.invoke('validateAndSaveProfile', payload);
+      if (res.data?.error) {
+        setCurpError(res.data.error);
+        setSaving(false);
+        return;
+      }
       onSaved?.();
     }
+
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);

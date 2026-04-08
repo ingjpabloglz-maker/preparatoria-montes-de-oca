@@ -104,8 +104,9 @@ export default function StudentDetail() {
     return Math.round(total / levelSubjects.length);
   })();
 
-  const handleAdminUpdate = async (data) => {
-    await base44.entities.User.update(student.id, data);
+  const handleAdminUpdate = async (_data) => {
+    // La actualización real ya fue hecha por validateAndSaveProfile en el backend.
+    // Solo refrescamos los datos locales.
     queryClient.invalidateQueries({ queryKey: ['student', studentEmail] });
   };
 
@@ -258,6 +259,7 @@ export default function StudentDetail() {
           <ProfileForm
             user={student}
             mode="admin"
+            targetUserId={student.id}
             onAdminUpdate={handleAdminUpdate}
             onAdminClearField={handleAdminClearField}
           />
