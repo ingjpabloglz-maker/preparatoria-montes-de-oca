@@ -218,9 +218,35 @@ export default function AuditAttemptDetail({ attempt, onBack, onReview, userRole
               <p className="text-gray-700">{duration !== null ? `${Math.floor(duration / 60)}m ${duration % 60}s` : '—'}</p>
             </div>
             {attempt.reviewed_by && (
-              <div>
-                <p className="text-xs text-gray-400 mb-1">Revisado por</p>
-                <p className="text-gray-700 text-xs">{attempt.reviewed_by}</p>
+              <div className="col-span-2">
+                <p className="text-xs text-gray-400 mb-1">Revisión docente</p>
+                <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-20">Docente:</span>
+                    <span className="text-sm font-medium text-gray-800">{attempt.reviewer_name || attempt.reviewed_by}</span>
+                  </div>
+                  {attempt.review_decision && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-20">Decisión:</span>
+                      {attempt.review_decision === 'approved'
+                        ? <Badge className="bg-green-100 text-green-700 gap-1 text-xs"><CheckCircle2 className="w-3 h-3" /> Aprobado</Badge>
+                        : <Badge className="bg-red-100 text-red-700 gap-1 text-xs"><XCircle className="w-3 h-3" /> Rechazado</Badge>
+                      }
+                    </div>
+                  )}
+                  {attempt.reviewed_at && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-20">Fecha:</span>
+                      <span className="text-xs text-gray-700">{format(new Date(attempt.reviewed_at), "dd MMM yyyy HH:mm", { locale: es })}</span>
+                    </div>
+                  )}
+                  {attempt.feedback && (
+                    <div className="flex items-start gap-2 mt-1">
+                      <span className="text-xs text-gray-500 w-20 shrink-0">Comentario:</span>
+                      <span className="text-xs text-gray-700 italic">"{attempt.feedback}"</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

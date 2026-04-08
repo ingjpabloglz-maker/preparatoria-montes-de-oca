@@ -24,7 +24,8 @@ import {
   FileText,
   BarChart2,
   MessageCircle,
-  Shield
+  Shield,
+  ClipboardCheck
 } from "lucide-react";
 import { hasPermission } from '@/lib/permissions';
 import GamificationHUD from "@/components/gamification/GamificationHUD";
@@ -64,7 +65,7 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link 
-              to={isAdmin ? createPageUrl('AdminDashboard') : createPageUrl('Dashboard')} 
+              to={isAdmin ? createPageUrl('AdminDashboard') : isDocente ? '/TeacherDashboard' : createPageUrl('Dashboard')} 
               className="flex items-center gap-2"
             >
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
@@ -112,6 +113,15 @@ export default function Layout({ children, currentPageName }) {
               {/* Nav docente */}
               {isDocente && (
                 <>
+                  <Link to="/TeacherDashboard">
+                    <Button
+                      variant={currentPageName === 'TeacherDashboard' ? 'secondary' : 'ghost'}
+                      size="sm"
+                    >
+                      <ClipboardCheck className="w-4 h-4 mr-2" />
+                      Panel Docente
+                    </Button>
+                  </Link>
                   <Link to="/Forum">
                     <Button
                       variant={currentPageName === 'Forum' || currentPageName === 'ForumThread' ? 'secondary' : 'ghost'}
@@ -119,15 +129,6 @@ export default function Layout({ children, currentPageName }) {
                     >
                       <MessageCircle className="w-4 h-4 mr-2" />
                       Foro
-                    </Button>
-                  </Link>
-                  <Link to="/AuditDashboard">
-                    <Button
-                      variant={currentPageName === 'AuditDashboard' ? 'secondary' : 'ghost'}
-                      size="sm"
-                    >
-                      <Shield className="w-4 h-4 mr-2" />
-                      Revisión de Exámenes
                     </Button>
                   </Link>
                 </>

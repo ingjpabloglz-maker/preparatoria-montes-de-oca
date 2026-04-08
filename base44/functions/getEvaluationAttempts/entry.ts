@@ -4,8 +4,8 @@ Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  // Permitir: admin, docente (rol nuevo)
-  const allowedRoles = ['admin', 'docente', 'teacher'];
+
+  const allowedRoles = ['admin', 'docente'];
   if (!allowedRoles.includes(user.role)) {
     return Response.json({ error: 'Forbidden: audit.access required' }, { status: 403 });
   }
@@ -29,6 +29,7 @@ Deno.serve(async (req) => {
 
   const safePage = Math.max(1, Number(page));
   const safeLimit = Math.min(20, Math.max(1, Number(limit)));
+  const isDocente = user.role === 'docente';
 
   // Fetch all needed data in parallel
   const [attempts, subjects, lessons, modules, units, users] = await Promise.all([
@@ -64,6 +65,9 @@ Deno.serve(async (req) => {
 
   // Filter
   const filtered = attempts.filter(a => {
+    // ⚠️ DOCENTES solo ven exámenes finales — NUNCA lessons ni mini_eval
+    if (isDocente && a.type !== 'final_exam') return false;
+
     if (user_email) {
       const q = user_email.toLowerCase();
       const fullName = (userMap[a.user_email] || '').toLowerCase();
@@ -109,5 +113,7 @@ Deno.serve(async (req) => {
     total_count,
     page: safePage,
     total_pages,
+    // Indicar al frontend si hay restricción de rol
+    role_filter_applied: isDocente ? 'final_exam_only' : 'none',
   });
 });

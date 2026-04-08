@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, Trophy, XCircle, Loader2 } from "lucide-react";
+import { ArrowRight, Trophy, XCircle, Loader2, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import RichContentRenderer from '../common/RichContentRenderer';
 
@@ -29,6 +29,7 @@ export default function SubjectTest({ subject, onComplete, onExit }) {
   const [textAnswer, setTextAnswer] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
+  const [pendingTeacherReview, setPendingTeacherReview] = useState(false);
 
   useEffect(() => {
     const loadQuestions = async () => {
@@ -99,7 +100,11 @@ export default function SubjectTest({ subject, onComplete, onExit }) {
       const finalScore = Math.round((correct / questions.length) * 100);
       const passed = finalScore >= 70;
       setScore(finalScore);
-      await onComplete?.(finalScore, passed);
+      const result = await onComplete?.(finalScore, passed);
+      // Si el backend indica que está pendiente de revisión docente
+      if (result?.pending_teacher_review) {
+        setPendingTeacherReview(true);
+      }
       setShowResults(true);
     }
   };
@@ -130,6 +135,32 @@ export default function SubjectTest({ subject, onComplete, onExit }) {
   }
 
   if (showResults) {
+    // Estado: examen final pendiente de revisión docente
+    if (pendingTeacherReview) {
+      return (
+        <Card className="max-w-2xl mx-auto border-yellow-200">
+          <CardContent className="p-8 text-center">
+            <div className="w-24 h-24 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-6">
+              <Clock className="w-12 h-12 text-yellow-600" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2 text-yellow-700">Examen Enviado</h2>
+            <p className="text-gray-600 mb-6">
+              Tu examen final ha sido recibido y está <strong>pendiente de revisión por un docente</strong>.
+              Recibirás retroalimentación una vez que sea evaluado.
+            </p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 mb-6">
+              <p className="text-4xl font-bold text-yellow-700 mb-2">{score}%</p>
+              <Badge className="bg-yellow-200 text-yellow-800">🟡 En revisión</Badge>
+              <p className="text-xs text-yellow-600 mt-3">
+                El avance a la siguiente materia se desbloqueará cuando el docente apruebe tu examen.
+              </p>
+            </div>
+            <Button onClick={onExit} variant="outline">Volver a la Materia</Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
     return (
       <Card className="max-w-2xl mx-auto">
         <CardContent className="p-8 text-center">

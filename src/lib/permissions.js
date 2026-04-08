@@ -11,9 +11,10 @@ export const ROLE_PERMISSIONS = {
     'forum.access',
     'forum.read',
     'forum.post',
-    'exam.review',
-    'exam.grade',
-    'audit.access',
+    'forum.moderate',
+    'exam.review',        // Revisar y decidir sobre exámenes finales
+    'exam.grade',         // Calificar manualmente
+    // ⚠️ audit.access NO incluido — docentes solo ven su panel de revisión
   ],
   user: [
     'forum.read',

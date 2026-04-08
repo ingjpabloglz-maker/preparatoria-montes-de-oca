@@ -78,7 +78,6 @@ Deno.serve(async (req) => {
   });
   const attempt_number = existingAttempts.length + 1;
 
-  // mini_eval: máximo 3 intentos antes de marcar riesgo (NO bloquea)
   // final_exam: máximo 3 intentos → BLOQUEO DURO, requiere folio extraordinario
   if (type === 'final_exam') {
     const spArr = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email, subject_id });
@@ -130,12 +129,26 @@ Deno.serve(async (req) => {
     ? Math.round((earned_points / total_points) * 100)
     : (total_gradeable > 0 ? Math.round((correct_count / total_gradeable) * 100) : 0);
 
-  // Umbral de aprobación: 70% para final_exam, 80% para mini_eval/lesson
+  // ─── LÓGICA CRÍTICA: final_exam SIEMPRE requiere revisión docente ─────────────
+  // El docente aprueba/rechaza manualmente — nunca automático
+  const isFinalExam = type === 'final_exam';
   const passThreshold = type === 'final_exam' ? 70 : 80;
-  const passed = requires_any_manual_review ? null : score >= passThreshold;
+  
+  let passed;
+  let requiresManualReview;
+
+  if (isFinalExam) {
+    // Examen final: SIEMPRE pendiente de revisión docente
+    passed = null;
+    requiresManualReview = true;
+  } else {
+    // Lecciones y mini-evals: aprobación automática normal
+    passed = requires_any_manual_review ? null : score >= passThreshold;
+    requiresManualReview = requires_any_manual_review;
+  }
 
   // ─── 5. GUARDAR EvaluationAttempt (registro auditable) ──────────────────────
-  console.log("EvaluationAttempt CREATED", { user_email, lesson_id, type, score });
+  console.log("EvaluationAttempt CREATED", { user_email, lesson_id, type, score, requiresManualReview });
   const attemptRecord = await base44.asServiceRole.entities.EvaluationAttempt.create({
     user_email,
     subject_id,
@@ -147,10 +160,10 @@ Deno.serve(async (req) => {
     started_at: started_at || submitted_at,
     submitted_at,
     attempt_number,
-    requires_manual_review: requires_any_manual_review,
+    requires_manual_review: requiresManualReview,
   });
 
-  // ─── 6. ACTUALIZAR LessonProgress (resumen UI — siempre antes de recalcular %) ─
+  // ─── 6. ACTUALIZAR LessonProgress (resumen UI) ────────────────────────────────
   const existingLP = await base44.asServiceRole.entities.LessonProgress.filter({ user_email, lesson_id });
   const lessonProgressData = {
     user_email, lesson_id, subject_id, score,
@@ -166,10 +179,8 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.LessonProgress.create({ ...lessonProgressData, module_id });
   }
 
-  // ─── 7. RECALCULAR progress_percent SIEMPRE (lesson / mini_eval) ─────────────
-  // Se ejecuta DESPUÉS de actualizar LessonProgress para que el conteo sea correcto.
-  // También crea SubjectProgress si no existe aún.
-  if (type !== 'final_exam') {
+  // ─── 7. RECALCULAR progress_percent (solo para lecciones/mini-eval, NO final_exam) ─
+  if (!isFinalExam) {
     const [allLessons, completedLessons] = await Promise.all([
       base44.asServiceRole.entities.CourseLesson.filter({ subject_id }),
       base44.asServiceRole.entities.LessonProgress.filter({ user_email, subject_id, completed: true }),
@@ -189,7 +200,6 @@ Deno.serve(async (req) => {
           last_activity: submitted_at,
         });
       } else {
-        // Crear SubjectProgress si aún no existe (primera lección completada)
         await base44.asServiceRole.entities.SubjectProgress.create({
           user_email, subject_id, progress_percent,
           completed: false, last_activity: submitted_at,
@@ -198,22 +208,21 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ─── 8. ACTUALIZAR SubjectProgress según tipo (final_exam / mini_eval signals) ─
-  // Se ejecuta DESPUÉS del recálculo de progress_percent para no sobrescribir campos.
+  // ─── 8. ACTUALIZAR SubjectProgress según tipo ─────────────────────────────────
   const spArr = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email, subject_id });
   const sp = spArr[0];
 
-  if (type === 'final_exam') {
-    // attemptRecord ya fue guardado exitosamente — ahora sí consumir el unlock
+  if (isFinalExam) {
+    // ⚠️ CRÍTICO: final_exam NO actualiza test_passed ni completed
+    // Eso lo hace reviewEvaluationAttempt cuando el docente aprueba
     const newTestAttempts = (sp?.test_attempts || 0) + 1;
     const spUpdate = {
       test_attempts: newTestAttempts,
-      test_passed: passed === true,
       final_grade: score,
       last_activity: submitted_at,
-      final_exam_unlocked: false, // consumir unlock DESPUÉS de confirmar guardado exitoso
+      final_exam_unlocked: false, // consumir unlock
+      // test_passed y completed NO se tocan — el docente decide
     };
-    if (passed === true) spUpdate.completed = true;
 
     if (sp) {
       await base44.asServiceRole.entities.SubjectProgress.update(sp.id, spUpdate);
@@ -223,9 +232,9 @@ Deno.serve(async (req) => {
       });
     }
   } else if (type === 'mini_eval') {
-    // Señal de refuerzo: contar intentos fallidos desde EvaluationAttempt (fuente de verdad)
+    // Señal de refuerzo
     const failedMiniEvals = existingAttempts.filter(a => a.type === 'mini_eval' && a.passed === false);
-    const requiresReinforcement = !passed && failedMiniEvals.length >= 2; // este es el 3er fallo
+    const requiresReinforcement = !passed && failedMiniEvals.length >= 2;
 
     if (requiresReinforcement && sp) {
       const miniUpdate = { requires_reinforcement: true, last_activity: submitted_at };
@@ -240,90 +249,10 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ─── 9. VERIFICAR FINALIZACIÓN DE CURSO (solo tras examen final aprobado) ────
-  if (type === 'final_exam' && passed === true) {
-    try {
-      // Validación correcta: usar nivel del alumno para obtener materias del plan
-      const upList = await base44.asServiceRole.entities.UserProgress.filter({ user_email });
-      const up = upList[0];
-      if (up && !up.course_completed_at) {
-        const userLevel = up.current_level || 1;
-        
-        // Obtener TODAS las materias de TODOS los niveles (1 a 6) del plan académico
-        const allSubjects = await base44.asServiceRole.entities.Subject.list();
-        const planSubjects = allSubjects.filter(s => s.level >= 1 && s.level <= 6);
-        
-        const allSP = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email });
-        const allCompleted = planSubjects.length > 0 && planSubjects.every(sub => {
-          const sp = allSP.find(s => s.subject_id === sub.id);
-          return sp && sp.completed === true && sp.test_passed === true;
-        });
-        
-        if (allCompleted) {
-          // Actualizar UserProgress a egresado
-          await base44.asServiceRole.entities.UserProgress.update(up.id, {
-            course_completed_at: submitted_at,
-            graduation_status: 'completed',
-          });
-
-          // Crear AcademicRecordSnapshot inmutable
-          try {
-            const userInfo = await base44.asServiceRole.entities.User.filter({ email: user_email });
-            const studentUser = userInfo[0] || {};
-            
-            const materias = planSubjects.map(sub => {
-              const sp = allSP.find(s => s.subject_id === sub.id);
-              return {
-                subject_id: sub.id,
-                subject_name: sub.name,
-                level: sub.level,
-                final_grade: sp?.final_grade || 0,
-                test_passed: sp?.test_passed === true,
-                completed_at: sp?.last_activity || submitted_at,
-              };
-            });
-
-            const grades = materias.filter(m => m.final_grade > 0).map(m => m.final_grade);
-            const promedio_final = grades.length > 0
-              ? Math.round((grades.reduce((s, g) => s + g, 0) / grades.length) * 100) / 100
-              : 0;
-
-            const snapshotContent = {
-              user_email,
-              full_name: studentUser.full_name || user.full_name || '',
-              curp: studentUser.curp || null,
-              fecha_inscripcion: studentUser.created_date || null,
-              course_completed_at: submitted_at,
-              promedio_final,
-              total_subjects: planSubjects.length,
-              subjects_completed: materias.filter(m => m.test_passed).length,
-              materias,
-              version: '1.0',
-            };
-
-            // Calcular hash SHA-256
-            const hashContent = JSON.stringify(snapshotContent);
-            const encoder = new TextEncoder();
-            const data = encoder.encode(hashContent);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const snapshot_hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-            await base44.asServiceRole.entities.AcademicRecordSnapshot.create({
-              ...snapshotContent,
-              integrity_verified: true,
-              generated_by: 'system',
-              snapshot_hash,
-            });
-            console.log('AcademicRecordSnapshot CREATED for', user_email);
-          } catch (snapErr) {
-            console.error('Snapshot creation error:', snapErr.message);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('checkCourseCompletion error:', e.message);
-    }
+  // ─── 9. VERIFICACIÓN DE FINALIZACIÓN DE CURSO (solo si aprobación automática) ─
+  // Para final_exam esto se maneja en reviewEvaluationAttempt
+  if (!isFinalExam && passed === true) {
+    // No aplica para final_exam — se delega al flujo de revisión docente
   }
 
   // ─── 10. RESPUESTA ────────────────────────────────────────────────────────────
@@ -335,9 +264,9 @@ Deno.serve(async (req) => {
     passed,
     correct_answers: correct_count,
     total_questions,
-    requires_manual_review: requires_any_manual_review,
+    requires_manual_review: requiresManualReview,
+    pending_teacher_review: isFinalExam,  // flag explícito para UI del alumno
     graded_answers: gradedAnswers,
-    // campo calculated_score para handleUserEvent (fuente de verdad)
     calculated_score: score,
   });
 });

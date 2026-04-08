@@ -61,12 +61,18 @@ export default function AuditDashboard() {
 
   if (!user) return null;
 
+  // Docentes NO tienen acceso a auditoría — redirigir a su propio panel
+  if (user && user.role === 'docente') {
+    window.location.replace('/TeacherDashboard');
+    return null;
+  }
+
   if (!hasPermission(user, 'audit.access')) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center">
         <AlertTriangle className="w-12 h-12 text-red-400" />
         <h2 className="text-xl font-bold text-gray-800">Acceso denegado</h2>
-        <p className="text-gray-500">Solo administradores y docentes pueden acceder a la Auditoría Académica.</p>
+        <p className="text-gray-500">Solo administradores pueden acceder a la Auditoría Académica.</p>
       </div>
     );
   }
