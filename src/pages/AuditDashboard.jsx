@@ -19,7 +19,7 @@ export default function AuditDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    base44.asServiceRole?.entities?.Subject?.list?.()
+    base44.entities.Subject.list()
       .then(s => setSubjects(s || []))
       .catch(() => {});
   }, [user]);
