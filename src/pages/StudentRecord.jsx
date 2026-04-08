@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, Download, User, GraduationCap, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Download, User, GraduationCap, AlertTriangle, CalendarDays, Trophy } from 'lucide-react';
+import { differenceInDays, differenceInMonths } from 'date-fns';
 import RecordSummaryCards from '@/components/student/RecordSummaryCards';
 import RecordSubjectTable from '@/components/student/RecordSubjectTable';
 import RecordEvalHistory from '@/components/student/RecordEvalHistory';
@@ -170,6 +171,20 @@ export default function StudentRecord() {
 
   const { student, summary, subjects, evaluation_history } = record;
 
+  // Calcular duración total del curso
+  function formatDuration(start, end) {
+    if (!start || !end) return null;
+    const s = new Date(start);
+    const e = new Date(end);
+    const months = differenceInMonths(e, s);
+    const days = differenceInDays(e, s) - months * 30;
+    if (months > 0) return `${months} mes${months !== 1 ? 'es' : ''}${days > 0 ? ` ${days} día${days !== 1 ? 's' : ''}` : ''}`;
+    return `${differenceInDays(e, s)} días`;
+  }
+
+  const isGraduated = student.graduation_status === 'completed';
+  const duration = formatDuration(student.fecha_inscripcion, student.course_completed_at);
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
       {/* Nav */}
@@ -199,12 +214,15 @@ export default function StudentRecord() {
               {student.current_level && (
                 <Badge className="bg-indigo-100 text-indigo-700 text-xs">Nivel {student.current_level}</Badge>
               )}
-              {student.enrollment_date && (
+              {student.fecha_inscripcion && (
                 <Badge variant="outline" className="text-xs">
-                  Ingreso: {format(new Date(student.enrollment_date), 'dd MMM yyyy', { locale: es })}
+                  Inscripción: {format(new Date(student.fecha_inscripcion), 'dd MMM yyyy', { locale: es })}
                 </Badge>
               )}
-              <Badge className="bg-green-100 text-green-700 text-xs">Activo</Badge>
+              {isGraduated
+                ? <Badge className="bg-blue-100 text-blue-700 text-xs gap-1"><Trophy className="w-3 h-3" />Graduado</Badge>
+                : <Badge className="bg-green-100 text-green-700 text-xs">En curso</Badge>
+              }
             </div>
           </div>
         </CardContent>
@@ -212,6 +230,45 @@ export default function StudentRecord() {
 
       {/* Summary cards */}
       <RecordSummaryCards summary={summary} />
+
+      {/* Estado Académico */}
+      <Card className="border-blue-100 bg-gradient-to-r from-blue-50 to-white">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <CalendarDays className="w-4 h-4 text-blue-600" />
+            <h3 className="font-semibold text-gray-800 text-sm">Estado Académico</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Fecha de inscripción</p>
+              <p className="font-medium text-gray-800">
+                {student.fecha_inscripcion
+                  ? format(new Date(student.fecha_inscripcion), 'dd MMM yyyy', { locale: es })
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Fecha de egreso</p>
+              <p className="font-medium text-gray-800">
+                {student.course_completed_at
+                  ? format(new Date(student.course_completed_at), 'dd MMM yyyy', { locale: es })
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Tiempo total cursado</p>
+              <p className="font-medium text-gray-800">{duration || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Estatus</p>
+              {isGraduated
+                ? <Badge className="bg-blue-100 text-blue-700 gap-1 text-xs"><Trophy className="w-3 h-3" />Finalizado</Badge>
+                : <Badge className="bg-green-100 text-green-700 text-xs">En curso</Badge>
+              }
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Subjects table */}
       <RecordSubjectTable subjects={subjects} onSelectAttempt={setSelectedAttempt} />

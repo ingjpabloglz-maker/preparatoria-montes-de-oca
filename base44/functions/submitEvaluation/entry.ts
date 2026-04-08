@@ -230,7 +230,31 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ─── 9. RESPUESTA ─────────────────────────────────────────────────────────────
+  // ─── 9. VERIFICAR FINALIZACIÓN DE CURSO (solo tras examen final aprobado) ────
+  if (type === 'final_exam' && passed === true) {
+    try {
+      const allSubjects = await base44.asServiceRole.entities.Subject.list();
+      const allSP = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email });
+      const allCompleted = allSubjects.every(sub => {
+        const sp = allSP.find(s => s.subject_id === sub.id);
+        return sp && sp.completed === true && sp.test_passed === true;
+      });
+      if (allCompleted) {
+        const upList = await base44.asServiceRole.entities.UserProgress.filter({ user_email });
+        const up = upList[0];
+        if (up && !up.course_completed_at) {
+          await base44.asServiceRole.entities.UserProgress.update(up.id, {
+            course_completed_at: submitted_at,
+            graduation_status: 'completed',
+          });
+        }
+      }
+    } catch (e) {
+      console.error('checkCourseCompletion error:', e.message);
+    }
+  }
+
+  // ─── 10. RESPUESTA ────────────────────────────────────────────────────────────
   return Response.json({
     status: 'ok',
     attempt_id: attemptRecord.id,

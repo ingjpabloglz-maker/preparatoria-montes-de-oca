@@ -165,8 +165,11 @@ Deno.serve(async (req) => {
       email: user_email,
       curp: studentUser.curp || null,
       status: studentUser.status || 'active',
-      enrollment_date: studentUser.created_date || null,
+      fecha_inscripcion: studentUser.created_date || null,
+      enrollment_date: studentUser.created_date || null, // backward compat
       current_level: userProgress.current_level ?? null,
+      course_completed_at: userProgress.course_completed_at || null,
+      graduation_status: userProgress.graduation_status || 'in_progress',
     },
     summary: {
       total_progress: userProgress.total_progress_percent ?? 0,

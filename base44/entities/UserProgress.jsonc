@@ -1,0 +1,87 @@
+{
+  "name": "UserProgress",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario"
+    },
+    "current_level": {
+      "type": "number",
+      "description": "Nivel actual del usuario",
+      "default": 1
+    },
+    "level_start_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de inicio del nivel actual"
+    },
+    "completed_subjects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de materias completadas"
+    },
+    "test_scores": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "number"
+          },
+          "test_number": {
+            "type": "number"
+          },
+          "score": {
+            "type": "number"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "date": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Resultados de pruebas"
+    },
+    "total_progress_percent": {
+      "type": "number",
+      "description": "Porcentaje total de avance"
+    },
+    "blocked_due_to_time": {
+      "type": "boolean",
+      "description": "Indica si el nivel est\u00e1 bloqueado por expiraci\u00f3n de tiempo",
+      "default": false
+    },
+    "course_completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha en que el alumno complet\u00f3 TODAS las materias y ex\u00e1menes finales. Solo se escribe una vez."
+    },
+    "graduation_status": {
+      "type": "string",
+      "enum": [
+        "in_progress",
+        "completed"
+      ],
+      "default": "in_progress",
+      "description": "Estado de egreso del alumno"
+    },
+    "certificate_generated": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el certificado ya fue generado"
+    },
+    "certificate_generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha en que se gener\u00f3 el certificado"
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}

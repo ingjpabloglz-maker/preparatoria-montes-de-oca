@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Eye, Users } from "lucide-react";
+import { Search, Eye, Users, Trophy } from "lucide-react";
 
 const formatName = (s) => {
   const parts = [s.apellido_paterno, s.apellido_materno, s.nombres].filter(Boolean);
@@ -79,6 +79,7 @@ export default function ManageStudents() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Nivel</TableHead>
+                  <TableHead>Estatus</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -91,6 +92,12 @@ export default function ManageStudents() {
                       <TableCell className="text-gray-500">{s.email}</TableCell>
                       <TableCell>
                         <Badge variant="outline">Nivel {prog?.current_level || 1}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {prog?.graduation_status === 'completed'
+                          ? <Badge className="bg-blue-100 text-blue-700 text-xs gap-1"><Trophy className="w-3 h-3" />Graduado</Badge>
+                          : <Badge className="bg-green-100 text-green-700 text-xs">En curso</Badge>
+                        }
                       </TableCell>
                       <TableCell>
                         <Button
