@@ -1,0 +1,51 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ],
+      "default": "user"
+    },
+    "nombres": {
+      "type": "string",
+      "description": "Nombres del alumno"
+    },
+    "apellido_paterno": {
+      "type": "string",
+      "description": "Apellido paterno"
+    },
+    "apellido_materno": {
+      "type": "string",
+      "description": "Apellido materno"
+    },
+    "telefono_personal": {
+      "type": "string",
+      "description": "Tel\u00e9fono de contacto personal"
+    },
+    "telefono_tutor": {
+      "type": "string",
+      "description": "Tel\u00e9fono del tutor (opcional)"
+    },
+    "correo_contacto": {
+      "type": "string",
+      "description": "Correo electr\u00f3nico de contacto"
+    },
+    "curp": {
+      "type": "string",
+      "description": "CURP oficial del alumno (18 caracteres)",
+      "maxLength": 18
+    }
+  },
+  "required": [
+    "nombres",
+    "apellido_paterno",
+    "apellido_materno",
+    "telefono_personal",
+    "telefono_tutor",
+    "correo_contacto"
+  ]
+}

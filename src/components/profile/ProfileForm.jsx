@@ -6,6 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserCircle, Save, Trash2 } from "lucide-react";
 
+const CURP_REGEX = /^[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[A-Z0-9]{2}$/;
+
+function validateCurp(value) {
+  if (!value) return null; // optional
+  if (value.length !== 18) return 'La CURP debe tener exactamente 18 caracteres';
+  if (!CURP_REGEX.test(value)) return 'Formato de CURP inválido';
+  return null;
+}
+
 const TEXT_FIELDS = [
   { key: 'nombres', label: 'Nombres', required: true, type: 'text' },
   { key: 'apellido_paterno', label: 'Apellido Paterno', required: true, type: 'text' },
@@ -31,10 +40,12 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
     telefono_personal: user?.telefono_personal || '',
     telefono_tutor: user?.telefono_tutor || '',
     correo_contacto: user?.correo_contacto || user?.email || '',
+    curp: user?.curp || '',
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [phoneErrors, setPhoneErrors] = useState({});
+  const [curpError, setCurpError] = useState(null);
 
   const handleChange = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -51,18 +62,27 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
     }
   };
 
+  const handleCurpChange = (value) => {
+    const upper = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 18);
+    setForm(prev => ({ ...prev, curp: upper }));
+    setCurpError(validateCurp(upper));
+  };
+
   const isValid = () => {
     const requiredOk = form.nombres && form.apellido_paterno && form.telefono_personal && form.correo_contacto;
     const phonesOk = validatePhone(form.telefono_personal) && validatePhone(form.telefono_tutor);
-    return requiredOk && phonesOk;
+    const curpOk = !validateCurp(form.curp);
+    return requiredOk && phonesOk && curpOk;
   };
 
   const handleSave = async () => {
     setSaving(true);
+    const payload = { ...form };
+    if (!payload.curp) delete payload.curp; // don't overwrite with empty string
     if (mode === 'admin') {
-      await onAdminUpdate?.(form);
+      await onAdminUpdate?.(payload);
     } else {
-      await base44.auth.updateMe(form);
+      await base44.auth.updateMe(payload);
       onSaved?.();
     }
     setSaving(false);
@@ -116,6 +136,42 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
               </div>
             </div>
           ))}
+
+          {/* CURP Field */}
+          <div className="space-y-1 sm:col-span-2">
+            <Label>
+              CURP <span className="text-gray-400 font-normal text-xs">(opcional)</span>
+            </Label>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  value={form.curp}
+                  onChange={(e) => handleCurpChange(e.target.value)}
+                  placeholder="Ej: GOMJ960101HNLPRN09"
+                  maxLength={18}
+                  className={`font-mono uppercase ${curpError ? 'border-red-400' : form.curp.length === 18 && !curpError ? 'border-green-400' : ''}`}
+                />
+                {curpError && <p className="text-xs text-red-500 mt-1">{curpError}</p>}
+                {!curpError && form.curp.length > 0 && form.curp.length < 18 && (
+                  <p className="text-xs text-gray-400 mt-1">{form.curp.length} / 18 caracteres</p>
+                )}
+                {!curpError && form.curp.length === 18 && (
+                  <p className="text-xs text-green-600 mt-1">✓ CURP válida</p>
+                )}
+              </div>
+              {mode === 'admin' && form.curp && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-red-400 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
+                  title="Borrar CURP"
+                  onClick={() => handleClear('curp')}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          </div>
 
           {PHONE_FIELDS.map(({ key, label, required }) => (
             <div key={key} className="space-y-1">
