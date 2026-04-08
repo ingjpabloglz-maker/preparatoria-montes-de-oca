@@ -139,56 +139,7 @@ Deno.serve(async (req) => {
     requires_manual_review: requires_any_manual_review,
   });
 
-  // ─── 6. ACTUALIZAR SubjectProgress según tipo ────────────────────────────────
-  const spArr = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email, subject_id });
-  const sp = spArr[0];
-
-  if (type === 'final_exam') {
-    const newTestAttempts = (sp?.test_attempts || 0) + 1;
-    const spUpdate = {
-      test_attempts: newTestAttempts,
-      test_passed: passed === true,
-      last_activity: submitted_at,
-      final_exam_unlocked: false, // consumir el unlock tras cada intento
-    };
-    if (passed === true) {
-      spUpdate.final_grade = score;
-      spUpdate.completed = true;
-    } else {
-      spUpdate.final_grade = score;
-    }
-
-    if (sp) {
-      await base44.asServiceRole.entities.SubjectProgress.update(sp.id, spUpdate);
-    } else {
-      await base44.asServiceRole.entities.SubjectProgress.create({
-        user_email, subject_id, progress_percent: 0, completed: false, ...spUpdate,
-      });
-    }
-  } else if (type === 'mini_eval') {
-    // Contar intentos fallidos en EvaluationAttempt para señal de refuerzo
-    const failedMiniEvals = existingAttempts.filter(a => a.type === 'mini_eval' && a.passed === false);
-    const requiresReinforcement = !passed && failedMiniEvals.length >= 2; // 3er intento fallido
-
-    const miniUpdate = { last_activity: submitted_at };
-    if (requiresReinforcement) {
-      miniUpdate.requires_reinforcement = true;
-      // Guardar temas fallidos si hay datos de la lección
-      const lessonArr = await base44.asServiceRole.entities.CourseLesson.filter({ id: lesson_id });
-      if (lessonArr[0]?.title) {
-        const prevErrors = sp?.errors_noted || [];
-        if (!prevErrors.includes(lessonArr[0].title)) {
-          miniUpdate.errors_noted = [...prevErrors, lessonArr[0].title];
-        }
-      }
-    }
-
-    if (sp) {
-      await base44.asServiceRole.entities.SubjectProgress.update(sp.id, miniUpdate);
-    }
-  }
-
-  // ─── 7. ACTUALIZAR LessonProgress (resumen UI) ───────────────────────────────
+  // ─── 6. ACTUALIZAR LessonProgress (resumen UI — siempre antes de recalcular %) ─
   const existingLP = await base44.asServiceRole.entities.LessonProgress.filter({ user_email, lesson_id });
   const lessonProgressData = {
     user_email, lesson_id, subject_id, score,
@@ -204,7 +155,9 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.LessonProgress.create({ ...lessonProgressData, module_id });
   }
 
-  // ─── 8. ACTUALIZAR SubjectProgress.progress_percent ─────────────────────────
+  // ─── 7. RECALCULAR progress_percent SIEMPRE (lesson / mini_eval) ─────────────
+  // Se ejecuta DESPUÉS de actualizar LessonProgress para que el conteo sea correcto.
+  // También crea SubjectProgress si no existe aún.
   if (type !== 'final_exam') {
     const [allLessons, completedLessons] = await Promise.all([
       base44.asServiceRole.entities.CourseLesson.filter({ subject_id }),
@@ -217,10 +170,62 @@ Deno.serve(async (req) => {
         return lesson && !lesson.is_mini_eval;
       }).length;
       const progress_percent = Math.round((completedCount / totalCount) * 100);
+
       const spFresh = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email, subject_id });
       if (spFresh[0]) {
-        await base44.asServiceRole.entities.SubjectProgress.update(spFresh[0].id, { progress_percent, last_activity: submitted_at });
+        await base44.asServiceRole.entities.SubjectProgress.update(spFresh[0].id, {
+          progress_percent,
+          last_activity: submitted_at,
+        });
+      } else {
+        // Crear SubjectProgress si aún no existe (primera lección completada)
+        await base44.asServiceRole.entities.SubjectProgress.create({
+          user_email, subject_id, progress_percent,
+          completed: false, last_activity: submitted_at,
+        });
       }
+    }
+  }
+
+  // ─── 8. ACTUALIZAR SubjectProgress según tipo (final_exam / mini_eval signals) ─
+  // Se ejecuta DESPUÉS del recálculo de progress_percent para no sobrescribir campos.
+  const spArr = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email, subject_id });
+  const sp = spArr[0];
+
+  if (type === 'final_exam') {
+    // attemptRecord ya fue guardado exitosamente — ahora sí consumir el unlock
+    const newTestAttempts = (sp?.test_attempts || 0) + 1;
+    const spUpdate = {
+      test_attempts: newTestAttempts,
+      test_passed: passed === true,
+      final_grade: score,
+      last_activity: submitted_at,
+      final_exam_unlocked: false, // consumir unlock DESPUÉS de confirmar guardado exitoso
+    };
+    if (passed === true) spUpdate.completed = true;
+
+    if (sp) {
+      await base44.asServiceRole.entities.SubjectProgress.update(sp.id, spUpdate);
+    } else {
+      await base44.asServiceRole.entities.SubjectProgress.create({
+        user_email, subject_id, progress_percent: 0, completed: false, ...spUpdate,
+      });
+    }
+  } else if (type === 'mini_eval') {
+    // Señal de refuerzo: contar intentos fallidos desde EvaluationAttempt (fuente de verdad)
+    const failedMiniEvals = existingAttempts.filter(a => a.type === 'mini_eval' && a.passed === false);
+    const requiresReinforcement = !passed && failedMiniEvals.length >= 2; // este es el 3er fallo
+
+    if (requiresReinforcement && sp) {
+      const miniUpdate = { requires_reinforcement: true, last_activity: submitted_at };
+      const lessonArr = await base44.asServiceRole.entities.CourseLesson.filter({ id: lesson_id });
+      if (lessonArr[0]?.title) {
+        const prevErrors = sp.errors_noted || [];
+        if (!prevErrors.includes(lessonArr[0].title)) {
+          miniUpdate.errors_noted = [...prevErrors, lessonArr[0].title];
+        }
+      }
+      await base44.asServiceRole.entities.SubjectProgress.update(sp.id, miniUpdate);
     }
   }
 
