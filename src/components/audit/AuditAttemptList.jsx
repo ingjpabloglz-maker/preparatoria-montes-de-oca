@@ -2,9 +2,10 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CheckCircle2, XCircle, Clock, AlertCircle, AlertTriangle, ChevronRight, BookOpen, ChevronLeft } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, AlertCircle, AlertTriangle, ChevronRight, BookOpen, ChevronLeft, FileText } from 'lucide-react';
 
 const TYPE_LABELS = {
   lesson: 'Lección',
@@ -138,11 +139,19 @@ export default function AuditAttemptList({ attempts, loading, onSelect, currentP
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <div className="text-right">
                   <div className="text-lg font-bold text-gray-800">{attempt.score ?? '—'}%</div>
                   <div className="text-xs text-gray-400">{(attempt.answers || []).length} pregs.</div>
                 </div>
+                <Link
+                  to={`/StudentRecord/${encodeURIComponent(attempt.user_email)}`}
+                  onClick={e => e.stopPropagation()}
+                  className="p-1.5 rounded hover:bg-indigo-50 text-indigo-400 hover:text-indigo-600 transition-colors"
+                  title="Ver expediente completo"
+                >
+                  <FileText className="w-4 h-4" />
+                </Link>
                 <ChevronRight className="w-4 h-4 text-gray-300" />
               </div>
             </div>
