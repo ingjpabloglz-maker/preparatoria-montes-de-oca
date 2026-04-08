@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, Download, User, GraduationCap, AlertTriangle, CalendarDays, Trophy } from 'lucide-react';
+import { ArrowLeft, Download, User, GraduationCap, AlertTriangle, CalendarDays, Trophy, Shield } from 'lucide-react';
 import { differenceInDays, differenceInMonths } from 'date-fns';
 import RecordSummaryCards from '@/components/student/RecordSummaryCards';
 import RecordSubjectTable from '@/components/student/RecordSubjectTable';
@@ -182,8 +182,39 @@ export default function StudentRecord() {
     return `${differenceInDays(e, s)} días`;
   }
 
-  const isGraduated = student.graduation_status === 'completed';
+  const isGraduated = student.graduation_status === 'completed' || student.graduation_status === 'certified';
+  const isCertified = student.graduation_status === 'certified';
   const duration = formatDuration(student.fecha_inscripcion, student.course_completed_at);
+
+  // Función para certificar al alumno (admin)
+  async function handleCertifyStudent() {
+    if (isCertified) return;
+    try {
+      await base44.functions.invoke('markStudentAsCertified', { user_email: student.email });
+      loadRecord();
+    } catch (e) {
+      console.error('Error certifying student:', e);
+    }
+  }
+
+  // Función para verificar integridad del snapshot
+  const [verifyingIntegrity, setVerifyingIntegrity] = useState(false);
+  async function handleVerifyIntegrity() {
+    setVerifyingIntegrity(true);
+    try {
+      const res = await base44.functions.invoke('verifyAcademicRecord', { user_email: student.email });
+      console.log('Integrity check:', res.data);
+      if (!res.data?.verified && res.data?.status !== 'no_snapshot') {
+        alert('⚠️ ALERTA: El expediente presenta inconsistencias. Posible manipulación detectada.');
+      } else if (res.data?.verified) {
+        alert('✅ Expediente verificado: Integridad confirmada.');
+      }
+    } catch (e) {
+      console.error('Error verifying integrity:', e);
+    } finally {
+      setVerifyingIntegrity(false);
+    }
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
@@ -192,10 +223,18 @@ export default function StudentRecord() {
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
           <ArrowLeft className="w-4 h-4" /> Volver
         </Button>
-        <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exporting} className="gap-2">
-          <Download className="w-4 h-4" />
-          {exporting ? 'Exportando...' : 'Exportar PDF'}
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exporting} className="gap-2">
+            <Download className="w-4 h-4" />
+            {exporting ? 'Exportando...' : 'Exportar PDF'}
+          </Button>
+          {currentUser.role === 'admin' && isGraduated && (
+            <Button variant="outline" size="sm" onClick={handleVerifyIntegrity} disabled={verifyingIntegrity} className="gap-2">
+              <Shield className="w-4 h-4" />
+              {verifyingIntegrity ? 'Verificando...' : 'Verificar Integridad'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Header alumno */}
@@ -219,9 +258,13 @@ export default function StudentRecord() {
                   Inscripción: {format(new Date(student.fecha_inscripcion), 'dd MMM yyyy', { locale: es })}
                 </Badge>
               )}
-              {isGraduated
-                ? <Badge className="bg-blue-100 text-blue-700 text-xs gap-1"><Trophy className="w-3 h-3" />Graduado</Badge>
-                : <Badge className="bg-green-100 text-green-700 text-xs">En curso</Badge>
+              {isCertified
+                ? <Badge className="bg-purple-100 text-purple-700 text-xs gap-1"><Trophy className="w-3 h-3" />Certificado</Badge>
+                : isGraduated
+                  ? <Badge className="bg-blue-100 text-blue-700 text-xs gap-1"><Trophy className="w-3 h-3" />Egresado</Badge>
+                  : student.graduation_status === 'in_progress'
+                    ? <Badge className="bg-green-100 text-green-700 text-xs">En curso</Badge>
+                    : <Badge className="bg-gray-100 text-gray-600 text-xs">Inscrito</Badge>
               }
             </div>
           </div>
@@ -261,12 +304,32 @@ export default function StudentRecord() {
             </div>
             <div>
               <p className="text-xs text-gray-400 mb-1">Estatus</p>
-              {isGraduated
-                ? <Badge className="bg-blue-100 text-blue-700 gap-1 text-xs"><Trophy className="w-3 h-3" />Finalizado</Badge>
-                : <Badge className="bg-green-100 text-green-700 text-xs">En curso</Badge>
+              {isCertified
+                ? <Badge className="bg-purple-100 text-purple-700 gap-1 text-xs"><Trophy className="w-3 h-3" />Certificado</Badge>
+                : isGraduated
+                  ? <Badge className="bg-blue-100 text-blue-700 gap-1 text-xs"><Trophy className="w-3 h-3" />Egresado</Badge>
+                  : student.graduation_status === 'in_progress'
+                    ? <Badge className="bg-green-100 text-green-700 text-xs">En curso</Badge>
+                    : <Badge className="bg-gray-100 text-gray-600 text-xs">Inscrito</Badge>
               }
             </div>
           </div>
+
+          {currentUser.role === 'admin' && isGraduated && !isCertified && (
+            <div className="mt-4 pt-4 border-t border-blue-100 flex justify-end">
+              <Button 
+                onClick={handleCertifyStudent} 
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                Marcar como Certificado
+              </Button>
+            </div>
+          )}
+          {isCertified && student.certificate_validated_at && (
+            <div className="mt-4 pt-4 border-t border-blue-100 text-xs text-gray-500">
+              Certificado validado el {format(new Date(student.certificate_validated_at), 'dd MMM yyyy', { locale: es })}
+            </div>
+          )}
         </CardContent>
       </Card>
 

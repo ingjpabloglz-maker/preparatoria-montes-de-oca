@@ -94,9 +94,13 @@ export default function ManageStudents() {
                         <Badge variant="outline">Nivel {prog?.current_level || 1}</Badge>
                       </TableCell>
                       <TableCell>
-                        {prog?.graduation_status === 'completed'
-                          ? <Badge className="bg-blue-100 text-blue-700 text-xs gap-1"><Trophy className="w-3 h-3" />Graduado</Badge>
-                          : <Badge className="bg-green-100 text-green-700 text-xs">En curso</Badge>
+                        {prog?.graduation_status === 'certified'
+                          ? <Badge className="bg-purple-100 text-purple-700 text-xs gap-1"><Trophy className="w-3 h-3" />🟣 Certificado</Badge>
+                          : prog?.graduation_status === 'completed'
+                            ? <Badge className="bg-blue-100 text-blue-700 text-xs gap-1"><Trophy className="w-3 h-3" />🔵 Egresado</Badge>
+                            : prog?.graduation_status === 'in_progress'
+                              ? <Badge className="bg-green-100 text-green-700 text-xs">🟢 En curso</Badge>
+                              : <Badge className="bg-gray-100 text-gray-600 text-xs">Inscrito</Badge>
                         }
                       </TableCell>
                       <TableCell>

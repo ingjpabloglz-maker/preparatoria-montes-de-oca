@@ -430,6 +430,15 @@ Deno.serve(async (req) => {
   const nowIso = new Date().toISOString();
   const currentMinute = nowIso.substring(0, 16);
 
+  // ─── 0. BLOQUEO GLOBAL POST-EGRESO ─────────────────────────────────────────
+  const upCheck = await base44.asServiceRole.entities.UserProgress.filter({ user_email });
+  if (upCheck[0]?.graduation_status === 'completed' || upCheck[0]?.graduation_status === 'certified') {
+    return Response.json({
+      status: 'ignored',
+      message: 'El alumno ya egresó. Se ignora la gamificación.',
+    });
+  }
+
   // ─── 1. IDEMPOTENCIA: registrar evento antes de procesar ─────────────────
   try {
     await base44.asServiceRole.entities.ProcessedEvent.create({

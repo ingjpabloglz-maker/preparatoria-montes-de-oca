@@ -59,26 +59,28 @@
     "course_completed_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Fecha en que el alumno complet\u00f3 TODAS las materias y ex\u00e1menes finales. Solo se escribe una vez."
+      "description": "Fecha en que el alumno complet\u00f3 TODO el plan acad\u00e9mico. Solo se escribe una vez."
     },
     "graduation_status": {
       "type": "string",
       "enum": [
+        "enrolled",
         "in_progress",
-        "completed"
+        "completed",
+        "certified"
       ],
-      "default": "in_progress",
-      "description": "Estado de egreso del alumno"
+      "default": "enrolled",
+      "description": "Estado de egreso: enrolled=inscrito, in_progress=cursando, completed=egresado, certified=certificado"
     },
-    "certificate_generated": {
+    "certificate_validated_by_school": {
       "type": "boolean",
       "default": false,
-      "description": "Si el certificado ya fue generado"
+      "description": "Si el plantel valid\u00f3 y certific\u00f3 oficialmente"
     },
-    "certificate_generated_at": {
+    "certificate_validated_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Fecha en que se gener\u00f3 el certificado"
+      "description": "Fecha cuando el plantel valid\u00f3 la certificaci\u00f3n"
     }
   },
   "required": [

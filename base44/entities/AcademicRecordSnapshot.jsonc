@@ -1,0 +1,93 @@
+{
+  "name": "AcademicRecordSnapshot",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del alumno"
+    },
+    "full_name": {
+      "type": "string",
+      "description": "Nombre completo del alumno al momento del egreso"
+    },
+    "curp": {
+      "type": "string",
+      "description": "CURP validada del alumno"
+    },
+    "fecha_inscripcion": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de inscripci\u00f3n del alumno"
+    },
+    "course_completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de egreso / terminaci\u00f3n del curso"
+    },
+    "promedio_final": {
+      "type": "number",
+      "description": "Promedio general de calificaciones finales"
+    },
+    "total_subjects": {
+      "type": "number",
+      "description": "Total de materias en el plan acad\u00e9mico"
+    },
+    "subjects_completed": {
+      "type": "number",
+      "description": "Total de materias aprobadas"
+    },
+    "materias": {
+      "type": "array",
+      "description": "Detalle de cada materia con calificaci\u00f3n final",
+      "items": {
+        "type": "object",
+        "properties": {
+          "subject_id": {
+            "type": "string"
+          },
+          "subject_name": {
+            "type": "string"
+          },
+          "level": {
+            "type": "number"
+          },
+          "final_grade": {
+            "type": "number"
+          },
+          "test_passed": {
+            "type": "boolean"
+          },
+          "completed_at": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "version": {
+      "type": "string",
+      "default": "1.0",
+      "description": "Versi\u00f3n del snapshot para compatibilidad futura"
+    },
+    "integrity_verified": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el hash fue verificado exitosamente"
+    },
+    "generated_by": {
+      "type": "string",
+      "default": "system",
+      "description": "Sistema que gener\u00f3 el snapshot"
+    },
+    "snapshot_hash": {
+      "type": "string",
+      "description": "Hash SHA-256 del contenido del snapshot para integridad"
+    }
+  },
+  "required": [
+    "user_email",
+    "full_name",
+    "course_completed_at",
+    "promedio_final",
+    "materias"
+  ]
+}

@@ -62,6 +62,16 @@ Deno.serve(async (req) => {
   const user_email = user.email;
   const submitted_at = new Date().toISOString();
 
+  // ─── 0. BLOQUEO GLOBAL POST-EGRESO ─────────────────────────────────────────
+  const upCheck = await base44.asServiceRole.entities.UserProgress.filter({ user_email });
+  if (upCheck[0]?.graduation_status === 'completed' || upCheck[0]?.graduation_status === 'certified') {
+    return Response.json({
+      error: 'GRADUATION_LOCKED',
+      message: 'El alumno ya egresó. No se permiten más evaluaciones.',
+      is_blocked: true,
+    }, { status: 403 });
+  }
+
   // ─── 1. CONTROL DE INTENTOS POR TIPO ────────────────────────────────────────
   const existingAttempts = await base44.asServiceRole.entities.EvaluationAttempt.filter({
     user_email, lesson_id,
@@ -233,20 +243,82 @@ Deno.serve(async (req) => {
   // ─── 9. VERIFICAR FINALIZACIÓN DE CURSO (solo tras examen final aprobado) ────
   if (type === 'final_exam' && passed === true) {
     try {
-      const allSubjects = await base44.asServiceRole.entities.Subject.list();
-      const allSP = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email });
-      const allCompleted = allSubjects.every(sub => {
-        const sp = allSP.find(s => s.subject_id === sub.id);
-        return sp && sp.completed === true && sp.test_passed === true;
-      });
-      if (allCompleted) {
-        const upList = await base44.asServiceRole.entities.UserProgress.filter({ user_email });
-        const up = upList[0];
-        if (up && !up.course_completed_at) {
+      // Validación correcta: usar nivel del alumno para obtener materias del plan
+      const upList = await base44.asServiceRole.entities.UserProgress.filter({ user_email });
+      const up = upList[0];
+      if (up && !up.course_completed_at) {
+        const userLevel = up.current_level || 1;
+        
+        // Obtener TODAS las materias de TODOS los niveles (1 a 6) del plan académico
+        const allSubjects = await base44.asServiceRole.entities.Subject.list();
+        const planSubjects = allSubjects.filter(s => s.level >= 1 && s.level <= 6);
+        
+        const allSP = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email });
+        const allCompleted = planSubjects.length > 0 && planSubjects.every(sub => {
+          const sp = allSP.find(s => s.subject_id === sub.id);
+          return sp && sp.completed === true && sp.test_passed === true;
+        });
+        
+        if (allCompleted) {
+          // Actualizar UserProgress a egresado
           await base44.asServiceRole.entities.UserProgress.update(up.id, {
             course_completed_at: submitted_at,
             graduation_status: 'completed',
           });
+
+          // Crear AcademicRecordSnapshot inmutable
+          try {
+            const userInfo = await base44.asServiceRole.entities.User.filter({ email: user_email });
+            const studentUser = userInfo[0] || {};
+            
+            const materias = planSubjects.map(sub => {
+              const sp = allSP.find(s => s.subject_id === sub.id);
+              return {
+                subject_id: sub.id,
+                subject_name: sub.name,
+                level: sub.level,
+                final_grade: sp?.final_grade || 0,
+                test_passed: sp?.test_passed === true,
+                completed_at: sp?.last_activity || submitted_at,
+              };
+            });
+
+            const grades = materias.filter(m => m.final_grade > 0).map(m => m.final_grade);
+            const promedio_final = grades.length > 0
+              ? Math.round((grades.reduce((s, g) => s + g, 0) / grades.length) * 100) / 100
+              : 0;
+
+            const snapshotContent = {
+              user_email,
+              full_name: studentUser.full_name || user.full_name || '',
+              curp: studentUser.curp || null,
+              fecha_inscripcion: studentUser.created_date || null,
+              course_completed_at: submitted_at,
+              promedio_final,
+              total_subjects: planSubjects.length,
+              subjects_completed: materias.filter(m => m.test_passed).length,
+              materias,
+              version: '1.0',
+            };
+
+            // Calcular hash SHA-256
+            const hashContent = JSON.stringify(snapshotContent);
+            const encoder = new TextEncoder();
+            const data = encoder.encode(hashContent);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const snapshot_hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+            await base44.asServiceRole.entities.AcademicRecordSnapshot.create({
+              ...snapshotContent,
+              integrity_verified: true,
+              generated_by: 'system',
+              snapshot_hash,
+            });
+            console.log('AcademicRecordSnapshot CREATED for', user_email);
+          } catch (snapErr) {
+            console.error('Snapshot creation error:', snapErr.message);
+          }
         }
       }
     } catch (e) {

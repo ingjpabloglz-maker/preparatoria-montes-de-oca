@@ -169,7 +169,9 @@ Deno.serve(async (req) => {
       enrollment_date: studentUser.created_date || null, // backward compat
       current_level: userProgress.current_level ?? null,
       course_completed_at: userProgress.course_completed_at || null,
-      graduation_status: userProgress.graduation_status || 'in_progress',
+      graduation_status: userProgress.graduation_status || 'enrolled',
+      certificate_validated_at: userProgress.certificate_validated_at || null,
+      certificate_validated_by_school: userProgress.certificate_validated_by_school || false,
     },
     summary: {
       total_progress: userProgress.total_progress_percent ?? 0,
