@@ -1,69 +1,133 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
-import { jsPDF } from 'npm:jspdf@4.0.0';
+import PDFDocument from 'npm:pdfkit@0.15.0';
 
 const crypto = globalThis.crypto;
 
-/**
- * Genera PDF auditable tipo SEP con trazabilidad completa
- * 
- * Input: user_email
- * Output: PDF descargable
- * 
- * Incluye:
- * - Encabezado institucional (RVOE, modalidad, folio)
- * - Identificación alumno (CURP, estatus académico)
- * - Resumen académico
- * - Detalle por materia
- * - Historial de evaluaciones (resuelto con nombres)
- * - Bloque crítico: Exámenes finales presenciales
- * - Hash de integridad SHA-256
- */
+// ── Datos institucionales oficiales ──────────────────────────────────────────
+const INSTITUCION = {
+  nombre:       'ESCUELA PREPARATORIA FERNANDO MONTES DE OCA',
+  cct:          '28PBH0301U',
+  estado:       'Tamaulipas',
+  municipio:    'Reynosa',
+  plan:         'Bachillerato General',
+  nivel:        'Bachillerato General',
+  modalidad:    'No escolarizada',
+  opcion:       'Intensiva',
+  rvoe:         'NMS/02/01/2010',
+  autoridad:    'Ejecutivo del Estado de Tamaulipas',
+};
 
-async function calculateSHA256(data) {
-  const msgBuffer = new TextEncoder().encode(data);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+// ── Utilidades ────────────────────────────────────────────────────────────────
+async function sha256(data) {
+  const buf = new TextEncoder().encode(data);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function safe(str, maxLen = 200) {
+  if (!str && str !== 0) return '\u2014';
+  return String(str).substring(0, maxLen) || '\u2014';
 }
 
 function formatDate(isoStr) {
-  if (!isoStr) return '—';
-  const d = new Date(isoStr);
-  return `${d.toLocaleDateString('es-MX')} ${d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`;
+  if (!isoStr) return '\u2014';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d)) return '\u2014';
+    return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      + ' ' + d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  } catch { return '\u2014'; }
 }
 
-function secondsToTime(seconds) {
-  if (!seconds && seconds !== 0) return '—';
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}m ${s}s`;
+function formatDateShort(isoStr) {
+  if (!isoStr) return '\u2014';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d)) return '\u2014';
+    return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch { return '\u2014'; }
 }
 
-function minutesToHours(minutes) {
-  if (!minutes) return '0h';
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+function secondsToTime(s) {
+  if (!s && s !== 0) return '\u2014';
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
+function minutesToHours(m) {
+  if (!m) return '0h';
+  const h = Math.floor(m / 60), rem = m % 60;
+  return rem > 0 ? `${h}h ${rem}m` : `${h}h`;
+}
+
+// Convierte el PDF stream (PDFKit) a ArrayBuffer
+function streamToBuffer(doc) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => {
+      const total = chunks.reduce((sum, c) => sum + c.length, 0);
+      const buf = new Uint8Array(total);
+      let offset = 0;
+      for (const c of chunks) { buf.set(c, offset); offset += c.length; }
+      resolve(buf.buffer);
+    });
+    doc.on('error', reject);
+  });
+}
+
+// ── Helpers de dibujo ─────────────────────────────────────────────────────────
+const MARGIN   = 40;
+const COL_LABEL = MARGIN;
+const COL_VALUE = MARGIN + 145;
+const PAGE_W    = 595.28;  // A4 points
+const PAGE_H    = 841.89;
+const CONTENT_W = PAGE_W - MARGIN * 2;
+
+function drawSeparator(doc, y, color = '#BBBBBB') {
+  doc.save().strokeColor(color).lineWidth(0.5).moveTo(MARGIN, y).lineTo(PAGE_W - MARGIN, y).stroke().restore();
+  return y + 8;
+}
+
+function sectionTitle(doc, title, y) {
+  // Fondo gris claro
+  doc.save()
+    .fillColor('#F0F0F0')
+    .rect(MARGIN - 4, y - 10, CONTENT_W + 8, 16)
+    .fill()
+    .restore();
+  doc.font('Helvetica-Bold').fontSize(9).fillColor('#1A1A1A').text(title, MARGIN, y - 7, { width: CONTENT_W });
+  return y + 12;
+}
+
+function labelValue(doc, label, value, y, labelWidth = 140) {
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#333333').text(label + ':', COL_LABEL, y, { width: labelWidth, lineBreak: false });
+  doc.font('Helvetica').fontSize(8).fillColor('#111111').text(safe(value, 120), COL_LABEL + labelWidth, y, { width: CONTENT_W - labelWidth });
+  return y + 13;
+}
+
+function checkPage(doc, y, needed = 40) {
+  if (y + needed > PAGE_H - 50) {
+    doc.addPage();
+    return MARGIN + 10;
+  }
+  return y;
+}
+
+// ── Handler principal ─────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
     const userEmail = body.user_email || user.email;
 
-    // Verificar permiso: solo admin o el usuario mismo
-    if (user.role !== 'admin' && user.email !== userEmail) {
+    if (user.role !== 'admin' && user.role !== 'docente' && user.email !== userEmail) {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Cargar datos
+    // ── Carga de datos ──
     const [userData, userProgress, subjectProgressList, evaluationAttempts, subjects, modules, lessons] = await Promise.all([
       base44.asServiceRole.entities.User.filter({ email: userEmail }).then(r => r[0]),
       base44.asServiceRole.entities.UserProgress.filter({ user_email: userEmail }).then(r => r[0]),
@@ -74,346 +138,335 @@ Deno.serve(async (req) => {
       base44.asServiceRole.entities.CourseLesson.list(),
     ]);
 
-    if (!userData) {
-      return Response.json({ error: 'User not found' }, { status: 404 });
+    if (!userData) return Response.json({ error: 'User not found' }, { status: 404 });
+
+    const subjectMap = new Map(subjects.map(s => [s.id, s]));
+    const lessonMap  = new Map(lessons.map(l => [l.id, l]));
+
+    const timeTotalMinutes = subjectProgressList.reduce((s, sp) => s + (sp.time_spent_minutes || 0), 0);
+    const sortedAttempts   = [...evaluationAttempts].sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+
+    // ── Hash de integridad ──
+    const integrityHash = await sha256(JSON.stringify({
+      user_email:       userEmail,
+      full_name:        userData.full_name,
+      timestamp:        new Date().toISOString(),
+      subject_count:    subjectProgressList.length,
+      evaluation_count: evaluationAttempts.length,
+    }));
+    const folio = integrityHash.substring(0, 12).toUpperCase();
+
+    // ── Crear documento PDF ──
+    const doc = new PDFDocument({ size: 'A4', margins: { top: MARGIN, bottom: 40, left: MARGIN, right: MARGIN }, bufferPages: true });
+    const bufferPromise = streamToBuffer(doc);
+
+    let y = MARGIN + 10;
+
+    // ══════════════════════════════════════════════════════════
+    // 1. ENCABEZADO INSTITUCIONAL
+    // ══════════════════════════════════════════════════════════
+    // Barra superior de color
+    doc.save().fillColor('#1A3A5C').rect(0, 0, PAGE_W, 6).fill().restore();
+
+    doc.font('Helvetica-Bold').fontSize(13).fillColor('#1A3A5C')
+      .text('EXPEDIENTE ACADEMICO OFICIAL - AUDITORIA SEP', MARGIN, y, { align: 'center', width: CONTENT_W });
+    y += 18;
+
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#1A3A5C')
+      .text(INSTITUCION.nombre, MARGIN, y, { align: 'center', width: CONTENT_W });
+    y += 14;
+
+    // Grid de datos institucionales (2 columnas)
+    doc.save().fillColor('#EAF1FB').rect(MARGIN - 4, y - 4, CONTENT_W + 8, 70).fill().restore();
+
+    const half = CONTENT_W / 2;
+    const institucionalLeft = [
+      ['CCT',                INSTITUCION.cct],
+      ['Estado',             INSTITUCION.estado],
+      ['Municipio',          INSTITUCION.municipio],
+      ['Plan de estudios',   INSTITUCION.plan],
+    ];
+    const institucionalRight = [
+      ['Modalidad',          INSTITUCION.modalidad],
+      ['Opcion educativa',   INSTITUCION.opcion],
+      ['Num. Acuerdo RVOE',  INSTITUCION.rvoe],
+      ['Autoridad de emision', INSTITUCION.autoridad],
+    ];
+
+    let yL = y, yR = y;
+    const colL = MARGIN, colR = MARGIN + half + 5;
+    for (let i = 0; i < institucionalLeft.length; i++) {
+      doc.font('Helvetica-Bold').fontSize(7).fillColor('#444').text(institucionalLeft[i][0] + ':', colL, yL, { width: 85, lineBreak: false });
+      doc.font('Helvetica').fontSize(7).fillColor('#111').text(safe(institucionalLeft[i][1], 60), colL + 88, yL, { width: half - 92 });
+      doc.font('Helvetica-Bold').fontSize(7).fillColor('#444').text(institucionalRight[i][0] + ':', colR, yR, { width: 95, lineBreak: false });
+      doc.font('Helvetica').fontSize(7).fillColor('#111').text(safe(institucionalRight[i][1], 80), colR + 98, yR, { width: half - 102 });
+      yL += 11; yR += 11;
+    }
+    y = Math.max(yL, yR) + 8;
+
+    // Folio y fecha de generación
+    doc.save().fillColor('#1A3A5C').rect(MARGIN - 4, y, CONTENT_W + 8, 14).fill().restore();
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFFFFF')
+      .text(`Folio del Expediente: ${folio}`, MARGIN, y + 4, { width: half, lineBreak: false });
+    doc.font('Helvetica').fontSize(7.5).fillColor('#FFFFFF')
+      .text(`Fecha de generacion: ${formatDate(new Date().toISOString())}`, MARGIN + half, y + 4, { align: 'right', width: half });
+    y += 22;
+
+    y = drawSeparator(doc, y);
+
+    // ══════════════════════════════════════════════════════════
+    // 2. IDENTIFICACION DEL ALUMNO
+    // ══════════════════════════════════════════════════════════
+    y = checkPage(doc, y, 80);
+    y = sectionTitle(doc, '1. IDENTIFICACION DEL ALUMNO', y);
+
+    const graduationLabels = { enrolled: 'Inscrito', in_progress: 'Cursando', completed: 'Egresado', certified: 'Certificado' };
+    const alumnoRows = [
+      ['Nombre completo',   safe(userData.full_name)],
+      ['CURP',              safe(userData.curp)],
+      ['Correo electronico',safe(userData.email)],
+      ['Fecha de inscripcion', formatDate(userData.created_date)],
+      ['Estatus academico', graduationLabels[userProgress?.graduation_status] || safe(userProgress?.graduation_status) || 'Inscrito'],
+    ];
+    if (userProgress?.course_completed_at) {
+      alumnoRows.push(['Fecha de egreso', formatDate(userProgress.course_completed_at)]);
+    }
+    for (const [label, value] of alumnoRows) {
+      y = checkPage(doc, y, 18);
+      y = labelValue(doc, label, value, y);
     }
 
-    // Mapeos para resolución de nombres
-    const subjectMap = new Map(subjects.map(s => [s.id, s]));
-    const moduleMap = new Map(modules.map(m => [m.id, m]));
-    const lessonMap = new Map(lessons.map(l => [l.id, l]));
+    y += 4;
+    y = drawSeparator(doc, y);
 
-    // Calcular tiempo total invertido
-    const timeTotalMinutes = subjectProgressList.reduce((sum, sp) => sum + (sp.time_spent_minutes || 0), 0);
-    const timeTotalHours = minutesToHours(timeTotalMinutes);
+    // ══════════════════════════════════════════════════════════
+    // 3. RESUMEN ACADEMICO
+    // ══════════════════════════════════════════════════════════
+    y = checkPage(doc, y, 70);
+    y = sectionTitle(doc, '2. RESUMEN ACADEMICO', y);
 
-    // Datos para hash
-    const hashData = JSON.stringify({
-      user_email: userEmail,
-      full_name: userData.full_name,
-      timestamp: new Date().toISOString(),
-      subject_count: subjectProgressList.length,
-      evaluation_count: evaluationAttempts.length,
-    });
-    const integrityHash = await calculateSHA256(hashData);
+    const completadas = subjectProgressList.filter(s => s.completed).length;
+    const promedioFinal = subjectProgressList.length > 0
+      ? (subjectProgressList.reduce((s, sp) => s + (sp.final_grade || 0), 0) / subjectProgressList.length).toFixed(1)
+      : '\u2014';
 
-    // Crear PDF
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-    });
+    const resumenRows = [
+      ['Progreso general',       `${userProgress?.total_progress_percent || 0}%`],
+      ['Materias completadas',   `${completadas} de ${subjectProgressList.length}`],
+      ['Promedio general',       promedioFinal !== '\u2014' ? `${promedioFinal}` : '\u2014'],
+      ['Tiempo total invertido', minutesToHours(timeTotalMinutes)],
+      ['Total evaluaciones',     `${evaluationAttempts.length}`],
+    ];
+    for (const [label, value] of resumenRows) {
+      y = checkPage(doc, y, 18);
+      y = labelValue(doc, label, value, y);
+    }
 
-    let y = 15;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
-    const contentWidth = pageWidth - 2 * margin;
+    y += 4;
+    y = drawSeparator(doc, y);
 
-    // Helper: nueva página si es necesario
-    function checkNewPage(minSpace = 30) {
-      if (y + minSpace > doc.internal.pageSize.getHeight() - 10) {
-        doc.addPage();
-        y = 15;
+    // ══════════════════════════════════════════════════════════
+    // 4. DETALLE POR MATERIA
+    // ══════════════════════════════════════════════════════════
+    y = checkPage(doc, y, 40);
+    y = sectionTitle(doc, '3. DETALLE POR MATERIA', y);
+
+    if (subjectProgressList.length === 0) {
+      doc.font('Helvetica').fontSize(8).fillColor('#666').text('Sin materias registradas.', MARGIN, y);
+      y += 14;
+    } else {
+      // Encabezados de tabla
+      const tCols = [MARGIN, MARGIN + 110, MARGIN + 155, MARGIN + 205, MARGIN + 255, MARGIN + 305];
+      const tHeaders = ['Materia', 'Nivel', 'Avance', 'Calificacion', 'Examen', 'Intentos'];
+      doc.save().fillColor('#1A3A5C').rect(MARGIN - 2, y - 2, CONTENT_W + 4, 13).fill().restore();
+      tHeaders.forEach((h, i) => {
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#FFFFFF').text(h, tCols[i], y, { width: 50, lineBreak: false });
+      });
+      y += 14;
+
+      subjectProgressList.forEach((sp, idx) => {
+        y = checkPage(doc, y, 14);
+        const subject = subjectMap.get(sp.subject_id);
+        if (idx % 2 === 0) {
+          doc.save().fillColor('#F7FAFD').rect(MARGIN - 2, y - 2, CONTENT_W + 4, 12).fill().restore();
+        }
+        const cols = [
+          safe(subject?.name, 28),
+          safe(subject?.level),
+          `${sp.progress_percent || 0}%`,
+          sp.final_grade != null ? String(sp.final_grade.toFixed(1)) : '\u2014',
+          sp.test_passed ? 'Aprobado' : sp.final_exam_status === 'pending_review' ? 'Revision' : 'Pendiente',
+          String(sp.test_attempts || 0),
+        ];
+        cols.forEach((c, i) => {
+          doc.font('Helvetica').fontSize(7).fillColor('#111').text(c, tCols[i], y, { width: 50, lineBreak: false });
+        });
+        y += 12;
+      });
+    }
+
+    y += 6;
+    y = drawSeparator(doc, y);
+
+    // ══════════════════════════════════════════════════════════
+    // 5. HISTORIAL DE EVALUACIONES
+    // ══════════════════════════════════════════════════════════
+    y = checkPage(doc, y, 40);
+    y = sectionTitle(doc, '4. HISTORIAL DE EVALUACIONES', y);
+
+    if (sortedAttempts.length === 0) {
+      doc.font('Helvetica').fontSize(8).fillColor('#666').text('Sin evaluaciones registradas.', MARGIN, y);
+      y += 14;
+    } else {
+      const eCols  = [MARGIN, MARGIN + 62, MARGIN + 100, MARGIN + 195, MARGIN + 240, MARGIN + 290];
+      const eHeaders = ['Fecha', 'Tipo', 'Materia', 'Calificacion', 'Estado', 'Revision'];
+      doc.save().fillColor('#1A3A5C').rect(MARGIN - 2, y - 2, CONTENT_W + 4, 13).fill().restore();
+      eHeaders.forEach((h, i) => {
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#FFFFFF').text(h, eCols[i], y, { width: 60, lineBreak: false });
+      });
+      y += 14;
+
+      sortedAttempts.forEach((attempt, idx) => {
+        y = checkPage(doc, y, 12);
+        if (idx % 2 === 0) {
+          doc.save().fillColor('#F7FAFD').rect(MARGIN - 2, y - 2, CONTENT_W + 4, 12).fill().restore();
+        }
+        const subject   = subjectMap.get(attempt.subject_id);
+        const typeLabel = attempt.type === 'final_exam' ? 'Examen Final' : attempt.type === 'mini_eval' ? 'Mini-Eval' : 'Leccion';
+        const stateLabel= attempt.passed ? 'Aprobado' : attempt.requires_manual_review ? 'Revision' : 'No aprobado';
+        const reviewLabel = attempt.review_decision === 'approved' ? 'Aprobado' : attempt.review_decision === 'rejected' ? 'Rechazado' : '\u2014';
+        const row = [
+          formatDateShort(attempt.submitted_at),
+          typeLabel,
+          safe(subject?.name, 16),
+          attempt.score != null ? `${attempt.score}%` : '\u2014',
+          stateLabel,
+          reviewLabel,
+        ];
+        row.forEach((c, i) => {
+          doc.font('Helvetica').fontSize(7).fillColor('#111').text(c, eCols[i], y, { width: 58, lineBreak: false });
+        });
+        y += 12;
+      });
+    }
+
+    y += 6;
+    y = drawSeparator(doc, y);
+
+    // ══════════════════════════════════════════════════════════
+    // 6. EXAMENES FINALES PRESENCIALES
+    // ══════════════════════════════════════════════════════════
+    const finalExams = sortedAttempts.filter(a => a.type === 'final_exam');
+    y = checkPage(doc, y, 40);
+    y = sectionTitle(doc, '5. EXAMENES FINALES - SUPERVISION PRESENCIAL', y);
+
+    if (finalExams.length === 0) {
+      doc.font('Helvetica').fontSize(8).fillColor('#666').text('Sin examenes finales presenciales registrados.', MARGIN, y);
+      y += 14;
+    } else {
+      for (const attempt of finalExams) {
+        y = checkPage(doc, y, 90);
+        const subject = subjectMap.get(attempt.subject_id);
+
+        // Cabecera de materia
+        doc.save().fillColor('#2C5282').rect(MARGIN - 2, y - 2, CONTENT_W + 4, 13).fill().restore();
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFF')
+          .text(`Materia: ${safe(subject?.name)}`, MARGIN, y, { width: CONTENT_W });
+        y += 16;
+
+        const examRows = [
+          ['Fecha de envio',         formatDate(attempt.submitted_at)],
+          ['Calificacion',           attempt.score != null ? `${attempt.score}%` : '\u2014'],
+          ['Estado',                 attempt.passed ? 'Aprobado' : attempt.requires_manual_review ? 'Pendiente revision' : 'No aprobado'],
+          ['Token (codigo)',          safe(attempt.token_code)],
+          ['Docente generador',      safe(attempt.validated_by_name)],
+          ['Token validado en',      formatDate(attempt.token_validated_at)],
+          ['Inicio real del examen', formatDate(attempt.exam_started_at)],
+          ['Duracion del examen',    secondsToTime(attempt.duration_seconds)],
+          ['Metodo de validacion',   'Token presencial'],
+          ['IP de validacion',       safe(attempt.ip_address)],
+          ['Dispositivo',            safe((attempt.device_info || '').substring(0, 60))],
+        ];
+        for (const [label, value] of examRows) {
+          y = checkPage(doc, y, 14);
+          y = labelValue(doc, label, value, y);
+        }
+        y += 4;
+        y = drawSeparator(doc, y, '#AACCEE');
       }
     }
 
-    // ========== 1. ENCABEZADO INSTITUCIONAL ==========
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text('EXPEDIENTE ACADÉMICO OFICIAL PARA AUDITORÍA', margin, y, { maxWidth: contentWidth, align: 'center' });
-    y += 12;
+    // ══════════════════════════════════════════════════════════
+    // 7. VALIDACION DE INTEGRIDAD
+    // ══════════════════════════════════════════════════════════
+    y = checkPage(doc, y, 60);
+    y = sectionTitle(doc, '6. VALIDACION DE INTEGRIDAD DEL EXPEDIENTE', y);
 
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(9);
-    const headerData = [
-      ['Institución', 'Preparatoria SEP'],
-      ['RVOE', 'Registrado ante SEP'],
-      ['Modalidad', 'No escolarizada (80% en línea / 20% presencial)'],
-      ['Folio del Expediente', integrityHash.substring(0, 12).toUpperCase()],
-      ['Fecha de Generación', formatDate(new Date().toISOString())],
+    const intRows = [
+      ['Hash SHA-256', integrityHash.substring(0, 40) + '...'],
+      ['Hash completo', integrityHash],
+      ['Generado por',  safe(user.full_name || user.email)],
+      ['Timestamp ISO', new Date().toISOString()],
     ];
-    headerData.forEach(([label, value]) => {
-      doc.setFont('Helvetica', 'bold');
-      doc.text(label + ':', margin, y);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(value, margin + 50, y);
-      y += 5;
-    });
-
-    y += 3;
-    doc.setDrawColor(100);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 8;
-
-    // ========== 2. IDENTIFICACIÓN DEL ALUMNO ==========
-    checkNewPage(25);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('IDENTIFICACIÓN DEL ALUMNO', margin, y);
-    y += 7;
-
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(9);
-    const studentData = [
-      ['Nombre Completo', userData.full_name || '—'],
-      ['CURP', userData.curp || '—'],
-      ['Correo Electrónico', userData.email || '—'],
-      ['Rol', userData.role === 'admin' ? 'Administrador' : userData.role === 'docente' ? 'Docente' : 'Estudiante'],
-      ['Fecha de Inscripción', formatDate(userData.created_date)],
-      ['Estatus Académico', userProgress?.graduation_status || 'enrolled'],
-      ...(userProgress?.course_completed_at ? [['Fecha de Egreso', formatDate(userProgress.course_completed_at)]] : []),
-    ];
-
-    studentData.forEach(([label, value]) => {
-      doc.setFont('Helvetica', 'bold');
-      doc.text(label + ':', margin, y);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(String(value).substring(0, 100), margin + 50, y);
-      y += 5;
-    });
-
-    y += 3;
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 8;
-
-    // ========== 3. RESUMEN ACADÉMICO ==========
-    checkNewPage(20);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('RESUMEN ACADÉMICO', margin, y);
-    y += 7;
-
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(9);
-    const summaryData = [
-      ['Progreso General', `${userProgress?.total_progress_percent || 0}%`],
-      ['Materias Completadas', `${subjectProgressList.filter(s => s.completed).length} / ${subjectProgressList.length}`],
-      ['Promedio General', userProgress?.total_progress_percent ? `${userProgress.total_progress_percent.toFixed(1)}%` : '—'],
-      ['Tiempo Total Invertido', timeTotalHours],
-    ];
-
-    summaryData.forEach(([label, value]) => {
-      doc.setFont('Helvetica', 'bold');
-      doc.text(label + ':', margin, y);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(String(value), margin + 50, y);
-      y += 5;
-    });
-
-    y += 3;
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 8;
-
-    // ========== 4. DETALLE POR MATERIA ==========
-    checkNewPage(20);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('DETALLE POR MATERIA', margin, y);
-    y += 7;
-
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(8);
-
-    subjectProgressList.forEach((sp) => {
-      checkNewPage(12);
-      const subject = subjectMap.get(sp.subject_id);
-      const subjectName = subject?.name || `Materia ${sp.subject_id}`;
-
-      doc.setFont('Helvetica', 'bold');
-      doc.text(`• ${subjectName}`, margin, y);
-      y += 4;
-
-      doc.setFont('Helvetica', 'normal');
-      const matData = [
-        [`Nivel: ${subject?.level || '—'}`, `Avance: ${sp.progress_percent || 0}%`, `Estado: ${sp.completed ? 'Completada' : 'En progreso'}`],
-        [`Calificación Final: ${sp.final_grade ? sp.final_grade.toFixed(1) : '—'}`, `Examen: ${sp.test_passed ? 'Aprobado' : 'Pendiente'}`, `Intentos: ${sp.test_attempts || 0}`],
-      ];
-      matData.forEach(row => {
-        doc.text(row.join('  |  '), margin + 5, y);
-        y += 4;
-      });
-
-      y += 2;
-    });
-
-    y += 3;
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 8;
-
-    // ========== 5. HISTORIAL DE EVALUACIONES ==========
-    checkNewPage(25);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('HISTORIAL DE EVALUACIONES', margin, y);
-    y += 7;
-
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(7);
-
-    const sortedAttempts = evaluationAttempts.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
-
-    if (sortedAttempts.length === 0) {
-      doc.text('Sin evaluaciones registradas', margin, y);
-      y += 5;
-    } else {
-      const colX = [margin, margin + 25, margin + 50, margin + 90, margin + 130];
-      doc.setFont('Helvetica', 'bold');
-      doc.text('Fecha', colX[0], y);
-      doc.text('Tipo', colX[1], y);
-      doc.text('Materia', colX[2], y);
-      doc.text('Score', colX[3], y);
-      doc.text('Estado', colX[4], y);
-      y += 4;
-
-      doc.setFont('Helvetica', 'normal');
-      sortedAttempts.forEach((attempt) => {
-        checkNewPage(5);
-        const subject = subjectMap.get(attempt.subject_id);
-        const lessonTitle = lessonMap.get(attempt.lesson_id)?.title || `Lección ${attempt.lesson_id}`;
-
-        const typeLabel = attempt.type === 'final_exam' ? 'Final' : attempt.type === 'mini_eval' ? 'Mini-eval' : 'Lección';
-        const stateLabel = attempt.passed ? 'Aprobado' : attempt.requires_manual_review ? 'Revisión' : 'No aprobado';
-
-        doc.text(formatDate(attempt.submitted_at).split(' ')[0], colX[0], y);
-        doc.text(typeLabel, colX[1], y);
-        doc.text((subject?.name || 'N/A').substring(0, 15), colX[2], y);
-        doc.text(`${attempt.score || 0}%`, colX[3], y);
-        doc.text(stateLabel, colX[4], y);
-        y += 4;
-      });
+    for (const [label, value] of intRows) {
+      y = checkPage(doc, y, 14);
+      y = labelValue(doc, label, value, y, 110);
     }
 
-    y += 3;
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 8;
+    y += 6;
+    doc.font('Helvetica').fontSize(7).fillColor('#888')
+      .text(
+        'Este expediente ha sido generado automaticamente por el sistema academico y contiene datos verificables para auditoria SEP.',
+        MARGIN, y, { width: CONTENT_W, align: 'justify' }
+      );
+    y += 14;
 
-    // ========== 6. SECCIÓN CRÍTICA: EXÁMENES FINALES PRESENCIALES ==========
-    checkNewPage(30);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('EXÁMENES FINALES - SUPERVISIÓN PRESENCIAL', margin, y);
-    y += 7;
+    // ══════════════════════════════════════════════════════════
+    // 8. FIRMA INSTITUCIONAL
+    // ══════════════════════════════════════════════════════════
+    y = checkPage(doc, y, 60);
+    y = sectionTitle(doc, '7. FIRMA INSTITUCIONAL', y);
+    y += 10;
 
-    const finalExams = sortedAttempts.filter(a => a.type === 'final_exam');
+    const lineY = y + 20;
+    doc.save().strokeColor('#333').lineWidth(0.8)
+      .moveTo(MARGIN + 10, lineY).lineTo(MARGIN + 120, lineY).stroke()
+      .moveTo(MARGIN + 160, lineY).lineTo(MARGIN + 270, lineY).stroke()
+      .restore();
 
-    if (finalExams.length === 0) {
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.text('Sin exámenes finales presenciales registrados', margin, y);
-      y += 5;
-    } else {
-      finalExams.forEach((attempt) => {
-        checkNewPage(25);
-        const subject = subjectMap.get(attempt.subject_id);
+    doc.font('Helvetica').fontSize(7.5).fillColor('#333')
+      .text('Responsable Academico', MARGIN + 10, lineY + 4, { width: 110, align: 'center' });
+    doc.font('Helvetica').fontSize(7.5).fillColor('#333')
+      .text('Sello Institucional', MARGIN + 160, lineY + 4, { width: 110, align: 'center' });
 
-        doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.text(`Materia: ${subject?.name || 'N/A'}`, margin, y);
-        y += 5;
+    // Barra inferior
+    y = PAGE_H - 30;
+    doc.save().fillColor('#1A3A5C').rect(0, PAGE_H - 20, PAGE_W, 20).fill().restore();
+    doc.font('Helvetica').fontSize(6.5).fillColor('#FFFFFF')
+      .text(`${INSTITUCION.nombre} | CCT: ${INSTITUCION.cct} | RVOE: ${INSTITUCION.rvoe} | Folio: ${folio}`,
+        MARGIN, PAGE_H - 14, { width: CONTENT_W, align: 'center' });
 
-        doc.setFont('Helvetica', 'normal');
-        doc.setFontSize(8);
-        const examData = [
-          ['Fecha de Envío', formatDate(attempt.submitted_at)],
-          ['Calificación', `${attempt.score}%`],
-          ['Estado', attempt.passed ? 'Aprobado' : attempt.requires_manual_review ? 'Pendiente revisión' : 'No aprobado'],
-          ['', ''],
-          ['[BLOQUE DE AUDITORÍA]', ''],
-          ['Token (código)', attempt.token_code || '—'],
-          ['Docente (generador)', attempt.validated_by_name || '—'],
-          ['Token validado', formatDate(attempt.token_validated_at)],
-          ['Inicio real del examen', formatDate(attempt.exam_started_at)],
-          ['Envío del examen', formatDate(attempt.submitted_at)],
-          ['Duración', secondsToTime(attempt.duration_seconds)],
-          ['IP de validación', attempt.ip_address || '—'],
-          ['Dispositivo', (attempt.device_info || '—').substring(0, 40)],
-          ['Modalidad', 'Presencial supervisada'],
-        ];
-
-        examData.forEach(([label, value]) => {
-          if (label.includes('BLOQUE')) {
-            doc.setFont('Helvetica', 'bold');
-            doc.text(label, margin + 2, y);
-            y += 3;
-            doc.setFont('Helvetica', 'normal');
-          } else if (label === '') {
-            y += 2;
-          } else {
-            doc.setFont('Helvetica', 'bold');
-            doc.text(label + ':', margin + 5, y);
-            doc.setFont('Helvetica', 'normal');
-            doc.text(String(value), margin + 60, y);
-            y += 4;
-          }
-        });
-
-        y += 3;
-        doc.setDrawColor(180);
-        doc.line(margin, y, pageWidth - margin, y);
-        y += 5;
-      });
+    // Numeracion de paginas
+    const totalPages = doc.bufferedPageRange().count;
+    for (let i = 0; i < totalPages; i++) {
+      doc.switchToPage(i);
+      doc.font('Helvetica').fontSize(6.5).fillColor('#999')
+        .text(`Pagina ${i + 1} de ${totalPages}`, MARGIN, PAGE_H - 35, { width: CONTENT_W, align: 'right' });
     }
 
-    // ========== 7. VALIDACIÓN DE INTEGRIDAD ==========
-    checkNewPage(20);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('VALIDACIÓN DE INTEGRIDAD DEL EXPEDIENTE', margin, y);
-    y += 7;
+    doc.end();
+    const pdfBytes = await bufferPromise;
 
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(8);
-    const integrityData = [
-      ['Hash SHA-256', integrityHash],
-      ['Generado por', user.full_name || user.email],
-      ['Fecha de generación', new Date().toISOString()],
-    ];
-
-    integrityData.forEach(([label, value]) => {
-      doc.setFont('Helvetica', 'bold');
-      doc.text(label + ':', margin, y);
-      doc.setFont('Helvetica', 'normal');
-      doc.text(value.length > 60 ? value.substring(0, 60) + '...' : value, margin + 50, y);
-      y += 5;
-    });
-
-    y += 5;
-    doc.setFont('Helvetica', 'italic');
-    doc.setFontSize(7);
-    doc.text('Este expediente ha sido generado por el sistema académico y contiene datos verificables.', margin, y, { maxWidth: contentWidth });
-
-    // ========== 8. FIRMA INSTITUCIONAL ==========
-    checkNewPage(25);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('FIRMA INSTITUCIONAL', margin, y);
-    y += 15;
-
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text('_________________________________', margin + 10, y);
-    y += 4;
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text('Responsable Académico', margin + 20, y);
-    y += 8;
-
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text('Sello Institucional', margin + 80, y - 8);
-
-    // Generar PDF
-    const pdfBytes = doc.output('arraybuffer');
-
+    const safeName = userEmail.replace(/[^a-zA-Z0-9._-]/g, '_');
     return new Response(pdfBytes, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="expediente_auditable_${userEmail}.pdf"`,
+        'Content-Disposition': `attachment; filename="expediente_auditable_${safeName}.pdf"`,
       },
     });
   } catch (error) {
-    console.error('[GENERATE_AUDITABLE_PDF] Error:', error.message);
+    console.error('[GENERATE_AUDITABLE_PDF] Error:', error.message, error.stack);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
