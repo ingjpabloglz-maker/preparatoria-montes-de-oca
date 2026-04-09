@@ -14,19 +14,12 @@ import ThreadStatusBadge from "@/components/forum/ThreadStatusBadge";
 import PostCard from "@/components/forum/PostCard";
 import NewPostForm from "@/components/forum/NewPostForm";
 import { useUserEvent } from "@/hooks/useUserEvent";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function ForumThread() {
   const { id } = useParams();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const load = async () => {
-      const u = await base44.auth.me();
-      setUser(u);
-    };
-    load();
-  }, []);
 
   const { dispatchUserEvent } = useUserEvent(user?.email);
 

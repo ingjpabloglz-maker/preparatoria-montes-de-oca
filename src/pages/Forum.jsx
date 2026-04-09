@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import LevelAccessGuard from "@/components/common/LevelAccessGuard";
 import { hasPermission } from "@/lib/permissions";
+import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import NewThreadForm from "@/components/forum/NewThreadForm";
 import { useUserEvent } from "@/hooks/useUserEvent";
 
 export default function Forum() {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [userLevel, setUserLevel] = useState(1);
   const [showNewThread, setShowNewThread] = useState(false);
   const [search, setSearch] = useState("");
@@ -21,12 +22,11 @@ export default function Forum() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (!user?.email) return;
     const load = async () => {
-      const u = await base44.auth.me();
-      setUser(u);
       const [prog, penalties] = await Promise.all([
-        base44.entities.UserProgress.filter({ user_email: u.email }),
-        base44.entities.ForumPenalty.filter({ user_email: u.email }),
+        base44.entities.UserProgress.filter({ user_email: user.email }),
+        base44.entities.ForumPenalty.filter({ user_email: user.email }),
       ]);
       setUserLevel(prog?.[0]?.current_level || 1);
       const p = penalties?.[0];
@@ -35,7 +35,7 @@ export default function Forum() {
       }
     };
     load();
-  }, []);
+  }, [user?.email]);
 
   const { dispatchUserEvent } = useUserEvent(user?.email);
 

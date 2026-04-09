@@ -28,25 +28,14 @@ import {
   ClipboardCheck
 } from "lucide-react";
 import { hasPermission } from '@/lib/permissions';
+import { useAuth } from '@/lib/AuthContext';
 import GamificationHUD from "@/components/gamification/GamificationHUD";
 import AchievementToast from "@/components/gamification/AchievementToast";
 import { cn } from "@/lib/utils";
 
 export default function Layout({ children, currentPageName }) {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await base44.auth.me();
-        setUser(userData);
-      } catch (e) {
-        // User not logged in
-      }
-    };
-    loadUser();
-  }, []);
 
   const isAdmin = user?.role === 'admin';
   const isDocente = user?.role === 'docente';
