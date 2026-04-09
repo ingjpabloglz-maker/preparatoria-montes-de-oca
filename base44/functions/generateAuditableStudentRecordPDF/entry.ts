@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(26, 58, 92);
-    doc.text('EXPEDIENTE ACADEMICO OFICIAL - AUDITORIA SEP', PW / 2, y, { align: 'center' });
+    doc.text('EXPEDIENTE ACADEMICO OFICIAL', PW / 2, y, { align: 'center' });
     y += 7;
 
     doc.setFontSize(9);
@@ -378,7 +378,7 @@ Deno.serve(async (req) => {
 
     y += 4;
     doc.setFont('Helvetica', 'italic').setFontSize(7).setTextColor(120, 120, 120);
-    doc.text('Expediente generado automaticamente. Contiene datos verificables para auditoria SEP.', M, y, { maxWidth: CW });
+    doc.text('Expediente generado automaticamente.', M, y, { maxWidth: CW });
     y += 8;
 
     // ══ 8. FIRMA ══
