@@ -1,0 +1,105 @@
+{
+  "name": "ForumThread",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo del hilo"
+    },
+    "content": {
+      "type": "string",
+      "description": "Contenido del hilo"
+    },
+    "author_email": {
+      "type": "string",
+      "description": "Email del autor"
+    },
+    "author_name": {
+      "type": "string",
+      "description": "Nombre del autor"
+    },
+    "author_role": {
+      "type": "string",
+      "enum": [
+        "student",
+        "teacher",
+        "admin",
+        "docente"
+      ],
+      "description": "Rol del autor"
+    },
+    "level_required": {
+      "type": "number",
+      "description": "Nivel acad\u00e9mico requerido para ver el hilo (1-6)",
+      "default": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "closed",
+        "resolved"
+      ],
+      "default": "open",
+      "description": "Estado del hilo"
+    },
+    "views_count": {
+      "type": "number",
+      "default": 0
+    },
+    "replies_count": {
+      "type": "number",
+      "default": 0
+    },
+    "last_activity_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "ID de materia relacionada (opcional)"
+    },
+    "is_deleted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Soft delete por moderador"
+    },
+    "deleted_by": {
+      "type": "string",
+      "description": "Email del moderador que elimin\u00f3"
+    },
+    "deleted_by_name": {
+      "type": "string",
+      "description": "Nombre del moderador que elimin\u00f3"
+    },
+    "deleted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de eliminaci\u00f3n"
+    },
+    "closed_by": {
+      "type": "string",
+      "description": "Email del moderador que cerr\u00f3 el hilo"
+    },
+    "closed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de cierre"
+    },
+    "resolved_by": {
+      "type": "string",
+      "description": "Email del moderador que marc\u00f3 como resuelto"
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de resoluci\u00f3n"
+    }
+  },
+  "required": [
+    "title",
+    "content",
+    "author_email",
+    "level_required"
+  ]
+}

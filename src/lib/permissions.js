@@ -12,9 +12,11 @@ export const ROLE_PERMISSIONS = {
     'forum.read',
     'forum.post',
     'forum.moderate',
-    'exam.review',        // Revisar y decidir sobre exámenes finales
-    'exam.grade',         // Calificar manualmente
-    // ⚠️ audit.access NO incluido — docentes solo ven su panel de revisión
+    'forum.delete_post',     // Eliminar respuestas (soft delete)
+    'forum.delete_thread',   // Eliminar hilos (soft delete)
+    'forum.penalize',        // Penalizar usuarios manualmente
+    'exam.review',
+    'exam.grade',
   ],
   user: [
     'forum.read',

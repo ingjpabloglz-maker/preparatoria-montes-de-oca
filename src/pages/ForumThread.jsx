@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import PenalizeUserModal from "@/components/forum/PenalizeUserModal";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, Trash2, ShieldAlert } from "lucide-react";
 import { hasPermission } from "@/lib/permissions";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -103,7 +104,11 @@ export default function ForumThread() {
   });
 
   const closeMutation = useMutation({
-    mutationFn: () => base44.entities.ForumThread.update(id, { status: "closed" }),
+    mutationFn: () => base44.entities.ForumThread.update(id, {
+      status: "closed",
+      closed_by: user?.email,
+      closed_at: new Date().toISOString(),
+    }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["forumThread", id] }),
   });
 
@@ -112,7 +117,31 @@ export default function ForumThread() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["forumThread", id] }),
   });
 
+  const deleteThreadMutation = useMutation({
+    mutationFn: () => base44.entities.ForumThread.update(id, {
+      is_deleted: true,
+      deleted_by: user?.email,
+      deleted_by_name: user?.full_name,
+      deleted_at: new Date().toISOString(),
+    }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["forumThreads"] }); window.history.back(); },
+  });
+
+  const deletePostMutation = useMutation({
+    mutationFn: (postId) => base44.entities.ForumPost.update(postId, {
+      is_deleted: true,
+      deleted_by: user?.email,
+      deleted_by_name: user?.full_name,
+      deleted_at: new Date().toISOString(),
+    }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["forumPosts", id] }),
+  });
+
+  const [penalizeTarget, setPenalizeTarget] = useState(null); // { email, name }
+
   const canManage = hasPermission(user, 'forum.moderate');
+  const canDelete = hasPermission(user, 'forum.delete_post');
+  const canPenalize = hasPermission(user, 'forum.penalize');
   const isClosed = thread?.status === "closed";
 
   if (loadingThread) {
@@ -158,7 +187,7 @@ export default function ForumThread() {
                 <span>{formatDistanceToNow(new Date(thread.created_date), { addSuffix: true, locale: es })}</span>
               </div>
               {canManage && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {!isClosed && thread.status !== "resolved" && (
                     <Button variant="outline" size="sm" onClick={() => closeMutation.mutate()} className="text-xs text-gray-600">
                       <Lock className="w-3.5 h-3.5 mr-1" />
@@ -168,6 +197,16 @@ export default function ForumThread() {
                   {isClosed && (
                     <Button variant="outline" size="sm" onClick={() => reopenMutation.mutate()} className="text-xs text-green-600 border-green-300">
                       Reabrir
+                    </Button>
+                  )}
+                  {hasPermission(user, 'forum.delete_thread') && (
+                    <Button
+                      variant="outline" size="sm"
+                      onClick={() => { if (window.confirm('¿Eliminar este hilo? (acción auditada)')) deleteThreadMutation.mutate(); }}
+                      className="text-xs text-red-600 border-red-300 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-1" />
+                      Eliminar hilo
                     </Button>
                   )}
                 </div>
@@ -185,16 +224,20 @@ export default function ForumThread() {
             <div className="space-y-3">
               {[1,2].map(i => <div key={i} className="h-24 bg-gray-200 rounded-xl animate-pulse" />)}
             </div>
-          ) : posts.length === 0 ? (
+          ) : posts.filter(p => canManage || !p.is_deleted).length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">Todavía no hay respuestas. ¡Sé el primero!</p>
           ) : (
             <div className="space-y-3">
-              {posts.map(post => (
+              {posts.filter(p => canManage || !p.is_deleted).map(post => (
                 <PostCard
                   key={post.id}
                   post={post}
                   canMarkSolution={canManage}
                   onMarkSolution={(postId) => solutionMutation.mutate(postId)}
+                  canDelete={canDelete}
+                  onDelete={(postId) => deletePostMutation.mutate(postId)}
+                  canPenalize={canPenalize}
+                  onPenalize={(email, name) => setPenalizeTarget({ email, name })}
                   threadStatus={thread.status}
                   currentUserEmail={user?.email}
                 />
@@ -222,6 +265,15 @@ export default function ForumThread() {
           </div>
         )}
       </div>
+
+      {penalizeTarget && (
+        <PenalizeUserModal
+          open={!!penalizeTarget}
+          onClose={() => setPenalizeTarget(null)}
+          targetUserEmail={penalizeTarget.email}
+          targetUserName={penalizeTarget.name}
+        />
+      )}
     </div>
   );
 }

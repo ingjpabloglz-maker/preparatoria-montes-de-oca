@@ -1,0 +1,56 @@
+{
+  "name": "UserReport",
+  "type": "object",
+  "properties": {
+    "reported_user_email": {
+      "type": "string",
+      "description": "Email del usuario reportado"
+    },
+    "reported_user_name": {
+      "type": "string",
+      "description": "Nombre del usuario reportado"
+    },
+    "reported_by": {
+      "type": "string",
+      "description": "Email de quien reporta"
+    },
+    "reported_by_name": {
+      "type": "string",
+      "description": "Nombre de quien reporta"
+    },
+    "reported_by_role": {
+      "type": "string",
+      "description": "Rol de quien reporta (docente | admin | user)"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Raz\u00f3n del reporte"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n adicional"
+    },
+    "thread_id": {
+      "type": "string",
+      "description": "ID del hilo relacionado (opcional)"
+    },
+    "post_id": {
+      "type": "string",
+      "description": "ID del post relacionado (opcional)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "reviewed",
+        "dismissed"
+      ],
+      "default": "pending"
+    }
+  },
+  "required": [
+    "reported_user_email",
+    "reported_by",
+    "reason"
+  ]
+}

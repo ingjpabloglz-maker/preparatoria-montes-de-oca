@@ -1,0 +1,74 @@
+{
+  "name": "ForumPost",
+  "type": "object",
+  "properties": {
+    "thread_id": {
+      "type": "string",
+      "description": "ID del hilo al que pertenece"
+    },
+    "content": {
+      "type": "string",
+      "description": "Contenido de la respuesta"
+    },
+    "author_email": {
+      "type": "string",
+      "description": "Email del autor"
+    },
+    "author_name": {
+      "type": "string",
+      "description": "Nombre del autor"
+    },
+    "author_role": {
+      "type": "string",
+      "enum": [
+        "student",
+        "teacher",
+        "admin",
+        "docente"
+      ],
+      "description": "Rol del autor"
+    },
+    "is_solution": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si esta respuesta es la soluci\u00f3n marcada"
+    },
+    "is_deleted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Soft delete por moderador"
+    },
+    "deleted_by": {
+      "type": "string",
+      "description": "Email del moderador que elimin\u00f3"
+    },
+    "deleted_by_name": {
+      "type": "string",
+      "description": "Nombre del moderador que elimin\u00f3"
+    },
+    "deleted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de eliminaci\u00f3n"
+    },
+    "is_correct": {
+      "type": "boolean",
+      "default": false,
+      "description": "Marcada como correcta por docente/admin"
+    },
+    "marked_correct_by": {
+      "type": "string",
+      "description": "Email del moderador que marc\u00f3 como correcta"
+    },
+    "marked_correct_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de marcado correcto"
+    }
+  },
+  "required": [
+    "thread_id",
+    "content",
+    "author_email"
+  ]
+}
