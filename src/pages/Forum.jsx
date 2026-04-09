@@ -52,7 +52,7 @@ export default function Forum() {
         content,
         author_email: user.email,
         author_name: user.full_name,
-        author_role: user.role === "admin" ? "admin" : user.role === "teacher" ? "teacher" : "student",
+        author_role: user.role === "admin" ? "admin" : user.role === "docente" ? "docente" : "student",
         level_required,
         status: "open",
         views_count: 0,

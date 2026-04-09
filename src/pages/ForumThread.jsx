@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Lock } from "lucide-react";
+import { hasPermission } from "@/lib/permissions";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import ReactMarkdown from "react-markdown";
@@ -60,7 +61,7 @@ export default function ForumThread() {
         content,
         author_email: user.email,
         author_name: user.full_name,
-        author_role: user.role === "admin" ? "admin" : user.role === "teacher" ? "teacher" : "student",
+        author_role: user.role === "admin" ? "admin" : user.role === "docente" ? "docente" : "student",
         is_solution: false,
       });
       await base44.entities.ForumThread.update(id, {
@@ -118,7 +119,7 @@ export default function ForumThread() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["forumThread", id] }),
   });
 
-  const canManage = user?.role === "admin" || user?.role === "teacher";
+  const canManage = hasPermission(user, 'forum.moderate');
   const isClosed = thread?.status === "closed";
 
   if (loadingThread) {
