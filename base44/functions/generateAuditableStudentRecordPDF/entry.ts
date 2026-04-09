@@ -9,10 +9,11 @@ const INSTITUCION = {
   estado:    'Tamaulipas',
   municipio: 'Reynosa',
   plan:      'Bachillerato General',
-  modalidad: 'No escolarizada',
+  modalidad: 'No escolarizada (80% en linea / 20% presencial)',
   opcion:    'Intensiva',
   rvoe:      'NMS/02/01/2010',
   autoridad: 'Ejecutivo del Estado de Tamaulipas',
+  duracion_programa: '2300 horas',
 };
 
 async function sha256(data) {
@@ -23,13 +24,13 @@ async function sha256(data) {
 
 // Elimina tildes y caracteres especiales para compatibilidad con fuentes PDF estandar
 function ascii(str) {
-  if (!str && str !== 0) return '-';
+  if (str === null || str === undefined || str === '') return '--';
   return String(str)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\u00f1/g, 'n').replace(/\u00d1/g, 'N')
     .replace(/[^\x00-\x7F]/g, '?')
-    .substring(0, 200) || '-';
+    .substring(0, 200) || '--';
 }
 
 function formatDate(isoStr) {
@@ -206,13 +207,26 @@ Deno.serve(async (req) => {
     // ══ 2. IDENTIFICACION DEL ALUMNO ══
     sectionHeader('1. IDENTIFICACION DEL ALUMNO');
 
-    const graduationLabels = { enrolled: 'Inscrito', in_progress: 'Cursando', completed: 'Egresado', certified: 'Certificado' };
-    row('Nombre completo', userData.full_name || '-');
+    const graduationLabels = {
+      enrolled:    'Inscrito',
+      in_progress: 'En curso',
+      completed:   'Egresado',
+      certified:   'Certificado',
+    };
+
+    // Construir nombre completo: apellido_paterno + apellido_materno + nombres
+    const nombreCompleto = (() => {
+      const parts = [userData.apellido_paterno, userData.apellido_materno, userData.nombres]
+        .filter(Boolean).join(' ');
+      return parts || userData.full_name || '-';
+    })();
+
+    row('Nombre completo', nombreCompleto);
     row('CURP', userData.curp || '-');
     row('Correo electronico', userData.email || '-');
     row('Fecha de inscripcion', formatDate(userData.created_date));
     row('Estatus academico', graduationLabels[userProgress?.graduation_status] || 'Inscrito');
-    if (userProgress?.course_completed_at) row('Fecha de egreso', formatDate(userProgress.course_completed_at));
+    row('Fecha de egreso', userProgress?.course_completed_at ? formatDate(userProgress.course_completed_at) : '\u2014');
 
     y += 2; drawLine();
 
@@ -226,8 +240,9 @@ Deno.serve(async (req) => {
 
     row('Progreso general', `${userProgress?.total_progress_percent || 0}%`);
     row('Materias completadas', `${completadas} de ${subjectProgressList.length}`);
-    row('Promedio general', promedioFinal);
-    row('Tiempo total invertido', minutesToHours(timeTotalMinutes));
+    row('Promedio general', promedioFinal !== '-' ? promedioFinal : '\u2014');
+    row('Duracion total del programa', INSTITUCION.duracion_programa);
+    row('Tiempo acreditado por alumno', minutesToHours(timeTotalMinutes));
     row('Total de evaluaciones', `${evaluationAttempts.length}`);
 
     y += 2; drawLine();
@@ -240,9 +255,16 @@ Deno.serve(async (req) => {
       y += 8;
     } else {
       // Cabeceras tabla
-      const tCols = [M, M + 75, M + 100, M + 125, M + 152, M + 170];
-      const tW    = [72, 22, 22, 24, 15, 22];
-      const tH    = ['Materia', 'Nivel', 'Avance', 'Calif.', 'Exam.', 'Intentos'];
+      const finalExamStatusLabels = {
+        not_started:    'No presentado',
+        pending_review: 'Pend. revision',
+        approved:       'Aprobado',
+        rejected:       'No aprobado',
+        blocked:        'Bloqueado',
+      };
+
+      const tCols = [M, M + 68, M + 88, M + 110, M + 132, M + 158];
+      const tH    = ['Materia', 'Nivel', 'Avance', 'Calif.', 'Examen final', 'Intentos'];
       doc.setFillColor(44, 82, 130);
       doc.rect(M - 2, y - 1, CW + 4, 7, 'F');
       doc.setFont('Helvetica', 'bold').setFontSize(7).setTextColor(255, 255, 255);
@@ -254,12 +276,13 @@ Deno.serve(async (req) => {
         checkPage(8);
         const subject = subjectMap.get(sp.subject_id);
         if (idx % 2 === 0) { doc.setFillColor(247, 250, 253); doc.rect(M - 2, y - 1, CW + 4, 7, 'F'); }
+        const finalStatusLabel = finalExamStatusLabels[sp.final_exam_status] || '\u2014';
         const cols = [
-          ascii(subject?.name || '-').substring(0, 28),
-          String(subject?.level || '-'),
+          ascii(subject?.name || '-').substring(0, 26),
+          String(subject?.level || '\u2014'),
           `${sp.progress_percent || 0}%`,
-          sp.final_grade != null ? sp.final_grade.toFixed(1) : '-',
-          sp.test_passed ? 'Aprob.' : 'Pend.',
+          sp.final_grade != null ? sp.final_grade.toFixed(1) : '\u2014',
+          finalStatusLabel,
           String(sp.test_attempts || 0),
         ];
         doc.setFont('Helvetica', 'normal').setFontSize(7);
