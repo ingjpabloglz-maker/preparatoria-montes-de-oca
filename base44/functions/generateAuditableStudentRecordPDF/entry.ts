@@ -10,10 +10,12 @@ const INSTITUCION = {
   municipio: 'Reynosa',
   plan:      'Bachillerato General',
   modalidad: 'No escolarizada (80% en linea / 20% presencial)',
+  modalidad_display: 'No escolarizada',
+  modalidad_detalle: '(80% en linea / 20% presencial)',
   opcion:    'Intensiva',
   rvoe:      'NMS/02/01/2010',
   autoridad: 'Ejecutivo del Estado de Tamaulipas',
-  duracion_programa: '2300 horas',
+  duracion_programa: '2320 horas',
 };
 
 async function sha256(data) {
@@ -172,8 +174,8 @@ Deno.serve(async (req) => {
       ['Plan', INSTITUCION.plan],
     ];
     const rightCols = [
-      ['Modalidad', INSTITUCION.modalidad],
-      ['Opcion', INSTITUCION.opcion],
+      ['Modalidad', INSTITUCION.modalidad_display],
+      ['', INSTITUCION.modalidad_detalle],
       ['Acuerdo RVOE', INSTITUCION.rvoe],
       ['Autoridad', INSTITUCION.autoridad],
     ];
@@ -185,10 +187,13 @@ Deno.serve(async (req) => {
       doc.text(ascii(v), M + 28, gridY + i * 7);
     });
     rightCols.forEach(([l, v], i) => {
-      doc.setFont('Helvetica', 'bold').setFontSize(7).setTextColor(80, 80, 80);
-      doc.text(ascii(l) + ':', M + half + 2, gridY + i * 7);
+      if (l) {
+        doc.setFont('Helvetica', 'bold').setFontSize(7).setTextColor(80, 80, 80);
+        doc.text(ascii(l) + ':', M + half + 2, gridY + i * 7);
+      }
       doc.setFont('Helvetica', 'normal').setTextColor(0, 0, 0);
-      doc.text(ascii(v).substring(0, 45), M + half + 30, gridY + i * 7);
+      const xOffset = l ? M + half + 30 : M + half + 4;
+      doc.text(ascii(v), xOffset, gridY + i * 7);
     });
     y = gridY + 30;
 
@@ -293,15 +298,15 @@ Deno.serve(async (req) => {
 
     y += 3; drawLine();
 
-    // ══ 5. HISTORIAL DE EVALUACIONES ══
-    sectionHeader('4. HISTORIAL DE EVALUACIONES');
+    // ══ 5. HISTORIAL DE ACTIVIDADES DEL PROGRAMA ══
+    sectionHeader('4. HISTORIAL DE ACTIVIDADES DEL PROGRAMA');
 
     if (sortedAttempts.length === 0) {
-      doc.setFont('Helvetica', 'normal').setFontSize(8).text('Sin evaluaciones registradas.', M, y);
+      doc.setFont('Helvetica', 'normal').setFontSize(8).text('Sin actividades registradas.', M, y);
       y += 8;
     } else {
-      const eCols = [M, M + 22, M + 45, M + 105, M + 130, M + 160];
-      const eH    = ['Fecha', 'Tipo', 'Materia', 'Calif.', 'Estado', 'Revision'];
+      const eCols = [M, M + 25, M + 50, M + 120, M + 155];
+      const eH    = ['Fecha', 'Tipo', 'Materia', 'Calif.', 'Estado'];
       doc.setFillColor(44, 82, 130);
       doc.rect(M - 2, y - 1, CW + 4, 7, 'F');
       doc.setFont('Helvetica', 'bold').setFontSize(7).setTextColor(255, 255, 255);
@@ -313,16 +318,14 @@ Deno.serve(async (req) => {
         checkPage(7);
         if (idx % 2 === 0) { doc.setFillColor(247, 250, 253); doc.rect(M - 2, y - 1, CW + 4, 7, 'F'); }
         const subject    = subjectMap.get(attempt.subject_id);
-        const typeLabel  = attempt.type === 'final_exam' ? 'Final' : attempt.type === 'mini_eval' ? 'Mini' : 'Leccion';
-        const stateLabel = attempt.passed ? 'Aprobado' : attempt.requires_manual_review ? 'Revision' : 'No aprobado';
-        const revLabel   = attempt.review_decision === 'approved' ? 'Aprob.' : attempt.review_decision === 'rejected' ? 'Rechaz.' : '-';
+        const typeLabel  = attempt.type === 'final_exam' ? 'Final' : attempt.type === 'mini_eval' ? 'Mini-eval' : 'Leccion';
+        const stateLabel = attempt.passed ? 'Aprobado' : attempt.requires_manual_review ? 'En revision' : 'No aprobado';
         const eRow = [
           formatDateShort(attempt.submitted_at),
           typeLabel,
-          ascii(subject?.name || '-').substring(0, 18),
-          attempt.score != null ? `${attempt.score}%` : '-',
+          ascii(subject?.name || '--').substring(0, 22),
+          attempt.score != null ? `${attempt.score}%` : '--',
           stateLabel,
-          revLabel,
         ];
         doc.setFont('Helvetica', 'normal').setFontSize(7);
         eRow.forEach((c, i) => doc.text(c, eCols[i], y + 4.5));
