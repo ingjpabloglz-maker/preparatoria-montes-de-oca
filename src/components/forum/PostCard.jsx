@@ -1,21 +1,36 @@
+import { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Trash2, ShieldAlert } from "lucide-react";
+import { CheckCircle2, Trash2 } from "lucide-react";
+import ModeratorActions from "./ModeratorActions";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import RoleBadge from "./RoleBadge";
 import ReportButton from "./ReportButton";
 import ReactMarkdown from "react-markdown";
 
-export default function PostCard({ post, canMarkSolution, onMarkSolution, canDelete, onDelete, canPenalize, onPenalize, threadStatus, currentUserEmail }) {
+export default function PostCard({ post, canMarkSolution, onMarkSolution, threadStatus, currentUserEmail, currentUser, threadId }) {
   const timeAgo = formatDistanceToNow(new Date(post.created_date), { addSuffix: true, locale: es });
+  const [deleted, setDeleted] = useState(post.is_deleted || false);
+  const queryClient = useQueryClient();
+  const isMod = currentUser?.role === 'docente' || currentUser?.role === 'admin';
 
-  if (post.is_deleted) {
+  async function handleDeletePost() {
+    await base44.entities.ForumPost.update(post.id, {
+      is_deleted: true,
+      deleted_by: currentUser.email,
+      deleted_at: new Date().toISOString(),
+    });
+    setDeleted(true);
+    queryClient.invalidateQueries({ queryKey: ["forumPosts"] });
+  }
+
+  if (deleted) {
     return (
-      <Card className="border border-dashed border-gray-300 bg-gray-50 opacity-60">
-        <CardContent className="p-4">
-          <p className="text-xs text-gray-400 italic">Respuesta eliminada por moderador — {post.deleted_by_name || post.deleted_by}</p>
-        </CardContent>
+      <Card className="border border-dashed border-gray-200 bg-gray-50 opacity-60">
+        <CardContent className="p-4 text-sm text-gray-400 italic">[Respuesta eliminada por moderador]</CardContent>
       </Card>
     );
   }
@@ -39,40 +54,29 @@ export default function PostCard({ post, canMarkSolution, onMarkSolution, canDel
             <span>{timeAgo}</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {currentUserEmail && post.author_email !== currentUserEmail && (
-              <ReportButton
-                postId={post.id}
-                reportedBy={currentUserEmail}
-              />
+            {isMod && post.author_email !== currentUserEmail && (
+              <>
+                <Button variant="ghost" size="sm" onClick={handleDeletePost} className="text-red-600 hover:bg-red-50 text-xs h-7 px-2">
+                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Eliminar
+                </Button>
+                <ModeratorActions
+                  targetEmail={post.author_email}
+                  targetName={post.author_name}
+                  threadId={threadId}
+                  commentId={post.id}
+                  currentUser={currentUser}
+                />
+              </>
             )}
             {canMarkSolution && !post.is_solution && threadStatus !== "closed" && (
               <Button
-                variant="outline" size="sm"
+                variant="outline"
+                size="sm"
                 onClick={() => onMarkSolution(post.id)}
                 className="text-green-600 border-green-300 hover:bg-green-50 text-xs"
               >
                 <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                 Marcar solución
-              </Button>
-            )}
-            {canDelete && (
-              <Button
-                variant="ghost" size="sm"
-                onClick={() => { if (window.confirm('¿Eliminar esta respuesta?')) onDelete(post.id); }}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50 text-xs"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1" />
-                Eliminar
-              </Button>
-            )}
-            {canPenalize && post.author_email !== currentUserEmail && (
-              <Button
-                variant="ghost" size="sm"
-                onClick={() => onPenalize(post.author_email, post.author_name)}
-                className="text-orange-500 hover:text-orange-700 hover:bg-orange-50 text-xs"
-              >
-                <ShieldAlert className="w-3.5 h-3.5 mr-1" />
-                Penalizar
               </Button>
             )}
           </div>
