@@ -32,7 +32,7 @@ export default function ManageStudents() {
     refetchOnWindowFocus: false,
   });
 
-  const students = allUsers.filter(u => u.role !== 'admin');
+  const students = allUsers.filter(u => u.role === 'user');
 
   const filteredStudents = students.filter(s =>
     s.full_name?.toLowerCase().includes(studentSearch.toLowerCase()) ||
