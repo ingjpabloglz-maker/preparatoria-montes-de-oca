@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,12 +13,8 @@ import AdminGuard from '../components/auth/AdminGuard';
 
 export default function ManageAdmins() {
   const [search, setSearch] = useState('');
-  const [currentUser, setCurrentUser] = React.useState(null);
+  const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    base44.auth.me().then(setCurrentUser);
-  }, []);
 
   const { data: allUsers = [] } = useQuery({
     queryKey: ['allUsers'],

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import { Link } from 'react-router-dom';
 import { hasPermission } from '@/lib/permissions';
 
 export default function TeacherDashboard() {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [pendingAttempts, setPendingAttempts] = useState([]);
   const [reviewedAttempts, setReviewedAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,14 +22,10 @@ export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState('pending');
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      // Redirigir si no es docente
-      if (u && !hasPermission(u, 'exam.review')) {
-        window.location.href = '/';
-      }
-    }).catch(() => {});
-  }, []);
+    if (user && !hasPermission(user, 'exam.review')) {
+      window.location.href = '/';
+    }
+  }, [user]);
 
   const loadAttempts = useCallback(async () => {
     setLoading(true);
