@@ -62,8 +62,8 @@ export default function AdminDashboard() {
     setRecalculating(false);
   };
 
-  // Tabla de alumnos
-  const students = allUsers.filter(u => u.role !== 'admin');
+  // Tabla de alumnos — solo role === 'user' (nunca docentes ni admins)
+  const students = allUsers.filter(u => u.role === 'user');
   const filtered = students.filter(u =>
     u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email?.toLowerCase().includes(searchTerm.toLowerCase())

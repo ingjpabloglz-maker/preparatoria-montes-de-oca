@@ -70,7 +70,8 @@ export default function StudentStatistics() {
 
   // ─── getAdminStats ───────────────────────────────────────────────
   const stats = useMemo(() => {
-    const students = allUsers.filter(u => u.role !== 'admin');
+    const students = allUsers.filter(u => u.role === 'user');
+    const studentEmails = new Set(students.map(u => u.email));
     const total_students = students.length;
 
     const enriched = students.map(u => {
@@ -105,7 +106,7 @@ export default function StudentStatistics() {
 
     // Distribución por nivel (solo niveles con alumnos)
     const levelDist = [1, 2, 3, 4, 5, 6].map(lvl => {
-      const inLevel = allProgress.filter(p => p.current_level === lvl);
+      const inLevel = allProgress.filter(p => p.current_level === lvl && studentEmails.has(p.user_email));
       const avgProg = inLevel.length > 0
         ? Math.round(inLevel.reduce((a, p) => a + (p.total_progress_percent || 0), 0) / inLevel.length)
         : 0;
@@ -153,7 +154,7 @@ export default function StudentStatistics() {
     const rows = [
       ['Nombre', 'Email', 'Nivel', 'Progreso (%)', 'XP', 'Racha', 'Días sin actividad', 'Bloqueado'],
     ];
-    const students = allUsers.filter(u => u.role !== 'admin').map(u => {
+    const students = allUsers.filter(u => u.role === 'user').map(u => {
       const prog = allProgress.find(p => p.user_email === u.email);
       const gam = allGamification.find(g => g.user_email === u.email);
       return [

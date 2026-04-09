@@ -26,7 +26,8 @@ Deno.serve(async (req) => {
       sa.entities.Payment.list(),
     ]);
 
-    const students = allUsers.filter(u => u.role !== 'admin');
+    const students = allUsers.filter(u => u.role === 'user');
+    const studentEmails = new Set(students.map(u => u.email));
     const total_students = students.length;
 
     // Activos: tienen UserProgress (han ingresado al menos al dashboard)
@@ -39,7 +40,7 @@ Deno.serve(async (req) => {
     const levelProgressSumMap = {};
     const levelProgressCountMap = {};
 
-    for (const prog of allProgress) {
+    for (const prog of allProgress.filter(p => studentEmails.has(p.user_email))) {
       const lvl = String(prog.current_level || 1);
       levelCountMap[lvl] = (levelCountMap[lvl] || 0) + 1;
 
@@ -63,8 +64,9 @@ Deno.serve(async (req) => {
       progress_per_level[lvl] = Math.round(levelProgressSumMap[lvl] / levelProgressCountMap[lvl]);
     }
 
-    // Materias completadas totales
-    const completed_subjects_count = allSubjectProgress.filter(sp => sp.test_passed === true).length;
+    // Materias completadas totales (solo alumnos)
+    const studentSubjectEmails = studentEmails;
+    const completed_subjects_count = allSubjectProgress.filter(sp => sp.test_passed === true && studentSubjectEmails.has(sp.user_email)).length;
 
     // Folios
     const used_folios = allPayments.filter(p => p.status === 'used').length;
