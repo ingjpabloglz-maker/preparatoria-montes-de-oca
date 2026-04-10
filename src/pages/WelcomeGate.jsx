@@ -14,13 +14,19 @@ export default function WelcomeGate({ onValidated }) {
     if (!folio.trim()) return;
     setLoading(true);
     setError('');
-    const res = await base44.functions.invoke('validateLevel1Folio', { folio: folio.trim() });
-    setLoading(false);
-    if (res.data?.status === 'ok') {
-      onValidated();
-    } else {
-      setError(res.data?.error || 'Error al validar el folio. Intenta de nuevo.');
+    try {
+      const res = await base44.functions.invoke('validateLevel1Folio', { folio: folio.trim() });
+      if (res.data?.status === 'ok') {
+        onValidated();
+      } else {
+        setError(res.data?.error || 'Error al validar el folio. Intenta de nuevo.');
+      }
+    } catch (err) {
+      // Axios lanza error en respuestas 4xx/5xx — extraer mensaje del backend
+      const msg = err?.response?.data?.error || 'Error al validar el folio. Intenta de nuevo.';
+      setError(msg);
     }
+    setLoading(false);
   };
 
   return (
