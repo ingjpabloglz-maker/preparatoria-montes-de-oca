@@ -1,7 +1,9 @@
+import React from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "@/components/ui/sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
+import { base44 } from '@/api/base44Client';
 import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
@@ -17,6 +19,7 @@ import InactivityWarningModal from '@/components/common/InactivityWarningModal';
 import AuditDashboard from './pages/AuditDashboard';
 import StudentRecord from './pages/StudentRecord';
 import TeacherDashboard from './pages/TeacherDashboard';
+import WelcomeGate from './pages/WelcomeGate';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -27,11 +30,36 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   : <>{children}</>;
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
   const { showWarning, updateActivity } = useInactivityLogout();
+  const [level1Loading, setLevel1Loading] = React.useState(true);
+  const [level1Unlocked, setLevel1Unlocked] = React.useState(false);
+
+  const checkLevel1Access = React.useCallback(async () => {
+    if (!user || user.role !== 'user') {
+      setLevel1Unlocked(true);
+      setLevel1Loading(false);
+      return;
+    }
+    try {
+      const payments = await base44.entities.Payment.filter({ user_email: user.email, level: 1, status: 'used' });
+      setLevel1Unlocked(payments.length > 0);
+    } catch (_) {
+      setLevel1Unlocked(false);
+    }
+    setLevel1Loading(false);
+  }, [user]);
+
+  React.useEffect(() => {
+    if (!isLoadingAuth && !isLoadingPublicSettings && user) {
+      checkLevel1Access();
+    } else if (!isLoadingAuth && !isLoadingPublicSettings && !user) {
+      setLevel1Loading(false);
+    }
+  }, [isLoadingAuth, isLoadingPublicSettings, user, checkLevel1Access]);
 
   // Show loading spinner while checking app public settings or auth
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  if (isLoadingPublicSettings || isLoadingAuth || level1Loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
@@ -48,6 +76,11 @@ const AuthenticatedApp = () => {
       navigateToLogin();
       return null;
     }
+  }
+
+  // Bloqueo global para alumnos sin folio nivel 1
+  if (user?.role === 'user' && !level1Unlocked) {
+    return <WelcomeGate onValidated={() => { setLevel1Unlocked(true); }} />;
   }
 
   // Render the main app
