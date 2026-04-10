@@ -50,10 +50,26 @@ Deno.serve(async (req) => {
     await deleteAll('ForumPenalty', { user_email });
     await deleteAll('ForumThread', { author_email: user_email });
 
-    // 7. Finalmente eliminar usuario
+    // 7. Evaluaciones y registros académicos
+    await deleteAll('EvaluationAttempt', { user_email });
+    await deleteAll('AcademicRecordSnapshot', { user_email });
+    await deleteAll('SurpriseExamAttempt', { user_email });
+    await deleteAll('AssistantBehavior', { user_email });
+    await deleteAll('AssistantState', { user_email });
+    await deleteAll('UserReport', { reported_by: user_email });
+    await deleteAll('AssistantDecisionLog', { user_email });
+
+    // 8. Finalmente eliminar usuario
     const users = await base44.asServiceRole.entities.User.filter({ email: user_email });
     if (users.length > 0) {
       await base44.asServiceRole.entities.User.delete(users[0].id);
+    }
+
+    // 9. Recalcular stats automáticamente
+    try {
+      await base44.asServiceRole.functions.invoke('recalculatePlatformStats', {});
+    } catch (e) {
+      console.warn('No se pudo recalcular stats:', e.message);
     }
 
     return Response.json({ success: true, deleted_email: user_email });
