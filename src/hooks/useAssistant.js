@@ -239,14 +239,33 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
   // ── Escuchar eventos reactivos ────────────────────────────────────────────
   useEffect(() => {
     if (!isAllowed) return;
-    const handler = (e) => {
+    const handler = async (e) => {
       const { eventType, payload } = e.detail;
 
       if (eventType === 'login') {
+        // Cargar progreso real del alumno antes de construir el mensaje
+        let nextRoute = '/Dashboard';
+        let hasStarted = false;
+        let isCompleted = false;
+        try {
+          const progList = await base44.entities.SubjectProgress.filter({ user_email: payload?.profile?.user_email || '' });
+          if (progList?.length) {
+            hasStarted = progList.some(p => (p.progress_percent || 0) > 0);
+            isCompleted = progList.every(p => p.test_passed === true);
+            // Navegar a la materia más recientemente activa
+            const inProgress = progList
+              .filter(p => !p.test_passed && (p.progress_percent || 0) > 0)
+              .sort((a, b) => new Date(b.last_activity || 0) - new Date(a.last_activity || 0));
+            if (inProgress.length) nextRoute = `/Subject/${inProgress[0].subject_id}`;
+          }
+        } catch (_) {}
         const decision = buildLoginDecision({
           name: payload?.name,
           profile: payload?.profile,
           behavior: behaviorRef.current,
+          hasStarted,
+          isCompleted,
+          nextRoute,
         });
         const mappedLogin = mapDecisionToMessage(decision);
         if (mappedLogin) enqueue(mappedLogin);

@@ -60,7 +60,8 @@ export const ACTION_TYPES = {
 // ─── ONBOARDING STEPS ────────────────────────────────────────────────────────
 
 export const ONBOARDING_STEPS = [
-  { text: '👋 Bienvenido. Comienza completando tu primera lección 📚', route: '/Dashboard', label: 'Ir a mi primera lección' },
+  // El paso 0 es dinámico: se construye en buildLoginDecision según progreso real
+  { text: null, route: '/Dashboard', label: null },
   { text: '🎯 ¡Bien hecho! Ahora prueba el desafío diario y gana XP extra', route: '/SurpriseExam', label: 'Aceptar desafío' },
   { text: '🌱 Un último paso: riega tu árbol con tus tokens de agua', route: '/Rewards', label: 'Ver mi árbol' },
 ];
@@ -364,7 +365,7 @@ export function getTopDecision(decisions, lastMessageType = '') {
 
 // ─── buildLoginDecision ───────────────────────────────────────────────────────
 
-export function buildLoginDecision({ name, profile, behavior }) {
+export function buildLoginDecision({ name, profile, behavior, hasStarted = false, isCompleted = false, nextRoute = '/Dashboard' }) {
   if (!profile) {
     return createDecision({
       id: 'login',
@@ -386,16 +387,52 @@ export function buildLoginDecision({ name, profile, behavior }) {
     : h < 19 ? `☀️ ¡Buenas tardes, ${firstName}!`
     : `🌙 ¡Buenas noches, ${firstName}!`;
 
+  // Onboarding paso 0: dinámico según progreso real
+  if (!behavior?.onboarding_completed && (behavior?.onboarding_step || 0) === 0) {
+    let messageText, ctaLabel, ctaRoute;
+    if (isCompleted) {
+      messageText = `${saludo} 🎓 Has completado tu plan académico. ¡Excelente trabajo!`;
+      ctaLabel = 'Ver mi progreso';
+      ctaRoute = '/Dashboard';
+    } else if (hasStarted) {
+      messageText = `${saludo} 📖 Continúa donde te quedaste. ¡Sigue avanzando!`;
+      ctaLabel = 'Continuar lección';
+      ctaRoute = nextRoute;
+    } else {
+      messageText = `${saludo} 👋 Bienvenido. Comienza completando tu primera lección 📚`;
+      ctaLabel = 'Ir a mi primera lección';
+      ctaRoute = '/Dashboard';
+    }
+    return createDecision({
+      id: 'login',
+      priorityKey: 'AMBIENT', priority: PRIORITY.AMBIENT,
+      reason: 'login_onboarding_dynamic',
+      text: messageText,
+      callToAction: { label: ctaLabel, route: ctaRoute },
+      isReactive: true,
+      duration: 12000,
+      ctx,
+      userState,
+    });
+  }
+
+  // Login normal: mostrar decisión más relevante
   const allDecisions = evaluateUserState({ profile, behavior });
   const top = getTopDecision(allDecisions, null);
   const next = top?.payload;
+
+  // Si CTA apunta a /Dashboard y tenemos ruta más específica, usarla
+  let cta = next?.callToAction || null;
+  if (cta?.route === '/Dashboard' && nextRoute !== '/Dashboard' && hasStarted && !isCompleted) {
+    cta = { ...cta, route: nextRoute };
+  }
 
   return createDecision({
     id: 'login',
     priorityKey: 'AMBIENT', priority: PRIORITY.AMBIENT,
     reason: 'login_greeting',
     text: `${saludo} ${next?.text || '¡Sigue avanzando!'}`,
-    callToAction: next?.callToAction || null,
+    callToAction: cta,
     isReactive: true,
     duration: 12000,
     ctx,
