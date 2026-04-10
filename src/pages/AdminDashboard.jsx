@@ -57,16 +57,12 @@ export default function AdminDashboard() {
 
   const handleRecalculate = async () => {
     setRecalculating(true);
-    await base44.functions.invoke('recalculatePlatformStats', {});
+    await base44.functions.invoke('cleanOrphanRecords', {});
+    setRecalculating(true);
+    await base44.functions.invoke('cleanOrphanRecords', {});
     await queryClient.invalidateQueries({ queryKey: ['platformStats'] });
     await queryClient.invalidateQueries({ queryKey: ['allUsers'] });
     await queryClient.invalidateQueries({ queryKey: ['allProgress'] });
-    setRecalculating(false);
-  };
-
-  const handleCleanOrphans = async () => {
-    setRecalculating(true);
-    await base44.functions.invoke('cleanOrphanRecords', {});
     await queryClient.invalidateQueries({ queryKey: ['platformStats'] });
     await queryClient.invalidateQueries({ queryKey: ['allUsers'] });
     await queryClient.invalidateQueries({ queryKey: ['allProgress'] });
@@ -129,10 +125,7 @@ export default function AdminDashboard() {
                 <RefreshCw className={`w-4 h-4 mr-2 ${recalculating ? 'animate-spin' : ''}`} />
                 Recalcular
               </Button>
-              <Button variant="outline" size="sm" onClick={handleCleanOrphans} disabled={recalculating}>
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                Limpiar huérfanos
-              </Button>
+
               <Button variant="outline" size="sm" onClick={() => window.location.href = createPageUrl('StudentStatistics')}>
                 <BarChart2 className="w-4 h-4 mr-2" />
                 Estadísticas
