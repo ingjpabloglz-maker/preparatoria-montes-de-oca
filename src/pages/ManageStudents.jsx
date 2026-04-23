@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Eye, Users, Trophy } from "lucide-react";
+import { Search, Eye, Users, Trophy, Download } from "lucide-react";
+import ExportGradesModal from '../components/admin/ExportGradesModal';
 
 const formatName = (s) => {
   const parts = [s.apellido_paterno, s.apellido_materno, s.nombres].filter(Boolean);
@@ -17,6 +18,7 @@ import AdminGuard from '../components/auth/AdminGuard';
 
 export default function ManageStudents() {
   const [studentSearch, setStudentSearch] = useState('');
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const { data: allUsers = [] } = useQuery({
     queryKey: ['allUsers'],
@@ -50,11 +52,17 @@ export default function ManageStudents() {
           <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
             <Users className="w-5 h-5 text-blue-600" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold text-gray-900">Gestión de Alumnos</h1>
             <p className="text-gray-500 text-sm">{students.length} alumnos registrados</p>
           </div>
+          <Button onClick={() => setExportModalOpen(true)} variant="outline" className="gap-2">
+            <Download className="w-4 h-4" />
+            Exportar calificaciones por nivel
+          </Button>
         </div>
+
+        <ExportGradesModal open={exportModalOpen} onClose={() => setExportModalOpen(false)} />
 
         {/* Table Card */}
         <Card className="border-0 shadow-md">

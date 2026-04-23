@@ -7,9 +7,6 @@ export function useGamificationProfile(userEmail) {
     queryFn: async () => {
       const result = await base44.entities.GamificationProfile.filter({ user_email: userEmail });
       if (!result || result.length === 0) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn(`GamificationProfile no encontrado para: ${userEmail}`);
-        }
         return null;
       }
       return result[0];

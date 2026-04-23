@@ -1,0 +1,46 @@
+{
+  "name": "LevelExportBatch",
+  "type": "object",
+  "properties": {
+    "level": {
+      "type": "number",
+      "description": "Nivel acad\u00e9mico exportado (1-6)"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de generaci\u00f3n"
+    },
+    "generated_by": {
+      "type": "string",
+      "description": "ID del administrador que gener\u00f3"
+    },
+    "generated_by_name": {
+      "type": "string",
+      "description": "Nombre del administrador"
+    },
+    "generated_by_email": {
+      "type": "string",
+      "description": "Email del administrador"
+    },
+    "total_students": {
+      "type": "number",
+      "description": "Total de alumnos incluidos en el batch"
+    },
+    "include_exported": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si se incluyeron alumnos ya exportados anteriormente"
+    },
+    "file_name": {
+      "type": "string",
+      "description": "Nombre del archivo generado"
+    }
+  },
+  "required": [
+    "level",
+    "generated_at",
+    "generated_by",
+    "total_students"
+  ]
+}

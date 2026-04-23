@@ -81,6 +81,72 @@
       "type": "string",
       "format": "date-time",
       "description": "Fecha cuando el plantel valid\u00f3 la certificaci\u00f3n"
+    },
+    "level_1_exported": {
+      "type": "boolean",
+      "default": false
+    },
+    "level_1_exported_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "level_1_export_batch_id": {
+      "type": "string"
+    },
+    "level_2_exported": {
+      "type": "boolean",
+      "default": false
+    },
+    "level_2_exported_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "level_2_export_batch_id": {
+      "type": "string"
+    },
+    "level_3_exported": {
+      "type": "boolean",
+      "default": false
+    },
+    "level_3_exported_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "level_3_export_batch_id": {
+      "type": "string"
+    },
+    "level_4_exported": {
+      "type": "boolean",
+      "default": false
+    },
+    "level_4_exported_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "level_4_export_batch_id": {
+      "type": "string"
+    },
+    "level_5_exported": {
+      "type": "boolean",
+      "default": false
+    },
+    "level_5_exported_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "level_5_export_batch_id": {
+      "type": "string"
+    },
+    "level_6_exported": {
+      "type": "boolean",
+      "default": false
+    },
+    "level_6_exported_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "level_6_export_batch_id": {
+      "type": "string"
     }
   },
   "required": [
