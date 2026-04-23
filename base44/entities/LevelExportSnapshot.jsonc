@@ -1,0 +1,82 @@
+{
+  "name": "LevelExportSnapshot",
+  "type": "object",
+  "properties": {
+    "batch_id": {
+      "type": "string",
+      "description": "ID del LevelExportBatch al que pertenece"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "ID del usuario en el sistema"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email del alumno al momento de exportar"
+    },
+    "apellido_paterno": {
+      "type": "string"
+    },
+    "apellido_materno": {
+      "type": "string"
+    },
+    "nombres": {
+      "type": "string"
+    },
+    "curp": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "level": {
+      "type": "number",
+      "description": "Nivel acad\u00e9mico exportado"
+    },
+    "materias": {
+      "type": "array",
+      "description": "Lista de materias con calificaciones congeladas",
+      "items": {
+        "type": "object",
+        "properties": {
+          "subject_id": {
+            "type": "string"
+          },
+          "subject_name": {
+            "type": "string"
+          },
+          "final_grade": {
+            "type": "number"
+          },
+          "test_passed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "promedio": {
+      "type": "number",
+      "description": "Promedio calculado del nivel al momento de exportar"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha en que el alumno complet\u00f3 el nivel"
+    },
+    "exported_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha exacta de esta exportaci\u00f3n"
+    },
+    "hash_integrity": {
+      "type": "string",
+      "description": "SHA-256 de los datos clave para auditor\u00eda"
+    }
+  },
+  "required": [
+    "batch_id",
+    "user_email",
+    "level",
+    "exported_at"
+  ]
+}
