@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Eye, Users, Trophy, Download } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ExportGradesModal from '../components/admin/ExportGradesModal';
 
 const formatName = (s) => {
@@ -18,6 +19,7 @@ import AdminGuard from '../components/auth/AdminGuard';
 
 export default function ManageStudents() {
   const [studentSearch, setStudentSearch] = useState('');
+  const [levelFilter, setLevelFilter] = useState('all');
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const { data: allUsers = [] } = useQuery({
@@ -36,10 +38,13 @@ export default function ManageStudents() {
 
   const students = allUsers.filter(u => u.role === 'user');
 
-  const filteredStudents = students.filter(s =>
-    s.full_name?.toLowerCase().includes(studentSearch.toLowerCase()) ||
-    s.email?.toLowerCase().includes(studentSearch.toLowerCase())
-  );
+  const filteredStudents = students.filter(s => {
+    const matchSearch = s.full_name?.toLowerCase().includes(studentSearch.toLowerCase()) ||
+      s.email?.toLowerCase().includes(studentSearch.toLowerCase());
+    const prog = getProgress(s.email);
+    const matchLevel = levelFilter === 'all' || (prog?.current_level || 1) === parseInt(levelFilter);
+    return matchSearch && matchLevel;
+  });
 
   const getProgress = (email) => allProgress.find(p => p.user_email === email);
 
@@ -69,14 +74,27 @@ export default function ManageStudents() {
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <CardTitle className="text-base">Lista de Alumnos</CardTitle>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar por nombre o email..."
-                  value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
-                  className="pl-9"
-                />
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Select value={levelFilter} onValueChange={setLevelFilter}>
+                  <SelectTrigger className="w-full sm:w-36">
+                    <SelectValue placeholder="Todos los niveles" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los niveles</SelectItem>
+                    {[1, 2, 3, 4, 5, 6].map(l => (
+                      <SelectItem key={l} value={l.toString()}>Nivel {l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Buscar por nombre o email..."
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
               </div>
             </div>
           </CardHeader>
