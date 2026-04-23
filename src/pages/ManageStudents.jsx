@@ -38,6 +38,8 @@ export default function ManageStudents() {
 
   const students = allUsers.filter(u => u.role === 'user');
 
+  const getProgress = (email) => allProgress.find(p => p.user_email === email);
+
   const filteredStudents = students.filter(s => {
     const matchSearch = s.full_name?.toLowerCase().includes(studentSearch.toLowerCase()) ||
       s.email?.toLowerCase().includes(studentSearch.toLowerCase());
@@ -45,8 +47,6 @@ export default function ManageStudents() {
     const matchLevel = levelFilter === 'all' || (prog?.current_level || 1) === parseInt(levelFilter);
     return matchSearch && matchLevel;
   });
-
-  const getProgress = (email) => allProgress.find(p => p.user_email === email);
 
   return (
     <AdminGuard>
