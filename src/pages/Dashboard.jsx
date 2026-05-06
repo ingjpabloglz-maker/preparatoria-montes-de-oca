@@ -400,16 +400,12 @@ export default function Dashboard() {
     return progressSum / levelSubjects.length;
   };
 
-  // Calcular días restantes
+  // Calcular días restantes desde expires_at (fuente de verdad explícita)
   const getDaysRemaining = () => {
-    if (!progress || !progress.level_start_date) return null;
-    const levelConfig = levels.find(l => l.level_number === currentLevel);
-    if (!levelConfig) return null;
-    
-    const startDate = new Date(progress.level_start_date);
+    if (!progress?.expires_at) return null;
     const now = new Date();
-    const daysPassed = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
-    return Math.max(0, levelConfig.time_limit_days - daysPassed);
+    const expiresAt = new Date(progress.expires_at);
+    return Math.max(0, Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)));
   };
 
   const getDaysInLevel = () => {
@@ -420,17 +416,16 @@ export default function Dashboard() {
   };
 
   const daysRemaining = getDaysRemaining();
-  const isBlockedByTime = daysRemaining !== null && daysRemaining === 0;
+  const isBlockedByTime = progress?.blocked_due_to_time === true || (daysRemaining !== null && daysRemaining === 0);
 
   const handleTimeUnlockSuccess = async () => {
-    // Dar 30 días extra a partir de hoy: level_start_date = hoy - (time_limit_days - 30)
+    // Extender 30 días desde hoy usando expires_at explícito
     if (progress) {
-      const timeLimitDays = currentLevelConfig?.time_limit_days || 60;
-      const newStartDate = new Date();
-      newStartDate.setDate(newStartDate.getDate() - (timeLimitDays - 30));
+      const newExpiresAt = new Date();
+      newExpiresAt.setDate(newExpiresAt.getDate() + 30);
       await base44.entities.UserProgress.update(progress.id, {
-        level_start_date: newStartDate.toISOString(),
-        blocked_due_to_time: false
+        expires_at: newExpiresAt.toISOString(),
+        blocked_due_to_time: false,
       });
     }
     window.location.reload();
@@ -617,7 +612,7 @@ export default function Dashboard() {
           completedSubjects={completedSubjectsCount}
           totalSubjects={totalSubjectsCount}
           daysInLevel={getDaysInLevel()}
-          timeLimitDays={currentLevelConfig?.time_limit_days || 180}
+          daysRemaining={daysRemaining}
         />
 
         {/* Materias del nivel actual */}

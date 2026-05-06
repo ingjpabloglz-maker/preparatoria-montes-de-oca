@@ -39,9 +39,36 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── VALIDACIÓN DE EXPIRACIÓN POR expires_at ─────────────────────────────
+    const now = new Date();
+    let isExpired = false;
+
+    if (progress.expires_at) {
+      // Fuente de verdad: campo expires_at explícito
+      isExpired = now > new Date(progress.expires_at);
+    }
+
+    if (isExpired && !progress.blocked_due_to_time) {
+      // Actualizar estado en BD si aún no estaba marcado
+      await base44.asServiceRole.entities.UserProgress.update(progress.id, {
+        blocked_due_to_time: true,
+      });
+    }
+
+    if (isExpired || progress.blocked_due_to_time) {
+      return Response.json({
+        has_access: false,
+        current_level: currentLevel,
+        blocked_due_to_time: true,
+        expires_at: progress.expires_at,
+        reason: 'El tiempo asignado para este nivel ha expirado.'
+      });
+    }
+
     return Response.json({
       has_access: true,
       current_level: currentLevel,
+      expires_at: progress.expires_at,
       reason: 'Acceso permitido.'
     });
 

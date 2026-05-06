@@ -1,5 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
+// Duración de cada nivel en días — fuente de verdad única
+const LEVEL_DURATION_DAYS = 100;
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -27,19 +30,19 @@ Deno.serve(async (req) => {
     const simulatedStartDate = new Date();
     simulatedStartDate.setDate(simulatedStartDate.getDate() - days_offset);
 
-    // Obtener LevelConfig para verificar si excede el límite
-    const currentLevel = progress.current_level || 1;
-    const levelConfigs = await base44.asServiceRole.entities.LevelConfig.filter({ level_number: currentLevel });
-    const levelConfig = levelConfigs?.[0];
-    const timeLimitDays = levelConfig?.time_limit_days || 180;
+    // Calcular expires_at basado en la nueva start_date + LEVEL_DURATION_DAYS
+    const simulatedExpiresAt = new Date(simulatedStartDate);
+    simulatedExpiresAt.setDate(simulatedExpiresAt.getDate() + LEVEL_DURATION_DAYS);
 
-    // Determinar si excede el límite
-    const isBlocked = days_offset >= timeLimitDays;
+    const now = new Date();
+    const isBlocked = now > simulatedExpiresAt;
+    const daysRemaining = Math.max(0, Math.ceil((simulatedExpiresAt - now) / (1000 * 60 * 60 * 24)));
 
-    // Actualizar UserProgress
+    // Actualizar UserProgress con ambos campos
     await base44.asServiceRole.entities.UserProgress.update(progress.id, {
       level_start_date: simulatedStartDate.toISOString(),
-      blocked_due_to_time: isBlocked
+      expires_at: simulatedExpiresAt.toISOString(),
+      blocked_due_to_time: isBlocked,
     });
 
     return Response.json({
@@ -47,13 +50,14 @@ Deno.serve(async (req) => {
       user_email,
       days_offset,
       simulated_start_date: simulatedStartDate.toISOString(),
-      current_level: currentLevel,
-      time_limit_days: timeLimitDays,
-      days_remaining: Math.max(0, timeLimitDays - days_offset),
+      simulated_expires_at: simulatedExpiresAt.toISOString(),
+      current_level: progress.current_level || 1,
+      level_duration_days: LEVEL_DURATION_DAYS,
+      days_remaining: daysRemaining,
       blocked_due_to_time: isBlocked,
       message: isBlocked
-        ? `✅ Usuario bloqueado por tiempo. Simulados ${days_offset} días (límite: ${timeLimitDays}).`
-        : `ℹ️ Usuario NO bloqueado. Simulados ${days_offset} días (límite: ${timeLimitDays}, restan ${timeLimitDays - days_offset}).`
+        ? `✅ Usuario bloqueado por tiempo. Simulados ${days_offset} días (límite: ${LEVEL_DURATION_DAYS}).`
+        : `ℹ️ Usuario NO bloqueado. Simulados ${days_offset} días (límite: ${LEVEL_DURATION_DAYS}, restan ${daysRemaining}).`
     });
 
   } catch (error) {

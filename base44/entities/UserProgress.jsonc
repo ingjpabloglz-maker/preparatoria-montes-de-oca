@@ -16,6 +16,11 @@
       "format": "date-time",
       "description": "Fecha de inicio del nivel actual"
     },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha exacta de expiraci\u00f3n del acceso al nivel actual. Calculada como level_start_date + LEVEL_DURATION_DAYS."
+    },
     "completed_subjects": {
       "type": "array",
       "items": {

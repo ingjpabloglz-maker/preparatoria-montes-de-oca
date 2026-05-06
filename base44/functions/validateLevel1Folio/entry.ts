@@ -1,5 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
+// Duración de cada nivel en días — fuente de verdad única
+const LEVEL_DURATION_DAYS = 100;
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
@@ -62,20 +65,26 @@ Deno.serve(async (req) => {
     used_date: new Date().toISOString(),
   });
 
-  // ─── DESBLOQUEAR ACCESO EN UserProgress ──────────────────────────────────────
+  // ─── ESTABLECER INICIO DE NIVEL CON expires_at ───────────────────────────────
+  const now = new Date();
+  const expiresAt = new Date(now);
+  expiresAt.setDate(expiresAt.getDate() + LEVEL_DURATION_DAYS);
+
+  const levelData = {
+    current_level: 1,
+    level_start_date: now.toISOString(),
+    expires_at: expiresAt.toISOString(),
+    blocked_due_to_time: false,
+    graduation_status: 'in_progress',
+  };
+
   const existingProgress = await sa.entities.UserProgress.filter({ user_email: user.email });
   if (existingProgress.length > 0) {
-    await sa.entities.UserProgress.update(existingProgress[0].id, {
-      current_level: 1,
-      level_start_date: new Date().toISOString(),
-      graduation_status: 'in_progress',
-    });
+    await sa.entities.UserProgress.update(existingProgress[0].id, levelData);
   } else {
     await sa.entities.UserProgress.create({
       user_email: user.email,
-      current_level: 1,
-      level_start_date: new Date().toISOString(),
-      graduation_status: 'in_progress',
+      ...levelData,
       completed_subjects: [],
       test_scores: [],
     });

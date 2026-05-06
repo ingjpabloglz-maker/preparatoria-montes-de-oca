@@ -15,7 +15,7 @@ export default function StatsOverview({
   completedSubjects, 
   totalSubjects,
   daysInLevel,
-  timeLimitDays
+  daysRemaining
 }) {
   const remaining = totalSubjects - completedSubjects;
   const subjectMsg = remaining === 0
@@ -28,7 +28,11 @@ export default function StatsOverview({
 
   const progressMsg = totalProgress === 0 ? 'Vas comenzando' : totalProgress < 50 ? 'Buen inicio' : totalProgress < 90 ? '¡Vas muy bien!' : '¡Casi terminas!';
 
-  const timeMsg = timeLimitDays - daysInLevel <= 7 ? '⚠️ Poco tiempo' : `${timeLimitDays - daysInLevel} días restantes`;
+  const timeMsg = daysRemaining === null
+    ? `${daysInLevel} días en nivel`
+    : daysRemaining <= 7
+    ? '⚠️ Poco tiempo'
+    : `${daysRemaining} días restantes`;
 
   const stats = [
     {
