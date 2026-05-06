@@ -1,11 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
-// Duración de cada nivel en días — fuente de verdad única
-const LEVEL_DURATION_DAYS = 100;
-
 /**
  * Migración de datos: calcula expires_at para todos los UserProgress existentes
- * que no tengan ese campo, basándose en level_start_date + 100 días.
+ * usando level_start_date + LevelConfig.time_limit_days (por nivel).
  * También sincroniza blocked_due_to_time según la nueva lógica.
  *
  * Solo puede ejecutarse por un administrador.
@@ -20,8 +17,15 @@ Deno.serve(async (req) => {
     }
 
     const sa = base44.asServiceRole;
-    const allProgress = await sa.entities.UserProgress.list();
 
+    // Cargar configuraciones de niveles — fuente de verdad de duración
+    const levelConfigs = await sa.entities.LevelConfig.list();
+    const getLevelDays = (levelNumber) => {
+      const config = levelConfigs.find(c => c.level_number === levelNumber);
+      return config?.time_limit_days || null;
+    };
+
+    const allProgress = await sa.entities.UserProgress.list();
     const now = new Date();
     let migrated = 0;
     let skipped = 0;
@@ -29,17 +33,22 @@ Deno.serve(async (req) => {
     const details = [];
 
     for (const progress of allProgress) {
-      // Saltar registros sin level_start_date (no hay inicio registrado)
       if (!progress.level_start_date) {
         skipped++;
         details.push({ email: progress.user_email, status: 'skipped', reason: 'sin level_start_date' });
         continue;
       }
 
-      // Calcular expires_at a partir de level_start_date
+      const timeLimitDays = getLevelDays(progress.current_level || 1);
+      if (!timeLimitDays) {
+        skipped++;
+        details.push({ email: progress.user_email, status: 'skipped', reason: `sin LevelConfig para nivel ${progress.current_level}` });
+        continue;
+      }
+
       const startDate = new Date(progress.level_start_date);
       const expiresAt = new Date(startDate);
-      expiresAt.setDate(expiresAt.getDate() + LEVEL_DURATION_DAYS);
+      expiresAt.setDate(expiresAt.getDate() + timeLimitDays);
 
       const isExpired = now > expiresAt;
 
@@ -53,6 +62,7 @@ Deno.serve(async (req) => {
         details.push({
           email: progress.user_email,
           level: progress.current_level,
+          time_limit_days: timeLimitDays,
           level_start_date: progress.level_start_date,
           expires_at: expiresAt.toISOString(),
           blocked_due_to_time: isExpired,
@@ -66,13 +76,7 @@ Deno.serve(async (req) => {
 
     return Response.json({
       success: true,
-      summary: {
-        total: allProgress.length,
-        migrated,
-        skipped,
-        errors,
-        level_duration_days: LEVEL_DURATION_DAYS,
-      },
+      summary: { total: allProgress.length, migrated, skipped, errors },
       details,
     });
 

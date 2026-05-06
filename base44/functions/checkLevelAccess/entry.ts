@@ -10,6 +10,7 @@ Deno.serve(async (req) => {
     }
 
     const user_email = user.email;
+    const sa = base44.asServiceRole;
 
     // Obtener UserProgress
     const progressList = await base44.entities.UserProgress.filter({ user_email });
@@ -39,20 +40,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ─── VALIDACIÓN DE EXPIRACIÓN POR expires_at ─────────────────────────────
-    const now = new Date();
-    let isExpired = false;
-
-    if (progress.expires_at) {
-      // Fuente de verdad: campo expires_at explícito
-      isExpired = now > new Date(progress.expires_at);
+    // ─── INTEGRIDAD: si expires_at es null, recalcular desde LevelConfig ────────
+    let expiresAtStr = progress.expires_at;
+    if (!expiresAtStr) {
+      const levelConfigs = await sa.entities.LevelConfig.filter({ level_number: currentLevel });
+      const levelConfig = levelConfigs[0];
+      if (levelConfig?.time_limit_days && progress.level_start_date) {
+        const startDate = new Date(progress.level_start_date);
+        const recalculated = new Date(startDate);
+        recalculated.setDate(recalculated.getDate() + levelConfig.time_limit_days);
+        expiresAtStr = recalculated.toISOString();
+        // Persistir el valor recalculado
+        await sa.entities.UserProgress.update(progress.id, { expires_at: expiresAtStr });
+      } else {
+        // Sin configuración ni start_date: denegar acceso por seguridad
+        return Response.json({
+          has_access: false,
+          current_level: currentLevel,
+          reason: 'No se puede determinar la expiración del nivel. Contacta al administrador.'
+        });
+      }
     }
 
+    // ─── VALIDACIÓN DE EXPIRACIÓN POR expires_at ─────────────────────────────
+    const now = new Date();
+    const isExpired = now > new Date(expiresAtStr);
+
     if (isExpired && !progress.blocked_due_to_time) {
-      // Actualizar estado en BD si aún no estaba marcado
-      await base44.asServiceRole.entities.UserProgress.update(progress.id, {
-        blocked_due_to_time: true,
-      });
+      await sa.entities.UserProgress.update(progress.id, { blocked_due_to_time: true });
     }
 
     if (isExpired || progress.blocked_due_to_time) {
@@ -60,7 +75,7 @@ Deno.serve(async (req) => {
         has_access: false,
         current_level: currentLevel,
         blocked_due_to_time: true,
-        expires_at: progress.expires_at,
+        expires_at: expiresAtStr,
         reason: 'El tiempo asignado para este nivel ha expirado.'
       });
     }
@@ -68,7 +83,7 @@ Deno.serve(async (req) => {
     return Response.json({
       has_access: true,
       current_level: currentLevel,
-      expires_at: progress.expires_at,
+      expires_at: expiresAtStr,
       reason: 'Acceso permitido.'
     });
 

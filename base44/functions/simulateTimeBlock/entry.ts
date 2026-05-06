@@ -1,8 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
-// Duración de cada nivel en días — fuente de verdad única
-const LEVEL_DURATION_DAYS = 100;
-
+/**
+ * Simula el paso del tiempo para un usuario comparando una "fecha simulada"
+ * contra el expires_at real del usuario. NO modifica expires_at.
+ * Solo actualiza blocked_due_to_time y level_start_date para la simulación.
+ */
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -18,30 +20,31 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Faltan parámetros: user_email y days_offset' }, { status: 400 });
     }
 
+    const sa = base44.asServiceRole;
+
     // Obtener UserProgress del usuario
-    const progressList = await base44.asServiceRole.entities.UserProgress.filter({ user_email });
+    const progressList = await sa.entities.UserProgress.filter({ user_email });
     const progress = progressList?.[0];
 
     if (!progress) {
       return Response.json({ error: 'No se encontró UserProgress para ese usuario' }, { status: 404 });
     }
 
-    // Calcular nueva level_start_date restando days_offset días desde hoy
-    const simulatedStartDate = new Date();
-    simulatedStartDate.setDate(simulatedStartDate.getDate() - days_offset);
+    if (!progress.expires_at) {
+      return Response.json({ error: 'El usuario no tiene expires_at. Ejecuta la migración primero.' }, { status: 400 });
+    }
 
-    // Calcular expires_at basado en la nueva start_date + LEVEL_DURATION_DAYS
-    const simulatedExpiresAt = new Date(simulatedStartDate);
-    simulatedExpiresAt.setDate(simulatedExpiresAt.getDate() + LEVEL_DURATION_DAYS);
+    // Simular el "ahora" desplazado en el futuro
+    const simulatedNow = new Date();
+    simulatedNow.setDate(simulatedNow.getDate() + days_offset);
 
-    const now = new Date();
-    const isBlocked = now > simulatedExpiresAt;
-    const daysRemaining = Math.max(0, Math.ceil((simulatedExpiresAt - now) / (1000 * 60 * 60 * 24)));
+    // Comparar la fecha simulada contra expires_at real — SIN modificar expires_at
+    const expiresAt = new Date(progress.expires_at);
+    const isBlocked = simulatedNow > expiresAt;
+    const daysRemaining = Math.max(0, Math.ceil((expiresAt - simulatedNow) / (1000 * 60 * 60 * 24)));
 
-    // Actualizar UserProgress con ambos campos
-    await base44.asServiceRole.entities.UserProgress.update(progress.id, {
-      level_start_date: simulatedStartDate.toISOString(),
-      expires_at: simulatedExpiresAt.toISOString(),
+    // Solo actualizar blocked_due_to_time (NO expires_at, NO level_start_date real)
+    await sa.entities.UserProgress.update(progress.id, {
       blocked_due_to_time: isBlocked,
     });
 
@@ -49,15 +52,14 @@ Deno.serve(async (req) => {
       success: true,
       user_email,
       days_offset,
-      simulated_start_date: simulatedStartDate.toISOString(),
-      simulated_expires_at: simulatedExpiresAt.toISOString(),
+      real_expires_at: progress.expires_at,
+      simulated_now: simulatedNow.toISOString(),
       current_level: progress.current_level || 1,
-      level_duration_days: LEVEL_DURATION_DAYS,
       days_remaining: daysRemaining,
       blocked_due_to_time: isBlocked,
       message: isBlocked
-        ? `✅ Usuario bloqueado por tiempo. Simulados ${days_offset} días (límite: ${LEVEL_DURATION_DAYS}).`
-        : `ℹ️ Usuario NO bloqueado. Simulados ${days_offset} días (límite: ${LEVEL_DURATION_DAYS}, restan ${daysRemaining}).`
+        ? `✅ Usuario bloqueado por tiempo. Simulado +${days_offset} días desde hoy supera expires_at.`
+        : `ℹ️ Usuario NO bloqueado. Simulado +${days_offset} días desde hoy, restan ${daysRemaining} días para expirar.`
     });
 
   } catch (error) {

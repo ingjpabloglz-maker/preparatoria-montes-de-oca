@@ -1,8 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
-// Duración de cada nivel en días — fuente de verdad única
-const LEVEL_DURATION_DAYS = 100;
-
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
@@ -25,23 +22,19 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Folio inválido. Verifica el código e intenta de nuevo.' }, { status: 404 });
   }
 
-  // Validar tipo: solo level_advance
   if (record.folio_type !== 'level_advance') {
     return Response.json({ error: 'Este folio no es válido para inscripción de nivel.' }, { status: 400 });
   }
 
-  // Validar nivel: debe ser nivel 1
   if (record.level !== 1) {
     return Response.json({ error: 'Este folio no corresponde al Nivel 1.' }, { status: 400 });
   }
 
-  // Validar estado
   if (record.status === 'expired') {
     return Response.json({ error: 'Folio expirado. Contacta a la administración.' }, { status: 400 });
   }
 
   if (record.status === 'used') {
-    // Si ya fue usado por este mismo alumno, simplemente confirmar acceso
     if (record.user_email === user.email) {
       return Response.json({ status: 'ok', already_validated: true });
     }
@@ -52,9 +45,15 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Folio no disponible.' }, { status: 400 });
   }
 
-  // Validar que el folio sea para este alumno (si está asignado)
   if (record.user_email && record.user_email !== user.email) {
     return Response.json({ error: 'Este folio está asignado a otro alumno.' }, { status: 403 });
+  }
+
+  // ─── OBTENER DURACIÓN DESDE LevelConfig ──────────────────────────────────────
+  const levelConfigs = await sa.entities.LevelConfig.filter({ level_number: 1 });
+  const levelConfig = levelConfigs[0];
+  if (!levelConfig?.time_limit_days) {
+    return Response.json({ error: 'Configuración de nivel no encontrada. Contacta al administrador.' }, { status: 500 });
   }
 
   // ─── MARCAR FOLIO COMO USADO ─────────────────────────────────────────────────
@@ -65,10 +64,10 @@ Deno.serve(async (req) => {
     used_date: new Date().toISOString(),
   });
 
-  // ─── ESTABLECER INICIO DE NIVEL CON expires_at ───────────────────────────────
+  // ─── ESTABLECER INICIO DE NIVEL CON expires_at desde LevelConfig ─────────────
   const now = new Date();
   const expiresAt = new Date(now);
-  expiresAt.setDate(expiresAt.getDate() + LEVEL_DURATION_DAYS);
+  expiresAt.setDate(expiresAt.getDate() + levelConfig.time_limit_days);
 
   const levelData = {
     current_level: 1,
