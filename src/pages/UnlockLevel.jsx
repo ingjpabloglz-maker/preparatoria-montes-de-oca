@@ -53,44 +53,9 @@ export default function UnlockLevel() {
     return sp?.completed && sp?.test_passed;
   });
 
-  const { data: levelConfigs = [] } = useQuery({
-    queryKey: ['levelConfigs'],
-    queryFn: () => base44.entities.LevelConfig.list(),
-    staleTime: 30 * 60 * 1000,
-  });
-
   const handleUnlockSuccess = async () => {
-    // Obtener duración desde LevelConfig — fuente de verdad
-    const levelConfig = levelConfigs.find(c => c.level_number === levelNum);
-    const timeLimitDays = levelConfig?.time_limit_days;
-    if (!timeLimitDays) {
-      console.error(`No se encontró LevelConfig para nivel ${levelNum}`);
-      return;
-    }
-
-    const now = new Date();
-    const expiresAt = new Date(now);
-    expiresAt.setDate(expiresAt.getDate() + timeLimitDays);
-
-    const levelData = {
-      current_level: levelNum,
-      level_start_date: now.toISOString(),
-      expires_at: expiresAt.toISOString(),
-      blocked_due_to_time: false,
-    };
-
-    if (progress) {
-      await base44.entities.UserProgress.update(progress.id, levelData);
-    } else {
-      await base44.entities.UserProgress.create({
-        user_email: user.email,
-        ...levelData,
-        completed_subjects: [],
-        test_scores: [],
-        total_progress_percent: 0,
-      });
-    }
-
+    // Delegar al backend: calcula expires_at con tiempo del servidor + LevelConfig
+    await base44.functions.invoke('advanceToLevel', { level_number: levelNum });
     setTimeout(() => {
       window.location.href = createPageUrl(`Level?level=${levelNum}`);
     }, 1500);

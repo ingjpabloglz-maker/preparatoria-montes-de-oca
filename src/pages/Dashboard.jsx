@@ -419,10 +419,16 @@ export default function Dashboard() {
   const isBlockedByTime = progress?.blocked_due_to_time === true || (daysRemaining !== null && daysRemaining === 0);
 
   const handleTimeUnlockSuccess = async () => {
-    // Extender 30 días desde hoy usando expires_at explícito
+    // Extender usando LevelConfig.time_limit_days — sin hardcodear días
     if (progress) {
+      const levelConfig = levels.find(l => l.level_number === currentLevel);
+      if (!levelConfig?.time_limit_days) {
+        console.error('No se encontró LevelConfig para el nivel actual');
+        window.location.reload();
+        return;
+      }
       const newExpiresAt = new Date();
-      newExpiresAt.setDate(newExpiresAt.getDate() + 30);
+      newExpiresAt.setDate(newExpiresAt.getDate() + levelConfig.time_limit_days);
       await base44.entities.UserProgress.update(progress.id, {
         expires_at: newExpiresAt.toISOString(),
         blocked_due_to_time: false,
@@ -668,7 +674,6 @@ export default function Dashboard() {
               const levelConfig = levels.find(l => l.level_number === levelNum) || {
                 level_number: levelNum,
                 name: `Nivel ${levelNum}`,
-                time_limit_days: 180
               };
               const isUnlocked = levelNum <= currentLevel;
               const isCompleted = levelNum < currentLevel;
