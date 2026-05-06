@@ -56,16 +56,17 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Configuración de nivel no encontrada. Contacta al administrador.' }, { status: 500 });
   }
 
+  const now = new Date();
+
   // ─── MARCAR FOLIO COMO USADO ─────────────────────────────────────────────────
   await sa.entities.Payment.update(record.id, {
     status: 'used',
     user_email: user.email,
     student_name: user.full_name,
-    used_date: new Date().toISOString(),
+    used_date: now.toISOString(),
   });
 
   // ─── ESTABLECER INICIO DE NIVEL CON expires_at desde LevelConfig ─────────────
-  const now = new Date();
   const expiresAt = new Date(now);
   expiresAt.setDate(expiresAt.getDate() + levelConfig.time_limit_days);
 
@@ -75,6 +76,7 @@ Deno.serve(async (req) => {
     expires_at: expiresAt.toISOString(),
     blocked_due_to_time: false,
     graduation_status: 'in_progress',
+    current_installment: 2, // la primera queda cubierta por este folio
   };
 
   const existingProgress = await sa.entities.UserProgress.filter({ user_email: user.email });
@@ -89,12 +91,13 @@ Deno.serve(async (req) => {
     });
   }
 
-  // ─── GENERAR COLEGIATURAS AUTOMÁTICAMENTE ────────────────────────────────────
+  // ─── GENERAR COLEGIATURAS — pasando trazabilidad del folio de inscripción ─────
   await base44.functions.invoke('generateInstallments', {
     user_email: user.email,
     level: 1,
     level_start_date: now.toISOString(),
-    mark_first_as_paid: true, // el folio de inscripción cubre la primera colegiatura
+    origin_folio: folio_code,
+    origin_payment_id: record.id,
   });
 
   return Response.json({ status: 'ok', message: '¡Acceso desbloqueado! Bienvenido a la plataforma.' });

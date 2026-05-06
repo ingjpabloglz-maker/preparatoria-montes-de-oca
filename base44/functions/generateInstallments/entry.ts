@@ -3,13 +3,13 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 /**
  * Genera las 4 colegiaturas de un nivel para un usuario.
  * Se llama automáticamente al iniciar un nivel (desde validateLevel1Folio y advanceToLevel).
- * Puede llamarse también por admin para migración.
  *
  * Parámetros:
  *   - user_email
  *   - level
  *   - level_start_date (ISO string)
- *   - mark_first_as_paid (boolean, default false) — para migración de usuarios existentes
+ *   - origin_folio     (string, opcional) — folio de inscripción que cubre la primera colegiatura
+ *   - origin_payment_id (string, opcional) — ID del Payment que cubre la primera colegiatura
  */
 Deno.serve(async (req) => {
   try {
@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { user_email, level, level_start_date, mark_first_as_paid = false } = body;
+    const { user_email, level, level_start_date, origin_folio = null, origin_payment_id = null } = body;
 
     // Solo admin puede generar para otros usuarios
     if (user_email !== user.email && user.role !== 'admin') {
@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     }
 
     const totalDays = levelConfig.time_limit_days;
-    const intervalDays = Math.floor(totalDays / 4); // 25 días si totalDays=100
+    const intervalDays = Math.floor(totalDays / 4);
 
     // Eliminar colegiaturas previas del mismo nivel (re-generación limpia)
     const existing = await sa.entities.LevelPaymentPlan.filter({ user_email, level });
@@ -55,20 +55,32 @@ Deno.serve(async (req) => {
       const dueDate = new Date(startDate);
       dueDate.setDate(dueDate.getDate() + i * intervalDays);
 
-      const isFirstAndPaid = i === 0 && mark_first_as_paid;
-      const isOverdue = !isFirstAndPaid && now > dueDate;
+      // ── La primera colegiatura se cubre con el folio de inscripción (con trazabilidad real)
+      const isFirst = i === 0;
+      const hasOriginEvidence = isFirst && !!origin_folio;
+      const isOverdue = !isFirst && now > dueDate;
 
       const record = await sa.entities.LevelPaymentPlan.create({
         user_email,
         level,
         installment_number: i + 1,
         due_date: dueDate.toISOString(),
-        paid_at: isFirstAndPaid ? now.toISOString() : null,
-        status: isFirstAndPaid ? 'paid' : (isOverdue ? 'overdue' : 'pending'),
-        folio_used: null,
-        payment_id: null,
+        paid_at: hasOriginEvidence ? now.toISOString() : null,
+        status: hasOriginEvidence ? 'paid' : (isOverdue ? 'overdue' : 'pending'),
+        folio_used: hasOriginEvidence ? origin_folio : null,
+        payment_id: hasOriginEvidence ? (origin_payment_id || null) : null,
       });
       created.push(record);
+    }
+
+    // ── Actualizar current_installment en UserProgress
+    const firstUnpaidNum = created.find(c => c.status !== 'paid')?.installment_number ?? null;
+    const progressList = await sa.entities.UserProgress.filter({ user_email });
+    const progress = progressList[0];
+    if (progress) {
+      await sa.entities.UserProgress.update(progress.id, {
+        current_installment: firstUnpaidNum,
+      });
     }
 
     return Response.json({

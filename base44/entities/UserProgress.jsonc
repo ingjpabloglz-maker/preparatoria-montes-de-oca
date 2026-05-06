@@ -21,6 +21,10 @@
       "format": "date-time",
       "description": "Fecha exacta de expiraci\u00f3n del acceso al nivel actual. Calculada como level_start_date + LEVEL_DURATION_DAYS."
     },
+    "current_installment": {
+      "type": "number",
+      "description": "N\u00famero de la pr\u00f3xima colegiatura a pagar (null si todas pagadas). Actualizado por generateInstallments y payInstallment."
+    },
     "completed_subjects": {
       "type": "array",
       "items": {
@@ -58,7 +62,7 @@
     },
     "blocked_due_to_time": {
       "type": "boolean",
-      "description": "Indica si el nivel est\u00e1 bloqueado por expiraci\u00f3n de tiempo",
+      "description": "Indica si el nivel est\u00e1 bloqueado por expiraci\u00f3n de tiempo o colegiatura vencida",
       "default": false
     },
     "course_completed_at": {

@@ -26,10 +26,10 @@ Deno.serve(async (req) => {
 
     // ─── Verificar que el folio de este nivel esté marcado como 'used' ───────────
     const payments = await sa.entities.Payment.filter({ user_email: user.email });
-    const hasValidPayment = payments.some(
+    const originPayment = payments.find(
       p => p.level === levelNum && p.folio_type === 'level_advance' && p.status === 'used'
     );
-    if (!hasValidPayment) {
+    if (!originPayment) {
       return Response.json({ error: 'No se encontró folio válido para este nivel.' }, { status: 403 });
     }
 
@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: `LevelConfig no encontrado para nivel ${levelNum}. Contacta al administrador.` }, { status: 500 });
     }
 
-    // ─── Calcular expires_at en el servidor (tiempo UTC del servidor) ─────────────
+    // ─── Calcular expires_at en el servidor ──────────────────────────────────────
     const now = new Date();
     const expiresAt = new Date(now);
     expiresAt.setDate(expiresAt.getDate() + levelConfig.time_limit_days);
@@ -50,6 +50,7 @@ Deno.serve(async (req) => {
       level_start_date: now.toISOString(),
       expires_at: expiresAt.toISOString(),
       blocked_due_to_time: false,
+      current_installment: 2, // la primera queda cubierta por el folio de inscripción
     };
 
     const existingProgress = await sa.entities.UserProgress.filter({ user_email: user.email });
@@ -65,12 +66,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ─── GENERAR COLEGIATURAS AUTOMÁTICAMENTE ────────────────────────────────────
+    // ─── GENERAR COLEGIATURAS — pasando trazabilidad del folio de inscripción ─────
     await base44.functions.invoke('generateInstallments', {
       user_email: user.email,
       level: levelNum,
       level_start_date: now.toISOString(),
-      mark_first_as_paid: true,
+      origin_folio: originPayment.folio,
+      origin_payment_id: originPayment.id,
     });
 
     return Response.json({
