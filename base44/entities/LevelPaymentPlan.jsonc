@@ -1,0 +1,52 @@
+{
+  "name": "LevelPaymentPlan",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del alumno"
+    },
+    "level": {
+      "type": "number",
+      "description": "Nivel acad\u00e9mico (1-6)"
+    },
+    "installment_number": {
+      "type": "number",
+      "description": "N\u00famero de colegiatura (1-4)"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha l\u00edmite de pago"
+    },
+    "paid_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de pago (null si no ha pagado)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "paid",
+        "overdue"
+      ],
+      "default": "pending",
+      "description": "Estado: pending=pendiente, paid=pagado, overdue=vencido"
+    },
+    "folio_used": {
+      "type": "string",
+      "description": "C\u00f3digo del folio usado para este pago"
+    },
+    "payment_id": {
+      "type": "string",
+      "description": "ID del registro Payment usado"
+    }
+  },
+  "required": [
+    "user_email",
+    "level",
+    "installment_number",
+    "due_date"
+  ]
+}

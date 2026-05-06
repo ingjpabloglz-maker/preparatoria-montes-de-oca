@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
 
     const currentLevel = progress.current_level || 1;
 
-    // Verificar pago activo para el nivel actual
+    // Verificar pago de inscripción (folio level_advance) para el nivel actual
     const payments = await base44.entities.Payment.filter({ user_email });
     const hasValidPayment = payments.some(
       p => p.level === currentLevel && p.folio_type === 'level_advance' && p.status === 'used'
@@ -50,10 +50,8 @@ Deno.serve(async (req) => {
         const recalculated = new Date(startDate);
         recalculated.setDate(recalculated.getDate() + levelConfig.time_limit_days);
         expiresAtStr = recalculated.toISOString();
-        // Persistir el valor recalculado
         await sa.entities.UserProgress.update(progress.id, { expires_at: expiresAtStr });
       } else {
-        // Sin configuración ni start_date: denegar acceso por seguridad
         return Response.json({
           has_access: false,
           current_level: currentLevel,
@@ -66,11 +64,10 @@ Deno.serve(async (req) => {
     const now = new Date();
     const isExpired = now > new Date(expiresAtStr);
 
-    if (isExpired && !progress.blocked_due_to_time) {
-      await sa.entities.UserProgress.update(progress.id, { blocked_due_to_time: true });
-    }
-
-    if (isExpired || progress.blocked_due_to_time) {
+    if (isExpired) {
+      if (!progress.blocked_due_to_time) {
+        await sa.entities.UserProgress.update(progress.id, { blocked_due_to_time: true });
+      }
       return Response.json({
         has_access: false,
         current_level: currentLevel,
@@ -78,6 +75,39 @@ Deno.serve(async (req) => {
         expires_at: expiresAtStr,
         reason: 'El tiempo asignado para este nivel ha expirado.'
       });
+    }
+
+    // ─── VALIDACIÓN DE COLEGIATURAS VENCIDAS ─────────────────────────────────
+    const installments = await sa.entities.LevelPaymentPlan.filter({ user_email, level: currentLevel });
+    const now2 = new Date();
+
+    // Sincronizar estados overdue
+    for (const inst of installments) {
+      if (inst.status === 'pending' && now2 > new Date(inst.due_date)) {
+        await sa.entities.LevelPaymentPlan.update(inst.id, { status: 'overdue' });
+        inst.status = 'overdue';
+      }
+    }
+
+    const hasOverdue = installments.some(i => i.status === 'overdue');
+
+    if (hasOverdue) {
+      if (!progress.blocked_due_to_time) {
+        await sa.entities.UserProgress.update(progress.id, { blocked_due_to_time: true });
+      }
+      const overdueInst = installments.filter(i => i.status === 'overdue');
+      return Response.json({
+        has_access: false,
+        current_level: currentLevel,
+        blocked_due_to_installment: true,
+        overdue_installments: overdueInst.map(i => i.installment_number),
+        reason: `Tienes ${overdueInst.length} colegiatura(s) vencida(s). Paga para restablecer tu acceso.`
+      });
+    }
+
+    // Desbloquear si estaba bloqueado y ya no hay bloqueos activos
+    if (progress.blocked_due_to_time) {
+      await sa.entities.UserProgress.update(progress.id, { blocked_due_to_time: false });
     }
 
     return Response.json({

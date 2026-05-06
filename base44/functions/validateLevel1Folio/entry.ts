@@ -89,5 +89,13 @@ Deno.serve(async (req) => {
     });
   }
 
+  // ─── GENERAR COLEGIATURAS AUTOMÁTICAMENTE ────────────────────────────────────
+  await base44.functions.invoke('generateInstallments', {
+    user_email: user.email,
+    level: 1,
+    level_start_date: now.toISOString(),
+    mark_first_as_paid: true, // el folio de inscripción cubre la primera colegiatura
+  });
+
   return Response.json({ status: 'ok', message: '¡Acceso desbloqueado! Bienvenido a la plataforma.' });
 });

@@ -33,6 +33,8 @@ import {
 import { toast } from "sonner";
 import AdminGuard from '../components/auth/AdminGuard';
 import FolioTicket from '../components/payment/FolioTicket';
+import InstallmentsAdminPanel from '../components/admin/InstallmentsAdminPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const formatName = (u) => {
   const parts = [u.apellido_paterno, u.apellido_materno, u.nombres].filter(Boolean);
@@ -43,6 +45,7 @@ const folioTypeLabel = {
   level_advance: 'Avance de Nivel',
   time_unlock: 'Desbloqueo por Tiempo',
   extraordinary_test: 'Prueba Extraordinaria',
+  installment: 'Colegiatura',
 };
 
 export default function ManageFolios() {
@@ -155,10 +158,22 @@ export default function ManageFolios() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900">Gestión de Folios</h1>
-              <p className="text-gray-500">Genera y asigna folios de pago a alumnos</p>
+              <h1 className="text-2xl font-bold text-gray-900">Gestión de Folios y Colegiaturas</h1>
+              <p className="text-gray-500">Genera folios y consulta el estado de colegiaturas</p>
             </div>
           </div>
+
+          <Tabs defaultValue="folios">
+            <TabsList className="bg-white shadow-sm">
+              <TabsTrigger value="folios">Folios de Pago</TabsTrigger>
+              <TabsTrigger value="colegiaturas">Colegiaturas</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="colegiaturas" className="mt-4">
+              <InstallmentsAdminPanel />
+            </TabsContent>
+
+            <TabsContent value="folios" className="mt-4 space-y-6">
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4">
@@ -207,8 +222,9 @@ export default function ManageFolios() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="level_advance">Avance de Nivel</SelectItem>
-                      <SelectItem value="time_unlock">Desbloqueo por Tiempo</SelectItem>
-                      <SelectItem value="extraordinary_test">Prueba Extraordinaria</SelectItem>
+                       <SelectItem value="time_unlock">Desbloqueo por Tiempo</SelectItem>
+                       <SelectItem value="extraordinary_test">Prueba Extraordinaria</SelectItem>
+                       <SelectItem value="installment">Colegiatura</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -407,6 +423,8 @@ export default function ManageFolios() {
               </Table>
             </CardContent>
           </Card>
+          </TabsContent>
+          </Tabs>
         </div>
       </div>
 
