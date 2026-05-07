@@ -130,6 +130,10 @@ export default function AdminDashboard() {
                 <BarChart2 className="w-4 h-4 mr-2" />
                 Estadísticas
               </Button>
+              <Button variant="outline" size="sm" onClick={() => window.location.href = '/ManageActivities'}>
+                <BookOpen className="w-4 h-4 mr-2" />
+                Actividades IA
+              </Button>
               <Button size="sm" onClick={() => window.location.href = createPageUrl('ManageFolios')}>
                 <CreditCard className="w-4 h-4 mr-2" />
                 Gestionar Folios

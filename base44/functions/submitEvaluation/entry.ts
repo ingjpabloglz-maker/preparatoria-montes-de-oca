@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
   // ─── LÓGICA CRÍTICA: final_exam SIEMPRE requiere revisión docente ─────────────
   // El docente aprueba/rechaza manualmente — nunca automático
   const isFinalExam = type === 'final_exam';
-  const passThreshold = type === 'final_exam' ? 70 : 80;
+  const passThreshold = type === 'final_exam' ? 70 : type === 'mini_eval' ? 60 : 60;
   
   let passed;
   let requiresManualReview;

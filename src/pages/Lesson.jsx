@@ -191,7 +191,7 @@ export default function Lesson() {
   const totalPoints = activities.reduce((s, a) => s + (a.points || 10), 0);
   const earnedPoints = answers.reduce((s, a) => s + a.points, 0);
   const finalScore = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
-  const passed = lesson?.is_mini_eval ? finalScore >= 80 : finalScore >= 60;
+  const passed = finalScore >= 60;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white">

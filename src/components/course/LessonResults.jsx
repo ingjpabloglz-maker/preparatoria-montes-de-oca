@@ -23,11 +23,13 @@ export default function LessonResults({
   const getMessage = () => {
     if (isMiniEval) {
       if (passed) return { title: '¡Módulo completado! 🎉', sub: 'Excelente trabajo, puedes continuar al siguiente módulo.' };
-      return { title: 'Casi lo logras 💪', sub: 'Necesitas 80% para desbloquear el siguiente módulo. ¡Inténtalo de nuevo!' };
+      return { title: 'Casi lo logras 💪', sub: 'Necesitas al menos 60% para desbloquear el siguiente módulo. ¡Inténtalo de nuevo!' };
     }
-    if (score >= 80) return { title: '¡Perfecto! ⭐', sub: 'Dominaste esta lección.' };
-    if (score >= 60) return { title: '¡Buen trabajo! 👍', sub: 'Lección completada. Sigue así.' };
-    return { title: 'Completado 📚', sub: 'Puedes repetir la lección para mejorar tu puntuación.' };
+    if (passed) {
+      if (score >= 80) return { title: '¡Perfecto! ⭐', sub: 'Dominaste esta lección.' };
+      return { title: '¡Buen trabajo! 👍', sub: 'Lección aprobada. Sigue así.' };
+    }
+    return { title: 'No aprobado 📚', sub: 'Necesitas al menos 60% para avanzar. Puedes repetir la lección.' };
   };
 
   const { title, sub } = getMessage();
@@ -104,7 +106,7 @@ export default function LessonResults({
           <div className="flex items-center gap-2 justify-center">
             {passed
               ? <><Trophy className="w-4 h-4 text-green-400" /><span className="text-sm font-semibold text-green-300">Módulo desbloqueado</span></>
-              : <><Zap className="w-4 h-4 text-amber-400" /><span className="text-sm font-semibold text-amber-300">Mínimo requerido: 80%</span></>
+              : <><Zap className="w-4 h-4 text-amber-400" /><span className="text-sm font-semibold text-amber-300">Mínimo requerido: 60%</span></>
             }
           </div>
         </div>
@@ -112,9 +114,15 @@ export default function LessonResults({
 
       {/* Actions */}
       <div className="w-full max-w-sm space-y-2.5">
+        {!passed && (
+          <div className="bg-red-500/20 border border-red-500/40 rounded-xl p-3 text-center text-sm text-red-300 font-medium">
+            Necesitas al menos 60% para avanzar. Repite la lección.
+          </div>
+        )}
         <Button
           onClick={onContinue}
-          className="w-full h-12 bg-gradient-to-r from-blue-500 to-violet-600 text-white font-bold rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2"
+          disabled={!passed}
+          className="w-full h-12 bg-gradient-to-r from-blue-500 to-violet-600 text-white font-bold rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isMiniEval && passed ? 'Continuar al siguiente módulo' : 'Ver ruta de aprendizaje'}
           <ArrowRight className="w-4 h-4" />

@@ -482,7 +482,7 @@ IMPORTANTE: devuelve SOLO el JSON, sin bloques de código markdown.`,
         </div>
         {isMiniEval ? (
           <div className="flex items-center gap-1.5">
-            <span>Pasa con ≥80%</span>
+            <span>Pasa con ≥60%</span>
           </div>
         ) : (
           <div className="flex items-center gap-1.5">

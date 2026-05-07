@@ -20,6 +20,7 @@ import AuditDashboard from './pages/AuditDashboard';
 import StudentRecord from './pages/StudentRecord';
 import TeacherDashboard from './pages/TeacherDashboard';
 import WelcomeGate from './pages/WelcomeGate';
+import ManageActivities from './pages/ManageActivities';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -111,6 +112,7 @@ const AuthenticatedApp = () => {
       <Route path="/AuditDashboard" element={<LayoutWrapper currentPageName="AuditDashboard"><AuditDashboard /></LayoutWrapper>} />
       <Route path="/StudentRecord/:user_email" element={<LayoutWrapper currentPageName="StudentRecord"><StudentRecord /></LayoutWrapper>} />
       <Route path="/TeacherDashboard" element={<LayoutWrapper currentPageName="TeacherDashboard"><TeacherDashboard /></LayoutWrapper>} />
+      <Route path="/ManageActivities" element={<LayoutWrapper currentPageName="ManageActivities"><ManageActivities /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
     </>
