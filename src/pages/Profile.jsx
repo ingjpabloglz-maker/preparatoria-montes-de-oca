@@ -52,7 +52,7 @@ export default function Profile() {
           <h1 className="text-2xl font-bold text-gray-900">Mi Perfil</h1>
         </div>
 
-        <Tabs defaultValue="profile">
+        <Tabs defaultValue={window.location.hash === '#installments' ? 'installments' : 'profile'}>
           <TabsList className="bg-white shadow-sm">
             <TabsTrigger value="profile" className="flex items-center gap-2">
               <User className="w-4 h-4" />

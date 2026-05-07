@@ -25,7 +25,8 @@ import {
   BarChart2,
   MessageCircle,
   Shield,
-  ClipboardCheck
+  ClipboardCheck,
+  CreditCard
 } from "lucide-react";
 import { hasPermission } from '@/lib/permissions';
 import { useAuth } from '@/lib/AuthContext';
@@ -94,6 +95,15 @@ export default function Layout({ children, currentPageName }) {
                     >
                       <MessageCircle className="w-4 h-4 mr-2" />
                       Foro
+                    </Button>
+                  </Link>
+                  <Link to={createPageUrl('Profile')}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Colegiaturas
                     </Button>
                   </Link>
                 </>
