@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 Deno.serve(async (req) => {
+  try {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -115,7 +116,16 @@ IMPORTANTE: devuelve SOLO el JSON array, sin texto adicional.`;
     }
   });
 
-  const activities = result?.activities || [];
+  // El LLM puede devolver {activities:[...]} o directamente un array
+  let activities = [];
+  if (Array.isArray(result)) {
+    activities = result;
+  } else if (result?.activities && Array.isArray(result.activities)) {
+    activities = result.activities;
+  } else {
+    console.error('Unexpected LLM result shape:', JSON.stringify(result)?.slice(0, 300));
+    return Response.json({ error: 'LLM returned unexpected format' }, { status: 500 });
+  }
 
   if (activities.length === 0) {
     return Response.json({ error: 'No activities generated' }, { status: 500 });
@@ -179,4 +189,8 @@ IMPORTANTE: devuelve SOLO el JSON array, sin texto adicional.`;
     activities_created: created.length,
     activities: created,
   });
+  } catch (e) {
+    console.error('generateLessonActivities error:', e.message, e.stack);
+    return Response.json({ error: e.message }, { status: 500 });
+  }
 });
