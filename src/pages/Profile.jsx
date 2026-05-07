@@ -34,6 +34,14 @@ export default function Profile() {
 
   const isStudent = user?.role === 'user';
 
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-2xl mx-auto p-6 space-y-6">
