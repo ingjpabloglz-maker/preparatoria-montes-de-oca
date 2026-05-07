@@ -27,7 +27,7 @@ export default function LessonResults({
     }
     if (score >= 80) return { title: '¡Perfecto! ⭐', sub: 'Dominaste esta lección.' };
     if (score >= 60) return { title: '¡Buen trabajo! 👍', sub: 'Lección completada. Sigue así.' };
-    return { title: 'Completado 📚', sub: 'Revisa la explicación e inténtalo de nuevo para mejorar.' };
+    return { title: 'Completado 📚', sub: 'Puedes repetir la lección para mejorar tu puntuación.' };
   };
 
   const { title, sub } = getMessage();
@@ -120,15 +120,13 @@ export default function LessonResults({
           <ArrowRight className="w-4 h-4" />
         </Button>
 
-        {(!passed || !isMiniEval) && (
-          <Button
-            onClick={onRetry}
-            variant="ghost"
-            className="w-full h-12 text-white/60 hover:text-white hover:bg-white/10 rounded-xl font-medium flex items-center justify-center gap-2"
-          >
-            <RotateCcw className="w-4 h-4" /> Intentar de nuevo
-          </Button>
-        )}
+        <Button
+          onClick={onRetry}
+          variant="ghost"
+          className="w-full h-12 text-white/60 hover:text-white hover:bg-white/10 rounded-xl font-medium flex items-center justify-center gap-2"
+        >
+          <RotateCcw className="w-4 h-4" /> Repetir lección
+        </Button>
       </div>
     </div>
   );

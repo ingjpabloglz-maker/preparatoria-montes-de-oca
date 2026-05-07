@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -57,9 +57,7 @@ function checkAnswer(userAnswer, activity) {
   if (type === 'true_false') {
     const trueVals = ['verdadero', 'true', 'v'];
     const falseVals = ['falso', 'false', 'f'];
-    const uaTrue = trueVals.includes(ua);
-    const caTrue = trueVals.includes(ca);
-    if (uaTrue && caTrue) return true;
+    if (trueVals.includes(ua) && trueVals.includes(ca)) return true;
     if (falseVals.includes(ua) && falseVals.includes(ca)) return true;
   }
 
@@ -73,7 +71,7 @@ function checkAnswer(userAnswer, activity) {
   return allValid.includes(ua);
 }
 
-// ─── SUB-COMPONENTES DE TIPOS DE RESPUESTA ───────────────────────────────────
+// ─── SUB-COMPONENTES ──────────────────────────────────────────────────────────
 
 function MultipleChoice({ options, selected, submitted, correct, onSelect }) {
   return (
@@ -110,7 +108,6 @@ function MultipleChoice({ options, selected, submitted, correct, onSelect }) {
 function MultipleSelect({ options, selected = [], submitted, correctRaw, onToggle }) {
   let correctArr = [];
   try { correctArr = JSON.parse(correctRaw); } catch { correctArr = [correctRaw]; }
-
   return (
     <div className="space-y-2.5">
       <p className="text-xs text-white/40 mb-1">Selecciona todas las correctas</p>
@@ -147,8 +144,8 @@ function TrueFalseChoice({ selected, submitted, correct, onSelect }) {
       {options.map((option) => {
         const isSelected = selected === option;
         const isCorrectOption =
-          (normalizedCorrect === 'verdadero' || normalizedCorrect === 'true') && option === 'Verdadero' ||
-          (normalizedCorrect === 'falso' || normalizedCorrect === 'false') && option === 'Falso';
+          ((normalizedCorrect === 'verdadero' || normalizedCorrect === 'true') && option === 'Verdadero') ||
+          ((normalizedCorrect === 'falso' || normalizedCorrect === 'false') && option === 'Falso');
         let cls = 'py-5 rounded-2xl border text-sm font-bold transition-all ';
         if (!submitted) {
           cls += isSelected
@@ -199,7 +196,6 @@ function OrderSteps({ items, order, submitted, onReorder }) {
     [newOrder[i], newOrder[i + 1]] = [newOrder[i + 1], newOrder[i]];
     onReorder(newOrder);
   };
-
   return (
     <div className="space-y-2">
       <p className="text-xs text-white/40 mb-1">Ordena los pasos usando ↑ ↓</p>
@@ -220,28 +216,21 @@ function OrderSteps({ items, order, submitted, onReorder }) {
 }
 
 function DragDrop({ dragItems, dropTargets, mapping, submitted, correctRaw, onMap }) {
-  // mapping: { [target]: item }
   let correctMapping = {};
   try { correctMapping = JSON.parse(correctRaw); } catch {}
-
   const unmapped = dragItems.filter(item => !Object.values(mapping).includes(item));
-
   const handleDrop = (target, item) => {
     if (submitted) return;
     onMap({ ...mapping, [target]: item });
   };
-
   return (
     <div className="space-y-3">
-      {/* Items disponibles */}
       <div className="flex flex-wrap gap-2 p-3 bg-white/5 rounded-xl border border-white/10 min-h-[48px]">
-        <p className="w-full text-xs text-white/40 mb-1">Arrastra o haz clic para asignar:</p>
+        <p className="w-full text-xs text-white/40 mb-1">Haz clic para asignar:</p>
         {unmapped.map((item, i) => (
-          <button
-            key={i}
+          <button key={i}
             className="px-3 py-1.5 bg-blue-500/20 border border-blue-400/40 text-blue-200 text-xs rounded-lg hover:bg-blue-500/30 transition-all"
             onClick={() => {
-              // Asignar al primer destino vacío
               const emptyTarget = dropTargets.find(t => !mapping[t]);
               if (emptyTarget) handleDrop(emptyTarget, item);
             }}
@@ -251,7 +240,6 @@ function DragDrop({ dragItems, dropTargets, mapping, submitted, correctRaw, onMa
         ))}
         {unmapped.length === 0 && <span className="text-white/30 text-xs">Todos asignados</span>}
       </div>
-      {/* Destinos */}
       <div className="space-y-2">
         {dropTargets.map((target, i) => {
           const assigned = mapping[target];
@@ -260,14 +248,12 @@ function DragDrop({ dragItems, dropTargets, mapping, submitted, correctRaw, onMa
           return (
             <div key={i} className="flex items-center gap-3">
               <span className="text-xs text-white/50 flex-shrink-0 w-24 text-right">{target}:</span>
-              <div
-                className={`flex-1 min-h-[38px] px-3 py-2 rounded-lg border text-sm flex items-center justify-between ${
-                  isCorrect ? 'bg-green-500/20 border-green-400/50 text-green-200' :
-                  isWrong ? 'bg-red-500/20 border-red-400/50 text-red-200' :
-                  assigned ? 'bg-violet-500/20 border-violet-400/40 text-white' :
-                  'bg-white/5 border-white/15 text-white/30 border-dashed'
-                }`}
-              >
+              <div className={`flex-1 min-h-[38px] px-3 py-2 rounded-lg border text-sm flex items-center justify-between ${
+                isCorrect ? 'bg-green-500/20 border-green-400/50 text-green-200' :
+                isWrong ? 'bg-red-500/20 border-red-400/50 text-red-200' :
+                assigned ? 'bg-violet-500/20 border-violet-400/40 text-white' :
+                'bg-white/5 border-white/15 text-white/30 border-dashed'
+              }`}>
                 <span>{assigned || 'Sin asignar'}</span>
                 {assigned && !submitted && (
                   <button onClick={() => { const m = {...mapping}; delete m[target]; onMap(m); }} className="text-white/40 hover:text-white ml-2 text-xs">×</button>
@@ -283,8 +269,6 @@ function DragDrop({ dragItems, dropTargets, mapping, submitted, correctRaw, onMa
 
 function StepByStep({ steps, stepAnswers, submitted, onAnswer }) {
   const currentStep = stepAnswers.length;
-  const isDone = currentStep >= steps.length;
-
   return (
     <div className="space-y-3">
       {steps.map((step, i) => {
@@ -292,7 +276,6 @@ function StepByStep({ steps, stepAnswers, submitted, onAnswer }) {
         const isDoneStep = i < currentStep || submitted;
         const userAns = stepAnswers[i] || '';
         const isCorrectStep = normalize(userAns) === normalize(step.answer);
-
         return (
           <div key={i} className={`rounded-xl border p-3 transition-all ${
             isActive ? 'border-blue-400/60 bg-blue-500/10' :
@@ -300,9 +283,7 @@ function StepByStep({ steps, stepAnswers, submitted, onAnswer }) {
             'border-white/10 bg-white/3 opacity-40'
           }`}>
             <p className="text-xs text-white/50 mb-2">Paso {i + 1}: <MdMath>{step.instruction}</MdMath></p>
-            {isActive && (
-              <StepInput stepIndex={i} step={step} onSubmitStep={(ans) => onAnswer(i, ans)} />
-            )}
+            {isActive && <StepInput step={step} onSubmitStep={(ans) => onAnswer(i, ans)} />}
             {isDoneStep && (
               <div className="flex items-center gap-2 text-sm">
                 {isCorrectStep
@@ -318,7 +299,7 @@ function StepByStep({ steps, stepAnswers, submitted, onAnswer }) {
   );
 }
 
-function StepInput({ stepIndex, step, onSubmitStep }) {
+function StepInput({ step, onSubmitStep }) {
   const [val, setVal] = useState('');
   return (
     <div className="flex gap-2">
@@ -349,21 +330,20 @@ export default function ActivityCard({
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [multiSelected, setMultiSelected] = useState([]);
   const [fillValue, setFillValue] = useState('');
-  const [orderItems, setOrderItems] = useState(() => {
+  const [orderItems] = useState(() => {
     if (activity.type === 'order_steps' || activity.type === 'drag_drop') {
-      const items = activity.options || [];
-      return [...items].sort(() => Math.random() - 0.5);
+      return [...(activity.options || [])].sort(() => Math.random() - 0.5);
     }
     return [];
   });
+  const [orderedItems, setOrderedItems] = useState(orderItems);
   const [dragMapping, setDragMapping] = useState({});
   const [stepAnswers, setStepAnswers] = useState([]);
 
   const [submitted, setSubmitted] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
-  const [attemptCount, setAttemptCount] = useState(0);
+  const [hintUsed, setHintUsed] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const [hintIndex, setHintIndex] = useState(0);
   const [explanationLevel, setExplanationLevel] = useState('basic');
   const [showAiExplanation, setShowAiExplanation] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -373,9 +353,9 @@ export default function ActivityCard({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const { playSound } = useSound();
-  const maxAttempts = activity.max_attempts || 3;
   const hints = activity.hints || [];
-  const hasHints = hints.length > 0;
+  const hasHint = hints.length > 0;
+  const hintPenalty = activity.hint_penalty ?? 2; // puntos que se restan si usa hint
 
   // Timer
   useEffect(() => {
@@ -386,7 +366,7 @@ export default function ActivityCard({
 
   const getCurrentAnswer = () => {
     if (activity.type === 'multiple_select') return JSON.stringify(multiSelected);
-    if (activity.type === 'order_steps') return JSON.stringify(orderItems);
+    if (activity.type === 'order_steps') return JSON.stringify(orderedItems);
     if (activity.type === 'drag_drop') return JSON.stringify(dragMapping);
     if (activity.type === 'step_by_step') return JSON.stringify(stepAnswers);
     if (activity.type === 'fill_blank' || activity.type === 'solve') return fillValue.trim();
@@ -406,13 +386,10 @@ export default function ActivityCard({
     const answer = getCurrentAnswer();
     if (!answer && answer !== false) return;
 
-    const newAttempt = attemptCount + 1;
-    setAttemptCount(newAttempt);
-
     const correct = checkAnswer(answer, activity);
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
-    // Calcular bonus de tiempo
+    // Bonus de tiempo
     let bonus = 0;
     if (correct && activity.time_limit_seconds) {
       if (timeSpent < activity.time_limit_seconds * 0.5) bonus = 5;
@@ -420,31 +397,15 @@ export default function ActivityCard({
     }
     setTimeBonus(bonus);
 
-    if (correct) {
-      setIsCorrect(true);
-      setSubmitted(true);
-      playSound('correct_answer');
-      onAnswer(activity.id, true, (activity.points || 10) + bonus, answer, timeSpent, newAttempt);
-    } else {
-      playSound('incorrect_answer');
-      if (newAttempt >= maxAttempts) {
-        // Revelar respuesta
-        setIsCorrect(false);
-        setSubmitted(true);
-        onAnswer(activity.id, false, 0, answer, timeSpent, newAttempt);
-      } else {
-        // Mostrar hint si hay
-        if (hints[newAttempt - 1]) {
-          setShowHint(true);
-          setHintIndex(newAttempt - 1);
-        }
-        // Reset input para reintento
-        if (activity.type !== 'fill_blank' && activity.type !== 'solve') {
-          setSelectedAnswer(null);
-          setMultiSelected([]);
-        }
-      }
-    }
+    // Penalización por hint
+    const basePoints = activity.points || 10;
+    const penalty = hintUsed ? hintPenalty : 0;
+    const pointsEarned = correct ? Math.max(0, basePoints + bonus - penalty) : 0;
+
+    setIsCorrect(correct);
+    setSubmitted(true);
+    playSound(correct ? 'correct_answer' : 'incorrect_answer');
+    onAnswer(activity.id, correct, pointsEarned, answer, timeSpent, 1, hintUsed);
   };
 
   const handleStepAnswer = (stepIndex, answer) => {
@@ -453,25 +414,17 @@ export default function ActivityCard({
     if (newStepAnswers.length === (activity.steps?.length || 0)) {
       const allCorrect = activity.steps.every((step, i) => normalize(newStepAnswers[i]) === normalize(step.answer));
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+      const basePoints = activity.points || 10;
+      const penalty = hintUsed ? hintPenalty : 0;
+      const pointsEarned = allCorrect ? Math.max(0, basePoints - penalty) : 0;
       setIsCorrect(allCorrect);
       setSubmitted(true);
       playSound(allCorrect ? 'correct_answer' : 'incorrect_answer');
-      onAnswer(activity.id, allCorrect, allCorrect ? (activity.points || 10) : 0, JSON.stringify(newStepAnswers), timeSpent, 1);
+      onAnswer(activity.id, allCorrect, pointsEarned, JSON.stringify(newStepAnswers), timeSpent, 1, hintUsed);
     }
   };
 
   const handleNext = () => {
-    setSelectedAnswer(null);
-    setMultiSelected([]);
-    setFillValue('');
-    setSubmitted(false);
-    setIsCorrect(false);
-    setShowHint(false);
-    setHintIndex(0);
-    setAiResponse(null);
-    setShowAiExplanation(false);
-    setTimeBonus(0);
-    setStepAnswers([]);
     onNext();
   };
 
@@ -492,9 +445,26 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
       });
       setAiResponse(typeof res === 'string' ? res : res?.explanation || res);
     } catch {
-      setAiResponse('No pude generar una explicación en este momento. Revisa la explicación de abajo.');
+      setAiResponse('No pude generar una explicación en este momento.');
     }
     setAiLoading(false);
+  };
+
+  const handleShowHint = () => {
+    setShowHint(true);
+    setHintUsed(true);
+  };
+
+  const getIncorrectFeedback = () => {
+    if (!activity.incorrect_feedback) return null;
+    const answer = getCurrentAnswer();
+    return activity.incorrect_feedback[answer] || activity.incorrect_feedback['default'] || null;
+  };
+
+  const getCurrentExplanation = () => {
+    const levels = activity.explanation_levels;
+    if (!levels) return activity.explanation;
+    return levels[explanationLevel] || activity.explanation;
   };
 
   const typeLabel = {
@@ -511,23 +481,9 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
 
   const difficultyColor = { easy: 'text-green-400', medium: 'text-amber-400', hard: 'text-red-400' }[activity.difficulty] || 'text-white/40';
 
-  // Obtener el feedback específico por respuesta incorrecta
-  const getIncorrectFeedback = () => {
-    if (!activity.incorrect_feedback) return null;
-    const answer = getCurrentAnswer();
-    return activity.incorrect_feedback[answer] || activity.incorrect_feedback['default'] || null;
-  };
-
-  // Explicación actual según nivel seleccionado
-  const getCurrentExplanation = () => {
-    const levels = activity.explanation_levels;
-    if (!levels) return activity.explanation;
-    return levels[explanationLevel] || activity.explanation;
-  };
-
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-      {/* Header: type + streak + difficulty */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">{typeLabel}</span>
@@ -550,16 +506,6 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
         </div>
       </div>
 
-      {/* Intentos restantes */}
-      {!submitted && attemptCount > 0 && maxAttempts > 1 && (
-        <div className="flex items-center gap-1.5 mb-3">
-          {Array.from({ length: maxAttempts }).map((_, i) => (
-            <div key={i} className={`h-1.5 flex-1 rounded-full ${i < attemptCount ? 'bg-red-400/60' : 'bg-white/20'}`} />
-          ))}
-          <span className="text-xs text-white/40 ml-1">{maxAttempts - attemptCount} intentos restantes</span>
-        </div>
-      )}
-
       {/* Question */}
       <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 mb-5 border border-white/10">
         <div className="text-white text-base sm:text-lg font-medium leading-relaxed prose prose-sm prose-invert max-w-none [&_.katex]:text-white [&_p]:my-0">
@@ -571,12 +517,27 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
         )}
       </div>
 
-      {/* Hint */}
-      {showHint && hints[hintIndex] && (
-        <div className="bg-amber-500/15 border border-amber-400/30 rounded-xl p-3 mb-4 flex items-start gap-2 animate-in fade-in duration-200">
-          <Lightbulb className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-          <span className="text-amber-200 text-sm">{hints[hintIndex]}</span>
-        </div>
+      {/* Hint (disponible antes de responder) */}
+      {!submitted && hasHint && (
+        <>
+          {!showHint ? (
+            <button
+              onClick={handleShowHint}
+              className="w-full text-xs text-amber-400/70 hover:text-amber-300 flex items-center justify-center gap-1.5 py-2 mb-4 transition-colors border border-amber-400/20 rounded-xl hover:bg-amber-400/5"
+            >
+              <Lightbulb className="w-3.5 h-3.5" />
+              Ver pista {hintPenalty > 0 && <span className="text-amber-400/50">(-{hintPenalty} pts)</span>}
+            </button>
+          ) : (
+            <div className="bg-amber-500/15 border border-amber-400/30 rounded-xl p-3 mb-4 flex items-start gap-2 animate-in fade-in duration-200">
+              <Lightbulb className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-amber-200 text-sm">{hints[0]}</span>
+                {hintPenalty > 0 && <span className="block text-xs text-amber-400/60 mt-0.5">-{hintPenalty} pts aplicados</span>}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Answer Area */}
@@ -595,7 +556,7 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
           <FillBlank value={fillValue} onChange={setFillValue} submitted={submitted} correct={isCorrect} />
         )}
         {activity.type === 'order_steps' && (
-          <OrderSteps items={activity.options || []} order={orderItems} submitted={submitted} onReorder={setOrderItems} />
+          <OrderSteps items={activity.options || []} order={orderedItems} submitted={submitted} onReorder={setOrderedItems} />
         )}
         {activity.type === 'drag_drop' && (
           <DragDrop dragItems={activity.drag_items || activity.options || []} dropTargets={activity.drop_targets || []}
@@ -606,13 +567,13 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
         )}
       </div>
 
-      {/* Feedback tras respuesta */}
+      {/* Feedback obligatorio tras responder */}
       {submitted && (
         <div className={`rounded-2xl p-4 mb-5 border animate-in fade-in duration-200 ${
           isCorrect ? 'bg-green-500/20 border-green-500/40' : 'bg-red-500/20 border-red-500/40'
         }`}>
-          {/* Header del feedback */}
-          <div className="flex items-center gap-2 mb-2">
+          {/* Resultado */}
+          <div className="flex items-center gap-2 mb-3">
             {isCorrect
               ? <CheckCircle2 className="w-5 h-5 text-green-400" />
               : <XCircle className="w-5 h-5 text-red-400" />
@@ -622,24 +583,30 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
             </span>
             {isCorrect && timeBonus > 0 && (
               <span className="ml-auto flex items-center gap-1 text-xs text-yellow-300 font-semibold">
-                <Zap className="w-3 h-3" /> +{timeBonus} bonus
+                <Zap className="w-3 h-3" /> +{timeBonus} bonus velocidad
               </span>
             )}
-            {!isCorrect && (
-              <span className="text-white/60 text-xs ml-1 inline-flex items-center gap-1">
-                Resp: <span className="text-white/90 font-medium"><MdMath>{activity.correct_answer}</MdMath></span>
-              </span>
+            {hintUsed && (
+              <span className="ml-auto text-xs text-amber-400/70">-{hintPenalty} pts (pista)</span>
             )}
           </div>
 
-          {/* Feedback específico por respuesta incorrecta */}
-          {!isCorrect && getIncorrectFeedback() && (
-            <p className="text-sm text-red-200/80 mb-2">{getIncorrectFeedback()}</p>
+          {/* Respuesta correcta si falló */}
+          {!isCorrect && (
+            <div className="bg-white/5 rounded-xl px-3 py-2 mb-3 text-sm">
+              <span className="text-white/50 text-xs">Respuesta correcta: </span>
+              <span className="text-white/90 font-medium"><MdMath>{activity.correct_answer}</MdMath></span>
+            </div>
           )}
 
-          {/* Explicación multinivel */}
+          {/* Feedback específico por respuesta */}
+          {!isCorrect && getIncorrectFeedback() && (
+            <p className="text-sm text-red-200/80 mb-3">{getIncorrectFeedback()}</p>
+          )}
+
+          {/* Explicación obligatoria multinivel */}
           {(activity.explanation || activity.explanation_levels) && (
-            <div>
+            <div className="mb-3">
               {activity.explanation_levels && (
                 <div className="flex gap-1.5 mb-2">
                   {['basic', 'detailed', 'example'].map(level => (
@@ -659,54 +626,42 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
             </div>
           )}
 
-          {/* Botón "Explícame" con IA */}
-          <div className="mt-3">
-            <button
-              onClick={handleAskAI}
-              className="flex items-center gap-1.5 text-xs text-violet-300 hover:text-violet-200 transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              {showAiExplanation ? 'Explicación IA' : 'Explícame con IA'}
-            </button>
-            {showAiExplanation && (
-              <div className="mt-2 p-3 bg-violet-500/10 border border-violet-400/25 rounded-xl">
-                {aiLoading
-                  ? <div className="flex items-center gap-2 text-violet-300 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> Generando explicación...</div>
-                  : <p className="text-violet-200 text-xs leading-relaxed">{aiResponse}</p>
-                }
-              </div>
-            )}
-          </div>
+          {/* Botón IA — solo disponible después de responder */}
+          <button
+            onClick={handleAskAI}
+            className="flex items-center gap-1.5 text-xs text-violet-300 hover:text-violet-200 transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {showAiExplanation ? 'Explicación IA' : 'Explícame con IA'}
+          </button>
+          {showAiExplanation && (
+            <div className="mt-2 p-3 bg-violet-500/10 border border-violet-400/25 rounded-xl">
+              {aiLoading
+                ? <div className="flex items-center gap-2 text-violet-300 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> Generando explicación...</div>
+                : <p className="text-violet-200 text-xs leading-relaxed">{aiResponse}</p>
+              }
+            </div>
+          )}
         </div>
       )}
 
-      {/* Streak visual tras respuesta correcta */}
+      {/* Streak visual */}
       {submitted && isCorrect && consecutiveCorrect >= 2 && (
         <div className="flex items-center justify-center gap-2 mb-4 animate-in zoom-in duration-300">
           <span className="text-orange-400 text-sm font-bold">🔥 ¡{consecutiveCorrect} respuestas correctas seguidas!</span>
         </div>
       )}
 
-      {/* Action buttons */}
+      {/* Botones de acción */}
       {activity.type !== 'step_by_step' && (
         !submitted ? (
-          <div className="space-y-2">
-            <Button
-              onClick={handleSubmit}
-              disabled={!isAnswerProvided()}
-              className="w-full h-12 bg-white text-slate-900 hover:bg-white/90 font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-            >
-              {attemptCount === 0 ? 'Comprobar' : `Intentar de nuevo (${attemptCount}/${maxAttempts})`}
-            </Button>
-            {hasHints && !showHint && attemptCount === 0 && (
-              <button
-                onClick={() => { setShowHint(true); setHintIndex(0); }}
-                className="w-full text-xs text-white/40 hover:text-white/60 flex items-center justify-center gap-1 py-2 transition-colors"
-              >
-                <Lightbulb className="w-3.5 h-3.5" /> Ver pista
-              </button>
-            )}
-          </div>
+          <Button
+            onClick={handleSubmit}
+            disabled={!isAnswerProvided()}
+            className="w-full h-12 bg-white text-slate-900 hover:bg-white/90 font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            Comprobar
+          </Button>
         ) : (
           <Button
             onClick={handleNext}
@@ -717,7 +672,6 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
         )
       )}
 
-      {/* Continuar para step_by_step cuando está completo */}
       {activity.type === 'step_by_step' && submitted && (
         <Button
           onClick={handleNext}
