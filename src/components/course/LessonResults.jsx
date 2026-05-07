@@ -127,6 +127,10 @@ export default function LessonResults({
         >
           <RotateCcw className="w-4 h-4" /> Repetir lección
         </Button>
+
+        <p className="text-center text-xs text-white/30 pt-1">
+          Puedes repetir la lección para mejorar tu puntuación
+        </p>
       </div>
     </div>
   );

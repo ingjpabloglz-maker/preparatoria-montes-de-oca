@@ -144,8 +144,8 @@ function TrueFalseChoice({ selected, submitted, correct, onSelect }) {
       {options.map((option) => {
         const isSelected = selected === option;
         const isCorrectOption =
-          ((normalizedCorrect === 'verdadero' || normalizedCorrect === 'true') && option === 'Verdadero') ||
-          ((normalizedCorrect === 'falso' || normalizedCorrect === 'false') && option === 'Falso');
+          (normalizedCorrect === 'verdadero' || normalizedCorrect === 'true') && option === 'Verdadero' ||
+          (normalizedCorrect === 'falso' || normalizedCorrect === 'false') && option === 'Falso';
         let cls = 'py-5 rounded-2xl border text-sm font-bold transition-all ';
         if (!submitted) {
           cls += isSelected
@@ -219,10 +219,6 @@ function DragDrop({ dragItems, dropTargets, mapping, submitted, correctRaw, onMa
   let correctMapping = {};
   try { correctMapping = JSON.parse(correctRaw); } catch {}
   const unmapped = dragItems.filter(item => !Object.values(mapping).includes(item));
-  const handleDrop = (target, item) => {
-    if (submitted) return;
-    onMap({ ...mapping, [target]: item });
-  };
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2 p-3 bg-white/5 rounded-xl border border-white/10 min-h-[48px]">
@@ -232,11 +228,9 @@ function DragDrop({ dragItems, dropTargets, mapping, submitted, correctRaw, onMa
             className="px-3 py-1.5 bg-blue-500/20 border border-blue-400/40 text-blue-200 text-xs rounded-lg hover:bg-blue-500/30 transition-all"
             onClick={() => {
               const emptyTarget = dropTargets.find(t => !mapping[t]);
-              if (emptyTarget) handleDrop(emptyTarget, item);
+              if (emptyTarget) onMap({ ...mapping, [emptyTarget]: item });
             }}
-          >
-            {item}
-          </button>
+          >{item}</button>
         ))}
         {unmapped.length === 0 && <span className="text-white/30 text-xs">Todos asignados</span>}
       </div>
@@ -303,10 +297,7 @@ function StepInput({ step, onSubmitStep }) {
   const [val, setVal] = useState('');
   return (
     <div className="flex gap-2">
-      <input
-        type="text"
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
+      <input type="text" value={val} onChange={(e) => setVal(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && val.trim() && onSubmitStep(val.trim())}
         placeholder={step.hint || 'Tu respuesta...'}
         className="flex-1 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white text-sm placeholder-white/30 focus:outline-none focus:border-blue-400/60"
@@ -330,19 +321,19 @@ export default function ActivityCard({
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [multiSelected, setMultiSelected] = useState([]);
   const [fillValue, setFillValue] = useState('');
-  const [orderItems] = useState(() => {
+  const [orderItems, setOrderItems] = useState(() => {
     if (activity.type === 'order_steps' || activity.type === 'drag_drop') {
       return [...(activity.options || [])].sort(() => Math.random() - 0.5);
     }
     return [];
   });
-  const [orderedItems, setOrderedItems] = useState(orderItems);
   const [dragMapping, setDragMapping] = useState({});
   const [stepAnswers, setStepAnswers] = useState([]);
 
   const [submitted, setSubmitted] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [hintUsed, setHintUsed] = useState(false);
+  const [aiUsed, setAiUsed] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [explanationLevel, setExplanationLevel] = useState('basic');
   const [showAiExplanation, setShowAiExplanation] = useState(false);
@@ -355,7 +346,7 @@ export default function ActivityCard({
   const { playSound } = useSound();
   const hints = activity.hints || [];
   const hasHint = hints.length > 0;
-  const hintPenalty = activity.hint_penalty ?? 2; // puntos que se restan si usa hint
+  const hintPenalty = activity.hint_penalty ?? 2; // puntos que se descuentan por usar pista
 
   // Timer
   useEffect(() => {
@@ -366,7 +357,7 @@ export default function ActivityCard({
 
   const getCurrentAnswer = () => {
     if (activity.type === 'multiple_select') return JSON.stringify(multiSelected);
-    if (activity.type === 'order_steps') return JSON.stringify(orderedItems);
+    if (activity.type === 'order_steps') return JSON.stringify(orderItems);
     if (activity.type === 'drag_drop') return JSON.stringify(dragMapping);
     if (activity.type === 'step_by_step') return JSON.stringify(stepAnswers);
     if (activity.type === 'fill_blank' || activity.type === 'solve') return fillValue.trim();
@@ -381,6 +372,22 @@ export default function ActivityCard({
     return selectedAnswer !== null;
   };
 
+  const calcPoints = (correct, timeSpent) => {
+    if (!correct) return 0;
+    const base = activity.points || 10;
+    let pts = base;
+    if (hintUsed) pts = Math.max(0, pts - hintPenalty);
+    if (aiUsed) pts = Math.max(0, pts - 2);
+    // Bonus de tiempo
+    let bonus = 0;
+    if (activity.time_limit_seconds) {
+      if (timeSpent < activity.time_limit_seconds * 0.5) bonus = 5;
+      else if (timeSpent < activity.time_limit_seconds * 0.75) bonus = 2;
+    }
+    setTimeBonus(bonus);
+    return pts + bonus;
+  };
+
   const handleSubmit = () => {
     if (submitted) return;
     const answer = getCurrentAnswer();
@@ -388,24 +395,12 @@ export default function ActivityCard({
 
     const correct = checkAnswer(answer, activity);
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-
-    // Bonus de tiempo
-    let bonus = 0;
-    if (correct && activity.time_limit_seconds) {
-      if (timeSpent < activity.time_limit_seconds * 0.5) bonus = 5;
-      else if (timeSpent < activity.time_limit_seconds * 0.75) bonus = 2;
-    }
-    setTimeBonus(bonus);
-
-    // Penalización por hint
-    const basePoints = activity.points || 10;
-    const penalty = hintUsed ? hintPenalty : 0;
-    const pointsEarned = correct ? Math.max(0, basePoints + bonus - penalty) : 0;
+    const points = calcPoints(correct, timeSpent);
 
     setIsCorrect(correct);
     setSubmitted(true);
     playSound(correct ? 'correct_answer' : 'incorrect_answer');
-    onAnswer(activity.id, correct, pointsEarned, answer, timeSpent, 1, hintUsed);
+    onAnswer(activity.id, correct, points, answer, timeSpent, 1);
   };
 
   const handleStepAnswer = (stepIndex, answer) => {
@@ -414,21 +409,22 @@ export default function ActivityCard({
     if (newStepAnswers.length === (activity.steps?.length || 0)) {
       const allCorrect = activity.steps.every((step, i) => normalize(newStepAnswers[i]) === normalize(step.answer));
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-      const basePoints = activity.points || 10;
-      const penalty = hintUsed ? hintPenalty : 0;
-      const pointsEarned = allCorrect ? Math.max(0, basePoints - penalty) : 0;
+      const points = calcPoints(allCorrect, timeSpent);
       setIsCorrect(allCorrect);
       setSubmitted(true);
       playSound(allCorrect ? 'correct_answer' : 'incorrect_answer');
-      onAnswer(activity.id, allCorrect, pointsEarned, JSON.stringify(newStepAnswers), timeSpent, 1, hintUsed);
+      onAnswer(activity.id, allCorrect, points, JSON.stringify(newStepAnswers), timeSpent, 1);
     }
   };
 
-  const handleNext = () => {
-    onNext();
+  const handleUseHint = () => {
+    setShowHint(true);
+    setHintUsed(true);
   };
 
   const handleAskAI = async () => {
+    if (!submitted) return; // solo disponible después de responder
+    setAiUsed(true);
     if (aiLoading || aiResponse) { setShowAiExplanation(true); return; }
     setAiLoading(true);
     setShowAiExplanation(true);
@@ -445,14 +441,25 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
       });
       setAiResponse(typeof res === 'string' ? res : res?.explanation || res);
     } catch {
-      setAiResponse('No pude generar una explicación en este momento.');
+      setAiResponse('No pude generar una explicación en este momento. Revisa la explicación de abajo.');
     }
     setAiLoading(false);
   };
 
-  const handleShowHint = () => {
-    setShowHint(true);
-    setHintUsed(true);
+  const handleNext = () => {
+    setSelectedAnswer(null);
+    setMultiSelected([]);
+    setFillValue('');
+    setSubmitted(false);
+    setIsCorrect(false);
+    setShowHint(false);
+    setHintUsed(false);
+    setAiUsed(false);
+    setAiResponse(null);
+    setShowAiExplanation(false);
+    setTimeBonus(0);
+    setStepAnswers([]);
+    onNext();
   };
 
   const getIncorrectFeedback = () => {
@@ -517,27 +524,17 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
         )}
       </div>
 
-      {/* Hint (disponible antes de responder) */}
-      {!submitted && hasHint && (
-        <>
-          {!showHint ? (
-            <button
-              onClick={handleShowHint}
-              className="w-full text-xs text-amber-400/70 hover:text-amber-300 flex items-center justify-center gap-1.5 py-2 mb-4 transition-colors border border-amber-400/20 rounded-xl hover:bg-amber-400/5"
-            >
-              <Lightbulb className="w-3.5 h-3.5" />
-              Ver pista {hintPenalty > 0 && <span className="text-amber-400/50">(-{hintPenalty} pts)</span>}
-            </button>
-          ) : (
-            <div className="bg-amber-500/15 border border-amber-400/30 rounded-xl p-3 mb-4 flex items-start gap-2 animate-in fade-in duration-200">
-              <Lightbulb className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <span className="text-amber-200 text-sm">{hints[0]}</span>
-                {hintPenalty > 0 && <span className="block text-xs text-amber-400/60 mt-0.5">-{hintPenalty} pts aplicados</span>}
-              </div>
-            </div>
-          )}
-        </>
+      {/* Hint (antes de responder) */}
+      {!submitted && showHint && hints[0] && (
+        <div className="bg-amber-500/15 border border-amber-400/30 rounded-xl p-3 mb-4 flex items-start gap-2 animate-in fade-in duration-200">
+          <Lightbulb className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+          <div>
+            <span className="text-amber-200 text-sm">{hints[0]}</span>
+            {hintPenalty > 0 && (
+              <span className="block text-amber-400/60 text-xs mt-0.5">−{hintPenalty} pts si aciertas</span>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Answer Area */}
@@ -556,7 +553,7 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
           <FillBlank value={fillValue} onChange={setFillValue} submitted={submitted} correct={isCorrect} />
         )}
         {activity.type === 'order_steps' && (
-          <OrderSteps items={activity.options || []} order={orderedItems} submitted={submitted} onReorder={setOrderedItems} />
+          <OrderSteps items={activity.options || []} order={orderItems} submitted={submitted} onReorder={setOrderItems} />
         )}
         {activity.type === 'drag_drop' && (
           <DragDrop dragItems={activity.drag_items || activity.options || []} dropTargets={activity.drop_targets || []}
@@ -572,8 +569,7 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
         <div className={`rounded-2xl p-4 mb-5 border animate-in fade-in duration-200 ${
           isCorrect ? 'bg-green-500/20 border-green-500/40' : 'bg-red-500/20 border-red-500/40'
         }`}>
-          {/* Resultado */}
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-2">
             {isCorrect
               ? <CheckCircle2 className="w-5 h-5 text-green-400" />
               : <XCircle className="w-5 h-5 text-red-400" />
@@ -583,38 +579,34 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
             </span>
             {isCorrect && timeBonus > 0 && (
               <span className="ml-auto flex items-center gap-1 text-xs text-yellow-300 font-semibold">
-                <Zap className="w-3 h-3" /> +{timeBonus} bonus velocidad
+                <Zap className="w-3 h-3" /> +{timeBonus} bonus
               </span>
             )}
-            {hintUsed && (
-              <span className="ml-auto text-xs text-amber-400/70">-{hintPenalty} pts (pista)</span>
+            {isCorrect && hintUsed && (
+              <span className="ml-auto flex items-center gap-1 text-xs text-amber-400/70">
+                −{hintPenalty} (pista usada)
+              </span>
+            )}
+            {!isCorrect && (
+              <span className="text-white/60 text-xs ml-auto inline-flex items-center gap-1">
+                Resp: <span className="text-white/90 font-medium"><MdMath>{activity.correct_answer}</MdMath></span>
+              </span>
             )}
           </div>
 
-          {/* Respuesta correcta si falló */}
-          {!isCorrect && (
-            <div className="bg-white/5 rounded-xl px-3 py-2 mb-3 text-sm">
-              <span className="text-white/50 text-xs">Respuesta correcta: </span>
-              <span className="text-white/90 font-medium"><MdMath>{activity.correct_answer}</MdMath></span>
-            </div>
-          )}
-
-          {/* Feedback específico por respuesta */}
+          {/* Feedback específico por respuesta incorrecta */}
           {!isCorrect && getIncorrectFeedback() && (
-            <p className="text-sm text-red-200/80 mb-3">{getIncorrectFeedback()}</p>
+            <p className="text-sm text-red-200/80 mb-2">{getIncorrectFeedback()}</p>
           )}
 
-          {/* Explicación obligatoria multinivel */}
+          {/* Explicación siempre visible */}
           {(activity.explanation || activity.explanation_levels) && (
-            <div className="mb-3">
+            <div className="mt-2">
               {activity.explanation_levels && (
                 <div className="flex gap-1.5 mb-2">
                   {['basic', 'detailed', 'example'].map(level => (
-                    <button
-                      key={level}
-                      onClick={() => setExplanationLevel(level)}
-                      className={`text-xs px-2 py-1 rounded-lg border transition-all ${explanationLevel === level ? 'bg-white/20 border-white/40 text-white' : 'bg-white/5 border-white/15 text-white/50 hover:bg-white/10'}`}
-                    >
+                    <button key={level} onClick={() => setExplanationLevel(level)}
+                      className={`text-xs px-2 py-1 rounded-lg border transition-all ${explanationLevel === level ? 'bg-white/20 border-white/40 text-white' : 'bg-white/5 border-white/15 text-white/50 hover:bg-white/10'}`}>
                       {level === 'basic' ? 'Básico' : level === 'detailed' ? 'Detallado' : 'Ejemplo'}
                     </button>
                   ))}
@@ -626,22 +618,22 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
             </div>
           )}
 
-          {/* Botón IA — solo disponible después de responder */}
-          <button
-            onClick={handleAskAI}
-            className="flex items-center gap-1.5 text-xs text-violet-300 hover:text-violet-200 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            {showAiExplanation ? 'Explicación IA' : 'Explícame con IA'}
-          </button>
-          {showAiExplanation && (
-            <div className="mt-2 p-3 bg-violet-500/10 border border-violet-400/25 rounded-xl">
-              {aiLoading
-                ? <div className="flex items-center gap-2 text-violet-300 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> Generando explicación...</div>
-                : <p className="text-violet-200 text-xs leading-relaxed">{aiResponse}</p>
-              }
-            </div>
-          )}
+          {/* Botón IA — solo después de responder */}
+          <div className="mt-3">
+            <button onClick={handleAskAI}
+              className="flex items-center gap-1.5 text-xs text-violet-300 hover:text-violet-200 transition-colors">
+              <Sparkles className="w-3.5 h-3.5" />
+              {showAiExplanation ? 'Explicación IA' : 'Explícame con IA'}
+            </button>
+            {showAiExplanation && (
+              <div className="mt-2 p-3 bg-violet-500/10 border border-violet-400/25 rounded-xl">
+                {aiLoading
+                  ? <div className="flex items-center gap-2 text-violet-300 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> Generando...</div>
+                  : <p className="text-violet-200 text-xs leading-relaxed">{aiResponse}</p>
+                }
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -655,13 +647,21 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
       {/* Botones de acción */}
       {activity.type !== 'step_by_step' && (
         !submitted ? (
-          <Button
-            onClick={handleSubmit}
-            disabled={!isAnswerProvided()}
-            className="w-full h-12 bg-white text-slate-900 hover:bg-white/90 font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-          >
-            Comprobar
-          </Button>
+          <div className="space-y-2">
+            <Button
+              onClick={handleSubmit}
+              disabled={!isAnswerProvided()}
+              className="w-full h-12 bg-white text-slate-900 hover:bg-white/90 font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              Comprobar
+            </Button>
+            {hasHint && !showHint && (
+              <button onClick={handleUseHint}
+                className="w-full text-xs text-white/40 hover:text-white/60 flex items-center justify-center gap-1 py-2 transition-colors">
+                <Lightbulb className="w-3.5 h-3.5" /> Ver pista {hintPenalty > 0 ? `(−${hintPenalty} pts)` : ''}
+              </button>
+            )}
+          </div>
         ) : (
           <Button
             onClick={handleNext}
