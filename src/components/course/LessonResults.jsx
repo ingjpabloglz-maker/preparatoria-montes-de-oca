@@ -1,12 +1,19 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, XCircle, Trophy, RotateCcw, ArrowRight, Star, Zap } from "lucide-react";
+import { CheckCircle2, XCircle, Trophy, RotateCcw, ArrowRight, Star, Zap, Flame, Clock } from "lucide-react";
 
 export default function LessonResults({
   lesson, correctCount, totalCount, score, passed,
   isMiniEval, answers, activities, onContinue, onRetry
 }) {
+  const totalTime = answers.reduce((s, a) => s + (a.timeSpent || 0), 0);
+  const avgTime = answers.length ? Math.round(totalTime / answers.length) : 0;
+  const maxStreak = answers.reduce((acc, a) => {
+    if (a.correct) { acc.cur++; acc.max = Math.max(acc.max, acc.cur); }
+    else acc.cur = 0;
+    return acc;
+  }, { cur: 0, max: 0 }).max;
   const getScoreColor = () => {
     if (score >= 80) return 'from-green-400 to-emerald-500';
     if (score >= 60) return 'from-amber-400 to-orange-500';
@@ -37,7 +44,7 @@ export default function LessonResults({
       <p className="text-white/60 text-sm mb-6 max-w-xs">{sub}</p>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 w-full max-w-sm mb-6">
+      <div className="grid grid-cols-2 gap-3 w-full max-w-sm mb-3">
         <div className="bg-white/10 rounded-xl p-3.5 text-center border border-white/10">
           <div className="flex items-center justify-center gap-1.5 mb-0.5">
             <CheckCircle2 className="w-4 h-4 text-green-400" />
@@ -53,6 +60,30 @@ export default function LessonResults({
           <p className="text-xs text-white/50">Incorrectas</p>
         </div>
       </div>
+
+      {/* Extra stats: tiempo y streak */}
+      {(totalTime > 0 || maxStreak >= 2) && (
+        <div className="grid grid-cols-2 gap-3 w-full max-w-sm mb-6">
+          {totalTime > 0 && (
+            <div className="bg-white/10 rounded-xl p-3.5 text-center border border-white/10">
+              <div className="flex items-center justify-center gap-1.5 mb-0.5">
+                <Clock className="w-4 h-4 text-blue-400" />
+                <span className="text-xl font-bold text-white">{avgTime}s</span>
+              </div>
+              <p className="text-xs text-white/50">Tiempo promedio</p>
+            </div>
+          )}
+          {maxStreak >= 2 && (
+            <div className="bg-white/10 rounded-xl p-3.5 text-center border border-white/10">
+              <div className="flex items-center justify-center gap-1.5 mb-0.5">
+                <Flame className="w-4 h-4 text-orange-400" />
+                <span className="text-xl font-bold text-white">{maxStreak}</span>
+              </div>
+              <p className="text-xs text-white/50">Racha máx.</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Progress Bar */}
       <div className="w-full max-w-sm mb-6">

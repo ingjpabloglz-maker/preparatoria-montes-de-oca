@@ -174,10 +174,10 @@ Deno.serve(async (req) => {
   let total_points = 0;
   let earned_points = 0;
 
-  const gradedAnswers = answers.map(({ question_id, user_answer }) => {
+  const gradedAnswers = answers.map(({ question_id, user_answer, time_spent, attempt_number }) => {
     const activity = activities.find(a => a.id === question_id);
     if (!activity) {
-      return { question_id, user_answer, correct: false, points_obtained: 0 };
+      return { question_id, user_answer, correct: false, points_obtained: 0, time_spent: time_spent || 0 };
     }
     const { correct, points_obtained, requires_review } = gradeAnswer(activity, user_answer);
     if (requires_review) requires_any_manual_review = true;
@@ -186,7 +186,27 @@ Deno.serve(async (req) => {
     earned_points += points_obtained;
     if (correct === true) correct_count++;
     if (correct !== null) total_gradeable++;
-    return { question_id, user_answer, correct, points_obtained };
+
+    // Clasificar tipo de error
+    let error_type = null;
+    if (correct === false) {
+      if (activity.type === 'multiple_choice' || activity.type === 'multiple_select') error_type = 'wrong_option';
+      else if (activity.type === 'true_false') error_type = 'wrong_tf';
+      else if (activity.type === 'fill_blank' || activity.type === 'solve') error_type = 'wrong_text';
+      else if (activity.type === 'order_steps' || activity.type === 'drag_drop') error_type = 'wrong_order';
+      else if (activity.type === 'step_by_step') error_type = 'wrong_step';
+      else error_type = 'unknown';
+    }
+
+    return {
+      question_id,
+      user_answer,
+      correct,
+      points_obtained,
+      time_spent: time_spent || 0,
+      attempt_number: attempt_number || 1,
+      error_type,
+    };
   });
 
   // ─── 4. CALCULAR SCORE (servidor es fuente de verdad) ────────────────────────

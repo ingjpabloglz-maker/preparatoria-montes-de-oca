@@ -14,7 +14,10 @@
         "fill_blank",
         "solve",
         "match",
-        "order_steps"
+        "order_steps",
+        "multiple_select",
+        "drag_drop",
+        "step_by_step"
       ],
       "description": "Tipo de actividad"
     },
@@ -31,7 +34,7 @@
     },
     "correct_answer": {
       "type": "string",
-      "description": "Respuesta correcta principal (texto o \u00edndice)"
+      "description": "Respuesta correcta principal (texto o \u00edndice). Para multiple_select: JSON array de opciones correctas. Para drag_drop/order_steps: JSON array ordenado."
     },
     "accepted_answers": {
       "type": "array",
@@ -42,12 +45,50 @@
     },
     "explanation": {
       "type": "string",
-      "description": "Explicaci\u00f3n de la respuesta correcta"
+      "description": "Explicaci\u00f3n b\u00e1sica de la respuesta correcta"
+    },
+    "explanation_levels": {
+      "type": "object",
+      "description": "Explicaciones en m\u00faltiples niveles de profundidad",
+      "properties": {
+        "basic": {
+          "type": "string",
+          "description": "Explicaci\u00f3n corta y directa"
+        },
+        "detailed": {
+          "type": "string",
+          "description": "Explicaci\u00f3n ampliada con razonamiento"
+        },
+        "example": {
+          "type": "string",
+          "description": "Ejemplo concreto paso a paso"
+        }
+      }
+    },
+    "incorrect_feedback": {
+      "type": "object",
+      "description": "Feedback espec\u00edfico por tipo de error o por opci\u00f3n incorrecta seleccionada. Clave: opci\u00f3n o tipo de error, valor: mensaje de retroalimentaci\u00f3n."
+    },
+    "hints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Pistas progresivas: hint[0] para intento 2, hint[1] para intento 3"
+    },
+    "max_attempts": {
+      "type": "number",
+      "default": 3,
+      "description": "N\u00famero m\u00e1ximo de intentos antes de revelar la respuesta"
     },
     "points": {
       "type": "number",
       "default": 10,
-      "description": "Puntos que otorga esta actividad"
+      "description": "Puntos base que otorga esta actividad"
+    },
+    "time_limit_seconds": {
+      "type": "number",
+      "description": "Tiempo l\u00edmite en segundos (opcional). Si se responde antes, otorga bonus."
     },
     "order": {
       "type": "number",
@@ -72,6 +113,52 @@
       "type": "boolean",
       "default": false,
       "description": "Si siempre debe ser revisada manualmente"
+    },
+    "visual_url": {
+      "type": "string",
+      "description": "URL de imagen educativa de apoyo"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "medium",
+        "hard"
+      ],
+      "default": "medium",
+      "description": "Nivel de dificultad de la actividad"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "instruction": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          },
+          "hint": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Para type=step_by_step: pasos ordenados a completar"
+    },
+    "drag_items": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Para type=drag_drop: \u00edtems a arrastrar (mezclados)"
+    },
+    "drop_targets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Para type=drag_drop: etiquetas de los destinos"
     }
   },
   "required": [

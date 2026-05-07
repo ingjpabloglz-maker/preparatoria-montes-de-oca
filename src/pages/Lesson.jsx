@@ -21,7 +21,8 @@ export default function Lesson() {
   const [user, setUser] = useState(null);
   const [phase, setPhase] = useState('intro'); // 'intro' | 'activity' | 'results'
   const [currentActivityIndex, setCurrentActivityIndex] = useState(0);
-  const [answers, setAnswers] = useState([]); // { activityId, correct, points }
+  const [answers, setAnswers] = useState([]); // { activityId, correct, points, userAnswer, timeSpent, attemptNumber }
+  const [consecutiveCorrect, setConsecutiveCorrect] = useState(0);
   const queryClient = useQueryClient();
   const { dispatchUserEvent } = useUserEvent(user?.email);
 
@@ -137,9 +138,10 @@ export default function Lesson() {
     },
   });
 
-  // answers guarda: { activityId, userAnswer, correct (optimista), points }
-  const handleActivityAnswer = (activityId, isCorrect, points, userAnswer) => {
-    setAnswers(prev => [...prev, { activityId, correct: isCorrect, points: isCorrect ? points : 0, userAnswer }]);
+  // answers guarda: { activityId, userAnswer, correct (optimista), points, timeSpent, attemptNumber }
+  const handleActivityAnswer = (activityId, isCorrect, points, userAnswer, timeSpent = 0, attemptNumber = 1) => {
+    setAnswers(prev => [...prev, { activityId, correct: isCorrect, points: isCorrect ? points : 0, userAnswer, timeSpent, attemptNumber }]);
+    setConsecutiveCorrect(prev => isCorrect ? prev + 1 : 0);
   };
 
   const handleNextActivity = () => {
@@ -150,6 +152,8 @@ export default function Lesson() {
       const answersPayload = answers.map(a => ({
         question_id: a.activityId,
         user_answer: a.userAnswer ?? '',
+        time_spent: a.timeSpent ?? 0,
+        attempt_number: a.attemptNumber ?? 1,
       }));
 
       saveProgressMutation.mutate({ answersPayload });
@@ -229,11 +233,14 @@ export default function Lesson() {
 
         {phase === 'activity' && currentActivity && (
           <ActivityCard
+            key={currentActivity.id}
             activity={currentActivity}
             activityNumber={currentActivityIndex + 1}
             totalActivities={activities.length}
             onAnswer={handleActivityAnswer}
             onNext={handleNextActivity}
+            consecutiveCorrect={consecutiveCorrect}
+            userEmail={user?.email}
           />
         )}
 
