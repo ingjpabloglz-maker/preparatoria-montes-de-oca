@@ -47,9 +47,12 @@ export default function Lesson() {
 
   const { data: activities = [] } = useQuery({
     queryKey: ['lessonActivities', lessonId],
-    queryFn: () => base44.entities.CourseActivity.filter({ lesson_id: lessonId }, 'order'),
+    queryFn: async () => {
+      const res = await base44.functions.invoke('getOrCreateLessonActivities', { lesson_id: lessonId });
+      return res.data?.activities || [];
+    },
     enabled: !!lessonId,
-    staleTime: 30 * 60 * 1000, // actividades son estáticas
+    staleTime: 30 * 60 * 1000, // actividades son estáticas por lección
     refetchOnWindowFocus: false,
   });
 
