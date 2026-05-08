@@ -4,16 +4,16 @@ const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_
 
 // CAPA 2: Sanitización antes de validar
 function sanitizeActivity(activity) {
-  // correct_answer: para multiple_select puede venir como array o como JSON string de array
   let correct_answer = activity.correct_answer;
   if (activity.type === 'multiple_select') {
+    // Normalizar a array real de strings
     if (Array.isArray(correct_answer)) {
       correct_answer = correct_answer.map(x => String(x));
     } else if (typeof correct_answer === 'string') {
-      try {
-        const parsed = JSON.parse(correct_answer);
-        correct_answer = Array.isArray(parsed) ? parsed.map(x => String(x)) : [correct_answer];
-      } catch {
+      // Compatibilidad con datos legacy serializados como JSON string
+      if (correct_answer.startsWith('[')) {
+        try { correct_answer = JSON.parse(correct_answer).map(x => String(x)); } catch { correct_answer = [correct_answer]; }
+      } else {
         correct_answer = [correct_answer];
       }
     } else {
@@ -127,12 +127,12 @@ TIPOS OBLIGATORIOS (incluir todos):
 
 REGLAS POR TIPO:
 - multiple_choice: options mínimo 3. correct_answer = string EXACTO de una opción.
-- multiple_select: options mínimo 4. correct_answer = JSON array de strings correctos, ej: '["op1","op3"]'.
+- multiple_select: options mínimo 4. correct_answer = ARRAY REAL de strings correctos, ej: ["op1","op3"] (NO string serializado).
 - true_false: correct_answer = "true" o "false" (en minúsculas).
-- fill_blank: pregunta con ___. accepted_answers = array con mínimo 1 respuesta.
+- fill_blank: pregunta con ___. accepted_answers = array con mínimo 1 respuesta. correct_answer = string con la respuesta principal.
 - drag_drop: drag_items y drop_targets obligatorios (mínimo 2 cada uno). correct_answer = JSON object mapeando target→item.
 - step_by_step: steps = array de objetos {instruction, answer, hint} con mínimo 3 pasos. correct_answer = "step_by_step".
-- order_steps: options = pasos MEZCLADOS. correct_answer = JSON array en ORDEN CORRECTO.
+- order_steps: options = pasos MEZCLADOS. correct_answer = ARRAY REAL en ORDEN CORRECTO (NO string serializado).
 - solve: correct_answer = resultado numérico o expresión como string.
 
 CALIDAD PEDAGÓGICA:
@@ -146,7 +146,7 @@ CALIDAD PEDAGÓGICA:
 
 EJEMPLOS DE REFERENCIA:
 {"type":"multiple_choice","question":"¿Cuánto es 3 + 5?","options":["6","7","8","9"],"correct_answer":"8","hints":["Suma los números paso a paso"],"explanation":"3 + 5 = 8","difficulty":"easy","points":8}
-{"type":"multiple_select","question":"Selecciona los números primos","options":["2","3","4","5"],"correct_answer":"[\\"2\\",\\"3\\",\\"5\\"]","hints":["Un número primo tiene solo dos divisores"],"explanation":"2, 3 y 5 son primos","difficulty":"medium","points":10}
+{"type":"multiple_select","question":"Selecciona los números primos","options":["2","3","4","5"],"correct_answer":["2","3","5"],"hints":["Un número primo tiene solo dos divisores"],"explanation":"2, 3 y 5 son primos","difficulty":"medium","points":10}
 {"type":"true_false","question":"5 es un número par","correct_answer":"false","hints":["Revisa si es divisible entre 2"],"explanation":"5 no es divisible entre 2","difficulty":"easy","points":8}
 {"type":"fill_blank","question":"Completa: 7 + 3 = ___","accepted_answers":["10"],"hints":["Suma los dos números"],"explanation":"7 + 3 = 10","difficulty":"easy","points":8}
 {"type":"drag_drop","question":"Relaciona cada número con su tipo","drag_items":["2","-3","1/2"],"drop_targets":["Natural","Entero","Racional"],"correct_answer":"{\\"Natural\\":\\"2\\",\\"Entero\\":\\"-3\\",\\"Racional\\":\\"1/2\\"}","hints":["Clasifica según su tipo"],"explanation":"2 es natural, -3 es entero, 1/2 es racional","difficulty":"medium","points":10}
@@ -167,7 +167,7 @@ FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
               type: { type: "string" },
               question: { type: "string" },
               options: { type: "array", items: { type: "string" } },
-              correct_answer: { type: "string" },
+              correct_answer: {},
               accepted_answers: { type: "array", items: { type: "string" } },
               explanation: { type: "string" },
               explanation_levels: {
@@ -277,7 +277,7 @@ FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
       type: act.type,
       question: act.question.trim(),
       options: act.options || [],
-      correct_answer: Array.isArray(act.correct_answer) ? JSON.stringify(act.correct_answer) : (act.correct_answer || ''),
+      correct_answer: act.correct_answer ?? '',
       accepted_answers: act.accepted_answers || [],
       explanation: act.explanation || '',
       explanation_levels: act.explanation_levels || null,

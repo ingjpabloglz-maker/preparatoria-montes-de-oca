@@ -56,17 +56,25 @@ function checkAnswer(userAnswer, activity) {
   const { correct_answer, accepted_answers = [], type, tolerance = 0 } = activity;
 
   if (type === 'multiple_select') {
-    try {
-      const correct = JSON.parse(correct_answer);
-      const user = Array.isArray(userAnswer) ? userAnswer : JSON.parse(userAnswer);
-      return JSON.stringify([...correct].sort()) === JSON.stringify([...user].sort());
-    } catch { return false; }
+    // correct_answer es array nativo
+    const correct = Array.isArray(correct_answer) ? correct_answer : [correct_answer];
+    const user = Array.isArray(userAnswer) ? userAnswer : [userAnswer];
+    return JSON.stringify([...correct].map(normalize).sort()) === JSON.stringify([...user].map(normalize).sort());
   }
 
-  if (type === 'order_steps' || type === 'drag_drop') {
+  if (type === 'order_steps') {
+    // correct_answer es array nativo
+    const correct = Array.isArray(correct_answer) ? correct_answer : [correct_answer];
+    const user = Array.isArray(userAnswer) ? userAnswer : [userAnswer];
+    return JSON.stringify(correct) === JSON.stringify(user);
+  }
+
+  if (type === 'drag_drop') {
     try {
-      const correct = JSON.parse(correct_answer);
-      const user = Array.isArray(userAnswer) ? userAnswer : JSON.parse(userAnswer);
+      const correct = typeof correct_answer === 'object' && !Array.isArray(correct_answer)
+        ? correct_answer
+        : JSON.parse(correct_answer);
+      const user = typeof userAnswer === 'object' ? userAnswer : JSON.parse(userAnswer);
       return JSON.stringify(correct) === JSON.stringify(user);
     } catch { return false; }
   }
@@ -138,8 +146,8 @@ function MultipleChoice({ options, selected, submitted, correct, onSelect }) {
 }
 
 function MultipleSelect({ options, selected = [], submitted, correctRaw, onToggle }) {
-  let correctArr = [];
-  try { correctArr = JSON.parse(correctRaw); } catch { correctArr = [correctRaw]; }
+  // correctRaw es array nativo o legacy string
+  const correctArr = Array.isArray(correctRaw) ? correctRaw : (correctRaw ? [correctRaw] : []);
   return (
     <div className="space-y-2.5">
       <p className="text-xs text-white/40 mb-1">Selecciona todas las correctas</p>
@@ -249,7 +257,11 @@ function OrderSteps({ items, order, submitted, onReorder }) {
 
 function DragDrop({ dragItems, dropTargets, mapping, submitted, correctRaw, onMap }) {
   let correctMapping = {};
-  try { correctMapping = JSON.parse(correctRaw); } catch {}
+  if (typeof correctRaw === 'object' && correctRaw !== null && !Array.isArray(correctRaw)) {
+    correctMapping = correctRaw;
+  } else if (typeof correctRaw === 'string') {
+    try { correctMapping = JSON.parse(correctRaw); } catch {}
+  }
   const unmapped = dragItems.filter(item => !Object.values(mapping).includes(item));
   return (
     <div className="space-y-3">
@@ -400,9 +412,9 @@ export default function ActivityCard({
   }, [submitted, startTime]);
 
   const getCurrentAnswer = () => {
-    if (activity.type === 'multiple_select') return JSON.stringify(multiSelected);
-    if (activity.type === 'order_steps') return JSON.stringify(orderItems);
-    if (activity.type === 'drag_drop') return JSON.stringify(dragMapping);
+    if (activity.type === 'multiple_select') return multiSelected;
+    if (activity.type === 'order_steps') return orderItems;
+    if (activity.type === 'drag_drop') return dragMapping;
     if (activity.type === 'step_by_step') return JSON.stringify(stepAnswers);
     if (activity.type === 'fill_blank' || activity.type === 'solve') return activity.options?.length > 0 ? selectedAnswer : fillValue.trim();
     return selectedAnswer;
@@ -458,7 +470,7 @@ export default function ActivityCard({
       setIsCorrect(allCorrect);
       setSubmitted(true);
       playSound(allCorrect ? 'correct_answer' : 'incorrect_answer');
-      onAnswer(activity.id, allCorrect, points, JSON.stringify(newStepAnswers), timeSpent, 1);
+      onAnswer(activity.id, allCorrect, points, newStepAnswers, timeSpent, 1);
     }
   };
 
@@ -649,7 +661,9 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
             )}
             {!isCorrect && (
               <span className="text-white/60 text-xs ml-auto inline-flex items-center gap-1">
-                Resp: <span className="text-white/90 font-medium"><MdMath>{activity.correct_answer}</MdMath></span>
+                Resp: <span className="text-white/90 font-medium">
+                  <MdMath>{Array.isArray(activity.correct_answer) ? activity.correct_answer.join(', ') : activity.correct_answer}</MdMath>
+                </span>
               </span>
             )}
           </div>
