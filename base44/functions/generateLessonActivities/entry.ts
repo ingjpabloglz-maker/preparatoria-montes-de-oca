@@ -87,7 +87,7 @@ REGLAS POR TIPO:
 REQUISITOS DE CALIDAD:
 - Cada actividad debe tener objective y explanation (explanation_levels con basic, detailed, example).
 - Preguntas claras, sin ambigüedades.
-- Para matemáticas usar LaTeX: $x^2$, $\\frac{a}{b}$, $\\sqrt{x}$.
+- Para matemáticas SIEMPRE usar LaTeX dentro de delimitadores $...$: ejemplos: $x^2$, $\\frac{a}{b}$, $\\sqrt{x}$, $\\mathbb{N}$, $\\mathbb{Z}$, $\\{1,2,3\\}$, $\\textbf{N}$. NUNCA escribir comandos LaTeX fuera de $...$. Si mencionas conjuntos numéricos: $\\mathbb{N}$, $\\mathbb{Z}$, $\\mathbb{Q}$, $\\mathbb{R}$. Conjuntos con llaves: $\\{1, 2, 3\\}$.
 - incorrect_feedback: objeto con feedback para opciones incorrectas (clave = opción, valor = mensaje). Al menos "default".
 - hints: array con 1 pista como máximo.
 - points: easy=8, medium=10, hard=14.

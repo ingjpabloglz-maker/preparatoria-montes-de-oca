@@ -21,7 +21,7 @@ function ensureMathDelimiters(text) {
   // Si ya tiene delimitadores $, listo
   if (str.includes('$')) return str;
   // Si contiene comandos LaTeX sueltos, envolver todo
-  if (/\\(frac|sqrt|sum|int|prod|lim|infty|cdot|times|div|pm|leq|geq|neq|alpha|beta|gamma|delta|pi|theta|lambda|mu|sigma|omega|vec|hat|bar|dot|ddot|overline|underline|text|mathbb|mathrm|left|right|binom|log|sin|cos|tan|ln|exp)\b/.test(str)) {
+  if (/\\(frac|sqrt|sum|int|prod|lim|infty|cdot|times|div|pm|leq|geq|neq|alpha|beta|gamma|delta|pi|theta|lambda|mu|sigma|omega|vec|hat|bar|dot|ddot|overline|underline|text|textbf|textit|mathbb|mathbf|mathit|mathrm|mathcal|left|right|binom|log|sin|cos|tan|ln|exp|not|subset|supset|cup|cap|in|notin|forall|exists|partial|nabla)\b/.test(str)) {
     return `$${str}$`;
   }
   return str;
