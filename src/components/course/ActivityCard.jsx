@@ -53,20 +53,24 @@ function splitTokens(str) {
 }
 
 function checkAnswer(userAnswer, activity) {
-  const { correct_answer, accepted_answers = [], type, tolerance = 0 } = activity;
+  const { correct_answer, correct_answers = [], accepted_answers = [], type, tolerance = 0 } = activity;
 
   if (type === 'multiple_select') {
-    // correct_answer es array nativo
-    const correct = Array.isArray(correct_answer) ? correct_answer : [correct_answer];
+    // Usar correct_answers (array nativo) — modelo dual
+    const correct = Array.isArray(correct_answers) && correct_answers.length > 0 ? correct_answers : [];
     const user = Array.isArray(userAnswer) ? userAnswer : [userAnswer];
-    return JSON.stringify([...correct].map(normalize).sort()) === JSON.stringify([...user].map(normalize).sort());
+    if (correct.length === 0) return false;
+    const sortedCorrect = [...correct].map(normalize).sort();
+    const sortedUser = [...user].map(normalize).sort();
+    return sortedCorrect.length === sortedUser.length && sortedCorrect.every((v, i) => v === sortedUser[i]);
   }
 
   if (type === 'order_steps') {
-    // correct_answer es array nativo
-    const correct = Array.isArray(correct_answer) ? correct_answer : [correct_answer];
+    // Usar correct_answers (array nativo) — modelo dual
+    const correct = Array.isArray(correct_answers) && correct_answers.length > 0 ? correct_answers : [];
     const user = Array.isArray(userAnswer) ? userAnswer : [userAnswer];
-    return JSON.stringify(correct) === JSON.stringify(user);
+    if (correct.length === 0) return false;
+    return correct.length === user.length && correct.every((v, i) => normalize(v) === normalize(user[i]));
   }
 
   if (type === 'drag_drop') {
@@ -146,8 +150,8 @@ function MultipleChoice({ options, selected, submitted, correct, onSelect }) {
 }
 
 function MultipleSelect({ options, selected = [], submitted, correctRaw, onToggle }) {
-  // correctRaw es array nativo o legacy string
-  const correctArr = Array.isArray(correctRaw) ? correctRaw : (correctRaw ? [correctRaw] : []);
+  // correctRaw es siempre array nativo (correct_answers)
+  const correctArr = Array.isArray(correctRaw) ? correctRaw : [];
   return (
     <div className="space-y-2.5">
       <p className="text-xs text-white/40 mb-1">Selecciona todas las correctas</p>
@@ -613,7 +617,7 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
           <MultipleChoice options={activity.options || []} selected={selectedAnswer} submitted={submitted} correct={activity.correct_answer} onSelect={setSelectedAnswer} />
         )}
         {activity.type === 'multiple_select' && (
-          <MultipleSelect options={activity.options || []} selected={multiSelected} submitted={submitted} correctRaw={activity.correct_answer}
+          <MultipleSelect options={activity.options || []} selected={multiSelected} submitted={submitted} correctRaw={activity.correct_answers}
             onToggle={(opt) => setMultiSelected(prev => prev.includes(opt) ? prev.filter(x => x !== opt) : [...prev, opt])} />
         )}
         {activity.type === 'true_false' && (
@@ -662,7 +666,11 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
             {!isCorrect && (
               <span className="text-white/60 text-xs ml-auto inline-flex items-center gap-1">
                 Resp: <span className="text-white/90 font-medium">
-                  <MdMath>{Array.isArray(activity.correct_answer) ? activity.correct_answer.join(', ') : activity.correct_answer}</MdMath>
+                  <MdMath>
+                    {(['multiple_select','order_steps'].includes(activity.type) && Array.isArray(activity.correct_answers))
+                      ? activity.correct_answers.join(', ')
+                      : activity.correct_answer}
+                  </MdMath>
                 </span>
               </span>
             )}
