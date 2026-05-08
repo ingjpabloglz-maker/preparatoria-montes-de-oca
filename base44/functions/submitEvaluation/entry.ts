@@ -28,36 +28,24 @@ function gradeAnswer(activity, user_answer) {
   const correctMain = activity.correct_answer;
   const acceptedList = activity.accepted_answers || [];
 
-  // ─── multiple_select: comparación de conjuntos sin importar orden + scoring parcial ─
+  // ─── multiple_select: scoring con penalización por respuestas incorrectas ──────
   if (activity.type === 'multiple_select') {
-    // Normalizar correct_answer a array (soporte nativo y legacy)
-    let correctArr = Array.isArray(correctMain)
-      ? correctMain
-      : (typeof correctMain === 'string' && correctMain.trim().startsWith('[')
-          ? (() => { try { return JSON.parse(correctMain); } catch { return [correctMain]; } })()
-          : [correctMain]);
+    // correct_answer SIEMPRE es array nativo (formato único)
+    const correctArr = Array.isArray(correctMain) ? correctMain : [];
+    const userArr = Array.isArray(user_answer) ? user_answer : [];
 
-    // Normalizar user_answer a array
-    let userArr = Array.isArray(user_answer)
-      ? user_answer
-      : (typeof user_answer === 'string' && user_answer.trim().startsWith('[')
-          ? (() => { try { return JSON.parse(user_answer); } catch { return [user_answer]; } })()
-          : [user_answer]);
+    const correctSet = new Set(correctArr.map(x => normalizeAnswer(String(x))));
+    const userSet = new Set(userArr.map(x => normalizeAnswer(String(x))));
 
-    const isCorrect = arraysEqual(userArr, correctArr);
+    const correctHits = [...userSet].filter(x => correctSet.has(x)).length;
+    const wrongHits = [...userSet].filter(x => !correctSet.has(x)).length;
 
-    // Scoring parcial: proporción de aciertos
-    if (!isCorrect && correctArr.length > 0) {
-      const normalizeArr = arr => arr.map(x => normalizeAnswer(String(x))).sort();
-      const normCorrect = normalizeArr(correctArr);
-      const normUser = normalizeArr(userArr);
-      const hits = normUser.filter(u => normCorrect.includes(u)).length;
-      const partialScore = hits / normCorrect.length;
-      const points_obtained = partialScore > 0 ? Math.round(points * partialScore) : 0;
-      return { correct: false, points_obtained, requires_review: false };
-    }
+    const rawScore = correctSet.size > 0 ? (correctHits - wrongHits) / correctSet.size : 0;
+    const finalScore = Math.max(0, rawScore);
+    const isCorrect = finalScore === 1;
+    const points_obtained = Math.round(points * finalScore);
 
-    return { correct: isCorrect, points_obtained: isCorrect ? points : 0, requires_review: false };
+    return { correct: isCorrect, points_obtained, requires_review: false };
   }
 
   // ─── fill_blank / solve: comparar tokens sin importar orden ─────────────────

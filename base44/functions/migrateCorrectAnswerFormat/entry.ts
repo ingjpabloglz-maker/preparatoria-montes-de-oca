@@ -37,33 +37,37 @@ Deno.serve(async (req) => {
         for (const act of activities) {
           const ca = act.correct_answer;
 
-          // Si ya es array nativo → no necesita migración
+          // Ya es array nativo → formato correcto, saltar
           if (Array.isArray(ca)) {
             skipped++;
             continue;
           }
 
-          // Si es string que empieza con '[' → parsear a array
-          if (typeof ca === 'string' && ca.trim().startsWith('[')) {
-            try {
-              const parsed = JSON.parse(ca);
-              if (Array.isArray(parsed)) {
-                await base44.asServiceRole.entities.CourseActivity.update(act.id, {
-                  correct_answer: parsed.map(x => String(x))
-                });
-                migrated++;
-                console.log(`Migrated ${act.id} (${actType}): "${ca}" → ${JSON.stringify(parsed)}`);
-              } else {
-                skipped++;
+          if (typeof ca === 'string') {
+            let newArr = null;
+
+            if (ca.trim().startsWith('[')) {
+              // JSON string → parsear a array
+              try {
+                const parsed = JSON.parse(ca);
+                newArr = Array.isArray(parsed) ? parsed.map(x => String(x)) : [ca];
+              } catch {
+                newArr = [ca]; // fallback: envolver en array
               }
-            } catch (e) {
-              errors++;
-              errorLog.push({ id: act.id, type: actType, correct_answer: ca, error: e.message });
-              console.error(`Error parsing ${act.id}:`, e.message);
+            } else {
+              // String simple → envolver en array de un elemento
+              newArr = [ca];
             }
+
+            await base44.asServiceRole.entities.CourseActivity.update(act.id, {
+              correct_answer: newArr
+            });
+            migrated++;
+            console.log(`Migrated ${act.id} (${actType}): "${ca}" → ${JSON.stringify(newArr)}`);
           } else {
-            // String simple o formato desconocido — no migrar
-            skipped++;
+            // null/undefined/otro tipo → registrar error
+            errors++;
+            errorLog.push({ id: act.id, type: actType, correct_answer: ca, error: 'unexpected type: ' + typeof ca });
           }
         }
 

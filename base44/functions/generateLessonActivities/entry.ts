@@ -6,17 +6,11 @@ const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_
 function sanitizeActivity(activity) {
   let correct_answer = activity.correct_answer;
   if (activity.type === 'multiple_select') {
-    // Normalizar a array real de strings
+    // Formato único: SIEMPRE array nativo de strings
     if (Array.isArray(correct_answer)) {
       correct_answer = correct_answer.map(x => String(x));
-    } else if (typeof correct_answer === 'string') {
-      // Compatibilidad con datos legacy serializados como JSON string
-      if (correct_answer.startsWith('[')) {
-        try { correct_answer = JSON.parse(correct_answer).map(x => String(x)); } catch { correct_answer = [correct_answer]; }
-      } else {
-        correct_answer = [correct_answer];
-      }
     } else {
+      // Si el LLM devolvió string en lugar de array → inválido, array vacío forzará rechazo en validateActivity
       correct_answer = [];
     }
   } else {
@@ -52,7 +46,8 @@ function validateActivity(act) {
       break;
     case 'multiple_select':
       if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
-      if (!Array.isArray(act.correct_answer) || act.correct_answer.length === 0) return 'correct_answer debe ser array no vacío';
+      // Formato único: correct_answer DEBE ser array nativo
+      if (!Array.isArray(act.correct_answer) || act.correct_answer.length === 0) return 'correct_answer debe ser array real no vacío (no string)';
       break;
     case 'true_false': {
       const ca = act.correct_answer?.toString().toLowerCase().trim();
