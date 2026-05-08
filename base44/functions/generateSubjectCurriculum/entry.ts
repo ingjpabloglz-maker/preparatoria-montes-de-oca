@@ -1,13 +1,74 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_steps','multiple_select','drag_drop','step_by_step'];
+const ARRAY_ANSWER_TYPES = ['multiple_select', 'order_steps'];
 
+// ─── SANITIZACIÓN ESTRICTA: solo un campo tiene valor según el tipo ───────────
+function sanitizeActivity(raw) {
+  const isArrayType = ARRAY_ANSWER_TYPES.includes(raw.type);
+  let correct_answer = '';
+  let correct_answers = [];
+
+  if (isArrayType) {
+    if (Array.isArray(raw.correct_answers) && raw.correct_answers.length > 0) {
+      correct_answers = raw.correct_answers.map(x => String(x));
+    } else if (Array.isArray(raw.correct_answer) && raw.correct_answer.length > 0) {
+      correct_answers = raw.correct_answer.map(x => String(x));
+    } else if (typeof raw.correct_answer === 'string' && raw.correct_answer.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(raw.correct_answer);
+        if (Array.isArray(parsed)) correct_answers = parsed.map(x => String(x));
+      } catch { /* dejará vacío → validación rechazará */ }
+    }
+    correct_answer = ''; // SIEMPRE vacío para tipos array
+  } else {
+    if (typeof raw.correct_answer === 'string') {
+      correct_answer = raw.correct_answer;
+    } else if (raw.correct_answer !== null && raw.correct_answer !== undefined) {
+      correct_answer = String(raw.correct_answer);
+    }
+    correct_answers = []; // SIEMPRE vacío para tipos string
+  }
+
+  return {
+    ...raw,
+    correct_answer,
+    correct_answers,
+    options: Array.isArray(raw.options) ? raw.options : [],
+    accepted_answers: Array.isArray(raw.accepted_answers) ? raw.accepted_answers.map(a => String(a)) : [],
+    hints: Array.isArray(raw.hints) ? raw.hints : raw.hints ? [String(raw.hints)] : [],
+    drag_items: Array.isArray(raw.drag_items) ? raw.drag_items : [],
+    drop_targets: Array.isArray(raw.drop_targets) ? raw.drop_targets : [],
+    steps: Array.isArray(raw.steps) ? raw.steps : [],
+  };
+}
+
+// ─── VALIDACIÓN ESTRICTA ──────────────────────────────────────────────────────
 function validateActivity(act) {
   if (!act.question?.toString().trim()) return 'question vacío';
   if (!VALID_TYPES.includes(act.type)) return `tipo inválido: ${act.type}`;
-  if (act.type === 'multiple_choice' || act.type === 'multiple_select') {
+
+  const isArrayType = ARRAY_ANSWER_TYPES.includes(act.type);
+
+  // Rechazar si ambos campos están llenos
+  if (isArrayType && act.correct_answer && act.correct_answer.trim() !== '') {
+    return `Invalid activity: wrong answer field for type ${act.type} — correct_answer debe estar vacío`;
+  }
+  if (!isArrayType && Array.isArray(act.correct_answers) && act.correct_answers.length > 0) {
+    return `Invalid activity: wrong answer field for type ${act.type} — correct_answers debe estar vacío`;
+  }
+
+  if (act.type === 'multiple_choice') {
     if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
-    if (!act.correct_answer) return 'correct_answer faltante';
+    if (typeof act.correct_answer !== 'string' || act.correct_answer.trim() === '') return 'correct_answer debe ser string no vacío';
+  }
+  if (act.type === 'multiple_select') {
+    if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
+    if (!Array.isArray(act.correct_answers) || act.correct_answers.length === 0) return 'Invalid activity: wrong answer field for type multiple_select — correct_answers vacío';
+  }
+  if (act.type === 'order_steps') {
+    if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
+    if (!Array.isArray(act.correct_answers) || act.correct_answers.length === 0) return 'Invalid activity: wrong answer field for type order_steps — correct_answers vacío';
   }
   if (act.type === 'true_false') {
     const ca = act.correct_answer?.toString().toLowerCase();
@@ -106,13 +167,14 @@ REGLAS:
 - multiple_choice: 4 opciones, correct_answer = texto exacto de opción correcta.
 - true_false: options=["Verdadero","Falso"], correct_answer="Verdadero" o "Falso".
 - fill_blank: pregunta con ___, correct_answer = texto.
-- multiple_select: correct_answer = JSON array de textos correctos.
-- order_steps: options=pasos MEZCLADOS, correct_answer=JSON array ORDENADO.
+- multiple_select: correct_answers = ARRAY de textos correctos, ej: ["op1","op3"]. NO usar correct_answer.
+  - order_steps: options=pasos MEZCLADOS, correct_answers=ARRAY en ORDEN CORRECTO. NO usar correct_answer.
 - drag_drop: drag_items=items mezclados, drop_targets=etiquetas, correct_answer=JSON object target→item.
 - step_by_step: steps=[{instruction,answer,hint}], correct_answer="step_by_step".
 CALIDAD: explanation_levels {basic,detailed,example}, incorrect_feedback {default:...}, hints (max 1), points: easy=8, medium=10, hard=14.
-Matemáticas: usa LaTeX dentro de $...$.
-Devuelve SOLO JSON con campo "activities": array de ${count} objetos.`;
+  Matemáticas: usa LaTeX dentro de $...$.
+  REGLA CRÍTICA: NUNCA incluir ambos campos correct_answer y correct_answers en la misma actividad.
+  Devuelve SOLO JSON con campo "activities": array de ${count} objetos.`;
 
   const activitiesResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
     prompt: activitiesPrompt,
@@ -124,8 +186,17 @@ Devuelve SOLO JSON con campo "activities": array de ${count} objetos.`;
     }
   });
 
-  let activities = Array.isArray(activitiesResult) ? activitiesResult : (activitiesResult?.activities || []);
-  const valid = activities.filter(a => !validateActivity(a));
+  let rawActivities = Array.isArray(activitiesResult) ? activitiesResult : (activitiesResult?.activities || []);
+  const valid = [];
+  for (const rawAct of rawActivities) {
+    const act = sanitizeActivity(rawAct);
+    const err = validateActivity(act);
+    if (err) {
+      console.warn(`Invalid activity rejected: ${err}`, { type: act.type, q: act.question?.slice(0, 60) });
+    } else {
+      valid.push(act);
+    }
+  }
 
   // Reintento si faltan
   if (valid.length < min) {
@@ -134,8 +205,14 @@ Devuelve SOLO JSON con campo "activities": array de ${count} objetos.`;
       prompt: `${activitiesPrompt}\n\nNecesito SOLO ${needed} actividades adicionales válidas. Devuelve JSON con "activities": [...]`,
       response_json_schema: { type: "object", properties: { activities: { type: "array", items: { type: "object" } } } }
     });
-    const retryActs = Array.isArray(retry) ? retry : (retry?.activities || []);
-    for (const a of retryActs) { if (valid.length >= min) break; if (!validateActivity(a)) valid.push(a); }
+    const retryRaw = Array.isArray(retry) ? retry : (retry?.activities || []);
+    for (const rawAct of retryRaw) {
+      if (valid.length >= min) break;
+      const act = sanitizeActivity(rawAct);
+      const err = validateActivity(act);
+      if (!err) valid.push(act);
+      else console.warn(`Retry rejected: ${err}`, { type: act.type });
+    }
   }
 
   if (valid.length < min) {
@@ -143,16 +220,18 @@ Devuelve SOLO JSON con campo "activities": array de ${count} objetos.`;
     throw new Error(`Solo ${valid.length}/${min} actividades válidas para "${lesson.title}". Lección eliminada.`);
   }
 
-  // Guardar actividades
+  // Guardar actividades con campo dual estricto
   let activitiesCreated = 0;
   for (let i = 0; i < valid.length; i++) {
     const act = valid[i];
+    const isArrayType = ARRAY_ANSWER_TYPES.includes(act.type);
     const actData = {
       lesson_id: lesson.id,
       type: act.type,
       question: act.question.trim(),
       options: act.options || [],
-      correct_answer: act.correct_answer || '',
+      correct_answer: isArrayType ? '' : (act.correct_answer || ''),
+      correct_answers: isArrayType ? (act.correct_answers || []) : [],
       accepted_answers: act.accepted_answers || [],
       explanation: act.explanation || '',
       explanation_levels: act.explanation_levels || null,
