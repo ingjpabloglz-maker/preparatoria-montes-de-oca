@@ -9,7 +9,21 @@ import { useSound } from '@/contexts/SoundContext';
 import { base44 } from '@/api/base44Client';
 import { cn } from '@/lib/utils';
 
+// Detecta expresiones LaTeX sin delimitadores y las envuelve en $...$
+function ensureMathDelimiters(text) {
+  if (!text) return '';
+  const str = String(text);
+  // Si ya tiene delimitadores $, dejarlo como está
+  if (str.includes('$')) return str;
+  // Si contiene comandos LaTeX comunes sin delimitadores, envolver todo
+  if (/\\(frac|sqrt|sum|int|prod|lim|infty|cdot|times|div|pm|leq|geq|neq|alpha|beta|gamma|delta|pi|theta|lambda|mu|sigma|omega|vec|hat|bar|dot|ddot|overline|underline|text|mathbb|mathrm|left|right|binom|log|sin|cos|tan|ln|exp)\b/.test(str)) {
+    return `$${str}$`;
+  }
+  return str;
+}
+
 function MdMath({ children, className = '' }) {
+  const content = ensureMathDelimiters(children);
   return (
     <ReactMarkdown
       remarkPlugins={[remarkMath]}
@@ -17,7 +31,7 @@ function MdMath({ children, className = '' }) {
       components={{ p: ({ children }) => <span>{children}</span> }}
       className={className}
     >
-      {children || ''}
+      {content}
     </ReactMarkdown>
   );
 }
