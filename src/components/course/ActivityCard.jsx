@@ -404,7 +404,7 @@ export default function ActivityCard({
     if (activity.type === 'order_steps') return JSON.stringify(orderItems);
     if (activity.type === 'drag_drop') return JSON.stringify(dragMapping);
     if (activity.type === 'step_by_step') return JSON.stringify(stepAnswers);
-    if (activity.type === 'fill_blank' || activity.type === 'solve') return fillValue.trim();
+    if (activity.type === 'fill_blank' || activity.type === 'solve') return activity.options?.length > 0 ? selectedAnswer : fillValue.trim();
     return selectedAnswer;
   };
 
@@ -413,7 +413,7 @@ export default function ActivityCard({
     if (activity.type === 'order_steps') return orderItems.length > 0;
     if (activity.type === 'drag_drop') return Object.keys(dragMapping).length === (activity.drop_targets?.length || 0);
     if (activity.type === 'step_by_step') return stepAnswers.length === (activity.steps?.length || 0);
-    if (activity.type === 'fill_blank' || activity.type === 'solve') return fillValue.trim().length > 0;
+    if (activity.type === 'fill_blank' || activity.type === 'solve') return activity.options?.length > 0 ? selectedAnswer !== null : fillValue.trim().length > 0;
     return selectedAnswer !== null;
   };
 
@@ -608,7 +608,9 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
           <TrueFalseChoice selected={selectedAnswer} submitted={submitted} correct={activity.correct_answer} onSelect={setSelectedAnswer} />
         )}
         {(activity.type === 'fill_blank' || activity.type === 'solve') && (
-          <FillBlank value={fillValue} onChange={setFillValue} submitted={submitted} correct={isCorrect} />
+          activity.options?.length > 0
+            ? <MultipleChoice options={activity.options} selected={selectedAnswer} submitted={submitted} correct={activity.correct_answer} onSelect={setSelectedAnswer} />
+            : <FillBlank value={fillValue} onChange={setFillValue} submitted={submitted} correct={isCorrect} />
         )}
         {activity.type === 'order_steps' && (
           <OrderSteps items={activity.options || []} order={orderItems} submitted={submitted} onReorder={setOrderItems} />
