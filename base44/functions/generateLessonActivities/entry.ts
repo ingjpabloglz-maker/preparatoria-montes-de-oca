@@ -3,6 +3,22 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_steps','multiple_select','drag_drop','step_by_step'];
 const ARRAY_ANSWER_TYPES = ['multiple_select', 'order_steps'];
 
+// ─── NORMALIZACIÓN: explanation_levels siempre válido ─────────────────────────
+function normalizeExplanationLevels(raw, question) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return {
+      basic: `La respuesta correcta es: ${question}`,
+      detailed: `Se resuelve aplicando el concepto correspondiente.`,
+      example: `Ejemplo: aplica el mismo procedimiento en un caso similar.`
+    };
+  }
+  return {
+    basic: typeof raw.basic === 'string' && raw.basic.trim() ? raw.basic : `Respuesta correcta.`,
+    detailed: typeof raw.detailed === 'string' && raw.detailed.trim() ? raw.detailed : `Explicación paso a paso del procedimiento.`,
+    example: typeof raw.example === 'string' && raw.example.trim() ? raw.example : `Ejemplo similar aplicado.`
+  };
+}
+
 // ─── SANITIZACIÓN ESTRICTA ────────────────────────────────────────────────────
 // Garantiza que SOLO el campo correcto esté lleno según el tipo.
 function sanitizeActivity(raw) {
@@ -323,7 +339,7 @@ FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
         correct_answers: isArrayType ? act.correct_answers : [],
         accepted_answers: act.accepted_answers || [],
         explanation: act.explanation || '',
-        explanation_levels: act.explanation_levels || null,
+        explanation_levels: normalizeExplanationLevels(act.explanation_levels, act.question),
         incorrect_feedback: act.incorrect_feedback || null,
         hints: act.hints || [],
         difficulty: act.difficulty || 'medium',
