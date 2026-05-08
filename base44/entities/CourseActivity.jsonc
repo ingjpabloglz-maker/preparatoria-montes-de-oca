@@ -34,7 +34,7 @@
     },
     "correct_answer": {
       "type": "string",
-      "description": "Respuesta correcta principal (texto o \u00edndice). Para multiple_select: JSON array de opciones correctas. Para drag_drop/order_steps: JSON array ordenado."
+      "description": "Respuesta correcta principal. Para multiple_select y order_steps: JSON array serializado como string. Para drag_drop: JSON object serializado como string."
     },
     "accepted_answers": {
       "type": "array",
@@ -67,7 +67,7 @@
     },
     "incorrect_feedback": {
       "type": "object",
-      "description": "Feedback espec\u00edfico por tipo de error o por opci\u00f3n incorrecta seleccionada. Clave: opci\u00f3n o tipo de error, valor: mensaje de retroalimentaci\u00f3n."
+      "description": "Feedback espec\u00edfico por tipo de error o por opci\u00f3n incorrecta seleccionada."
     },
     "hints": {
       "type": "array",
@@ -88,7 +88,7 @@
     },
     "time_limit_seconds": {
       "type": "number",
-      "description": "Tiempo l\u00edmite en segundos (opcional). Si se responde antes, otorga bonus."
+      "description": "Tiempo l\u00edmite en segundos (opcional)."
     },
     "order": {
       "type": "number",

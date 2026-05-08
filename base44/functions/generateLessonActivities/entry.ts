@@ -4,14 +4,31 @@ const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_
 
 // CAPA 2: Sanitización antes de validar
 function sanitizeActivity(activity) {
+  // correct_answer: para multiple_select puede venir como array o como JSON string de array
+  let correct_answer = activity.correct_answer;
+  if (activity.type === 'multiple_select') {
+    if (Array.isArray(correct_answer)) {
+      correct_answer = correct_answer.map(x => String(x));
+    } else if (typeof correct_answer === 'string') {
+      try {
+        const parsed = JSON.parse(correct_answer);
+        correct_answer = Array.isArray(parsed) ? parsed.map(x => String(x)) : [correct_answer];
+      } catch {
+        correct_answer = [correct_answer];
+      }
+    } else {
+      correct_answer = [];
+    }
+  } else {
+    correct_answer = correct_answer !== undefined ? String(correct_answer) : "";
+  }
+
   return {
     ...activity,
+    correct_answer,
     hints: Array.isArray(activity.hints)
       ? activity.hints
       : activity.hints ? [String(activity.hints)] : [],
-    correct_answer: activity.correct_answer !== undefined
-      ? String(activity.correct_answer)
-      : "",
     accepted_answers: Array.isArray(activity.accepted_answers)
       ? activity.accepted_answers.map(a => String(a))
       : activity.accepted_answers ? [String(activity.accepted_answers)] : [],
@@ -22,36 +39,42 @@ function sanitizeActivity(activity) {
   };
 }
 
-// CAPA 4: Validador inteligente
+// CAPA 4: Validador inteligente por tipo
 function validateActivity(act) {
   const q = act.question?.toString().trim();
   if (!q) return 'question vacío';
   if (!VALID_TYPES.includes(act.type)) return `tipo inválido: ${act.type}`;
 
-  if (act.type === 'multiple_choice') {
-    if (!Array.isArray(act.options) || act.options.length < 3) return 'options insuficientes (mínimo 3)';
-    if (!act.correct_answer) return 'correct_answer faltante';
-  }
-  if (act.type === 'multiple_select') {
-    if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
-    if (!act.correct_answer) return 'correct_answer faltante';
-  }
-  if (act.type === 'true_false') {
-    const ca = act.correct_answer?.toString().toLowerCase().trim();
-    if (!['verdadero','falso','true','false'].includes(ca)) return `correct_answer inválido para true_false: ${ca}`;
-  }
-  if (act.type === 'fill_blank') {
-    if (act.accepted_answers.length === 0 && !act.correct_answer) return 'accepted_answers o correct_answer requerido';
-  }
-  if (act.type === 'solve') {
-    if (!act.correct_answer && act.accepted_answers.length === 0) return 'correct_answer o accepted_answers requerido';
-  }
-  if (act.type === 'drag_drop') {
-    if (act.drag_items.length === 0) return 'drag_items vacío';
-    if (act.drop_targets.length === 0) return 'drop_targets vacío';
-  }
-  if (act.type === 'step_by_step') {
-    if (act.steps.length < 1) return 'steps requiere mínimo 1 paso';
+  switch (act.type) {
+    case 'multiple_choice':
+      if (!Array.isArray(act.options) || act.options.length < 3) return 'options insuficientes (mínimo 3)';
+      if (!act.correct_answer) return 'correct_answer faltante';
+      break;
+    case 'multiple_select':
+      if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
+      if (!Array.isArray(act.correct_answer) || act.correct_answer.length === 0) return 'correct_answer debe ser array no vacío';
+      break;
+    case 'true_false': {
+      const ca = act.correct_answer?.toString().toLowerCase().trim();
+      if (!['verdadero','falso','true','false'].includes(ca)) return `correct_answer inválido para true_false: ${ca}`;
+      break;
+    }
+    case 'fill_blank':
+      if (act.accepted_answers.length === 0 && !act.correct_answer) return 'accepted_answers o correct_answer requerido';
+      break;
+    case 'solve':
+      if (!act.correct_answer && act.accepted_answers.length === 0) return 'correct_answer o accepted_answers requerido';
+      break;
+    case 'drag_drop':
+      if (act.drag_items.length === 0) return 'drag_items vacío';
+      if (act.drop_targets.length === 0) return 'drop_targets vacío';
+      break;
+    case 'step_by_step':
+      if (act.steps.length < 2) return 'steps requiere mínimo 2 pasos';
+      break;
+    case 'order_steps':
+      if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes para order_steps';
+      break;
   }
   return null;
 }
@@ -254,7 +277,7 @@ FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
       type: act.type,
       question: act.question.trim(),
       options: act.options || [],
-      correct_answer: act.correct_answer || '',
+      correct_answer: Array.isArray(act.correct_answer) ? JSON.stringify(act.correct_answer) : (act.correct_answer || ''),
       accepted_answers: act.accepted_answers || [],
       explanation: act.explanation || '',
       explanation_levels: act.explanation_levels || null,
@@ -277,7 +300,7 @@ FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
   }
 
   console.log(`Guardadas ${created.length} actividades para lección ${lesson_id}`, {
-    lesson_title, is_mini_eval, count_requested: count, valid: valid.length, invalid: invalid.length
+    lesson_title, is_mini_eval, count_requested: generateCount, valid: valid.length, invalid: invalid.length
   });
 
   return Response.json({
