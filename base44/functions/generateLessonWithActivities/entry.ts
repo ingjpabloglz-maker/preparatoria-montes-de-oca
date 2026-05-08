@@ -37,7 +37,7 @@ function validateActivity(act) {
     if (!act.correct_answer) return 'correct_answer faltante';
   }
   if (act.type === 'true_false') {
-    const ca = act.correct_answer?.toString().toLowerCase();
+    const ca = act.correct_answer?.toString().toLowerCase().trim();
     if (!['verdadero','falso','true','false'].includes(ca)) return `correct_answer inválido para true_false: ${ca}`;
   }
   if (act.type === 'fill_blank') {
@@ -113,53 +113,66 @@ Devuelve SOLO un objeto JSON con: { "title": "...", "explanation": "..." }`;
     console.log(`Lección creada: ${lesson.id} — "${lesson.title}"`);
 
     // ── PASO 2: Generar actividades basadas en la lección ────────────────────
+    // Generar MÁS de lo necesario para permitir filtrado (Regla 1)
     const min = is_mini_eval ? 10 : 7;
-    const max = is_mini_eval ? 15 : 11;
-    const count = Math.floor(Math.random() * (max - min + 1)) + min;
+    const generateCount = is_mini_eval ? 16 : 12;
 
-    const easyCount  = Math.round(count * 0.4);
-    const hardCount  = Math.round(count * 0.2);
-    const mediumCount = count - easyCount - hardCount;
+    const easyCount  = Math.round(generateCount * 0.4);
+    const hardCount  = Math.round(generateCount * 0.2);
+    const mediumCount = generateCount - easyCount - hardCount;
 
-    const typeInstructions = is_mini_eval
-      ? `Mezcla obligatoria: MÍNIMO 2 multiple_choice, 2 true_false, 1 fill_blank, 2 multiple_select, 1 drag_drop, 1 step_by_step, 1 order_steps. Total: ${count} actividades.`
-      : `Mezcla obligatoria: MÍNIMO 2 multiple_choice, 1 true_false, 1 fill_blank, 1 multiple_select, 1 drag_drop, 1 step_by_step. Total: ${count} actividades.`;
+    const activitiesPrompt = `Eres un experto en diseño instruccional para preparatoria. Genera actividades educativas en formato JSON válido.
 
-    const activitiesPrompt = `Eres un experto en diseño instruccional. Genera ${count} actividades de aprendizaje para esta lección:
+CONTEXTO:
+- Tema: "${lesson.title}"
+- Materia: "${subject_name || 'General'}"
+- Contenido base: "${lesson.explanation}"
+- Tipo: ${is_mini_eval ? 'mini_eval (evaluativa, rigurosa)' : 'lesson (formativa, progresiva)'}
 
-TEMA: "${lesson.title}"
-MATERIA: "${subject_name || 'General'}"
-CONTENIDO BASE: "${lesson.explanation}"
-TIPO: ${is_mini_eval ? 'MINI EVALUACIÓN (evaluativa, rigurosa)' : 'LECCIÓN NORMAL (formativa, progresiva)'}
-
-${typeInstructions}
+REGLAS GENERALES (OBLIGATORIAS):
+1. Responde SOLO con JSON válido (sin texto adicional).
+2. Cada actividad debe cumplir exactamente el esquema.
+3. NO generar campos vacíos, null o undefined.
+4. Tipos de datos estrictos: strings entre comillas, arrays con [].
+5. Si no puedes generar un tipo correctamente, NO lo incluyas.
+6. Genera exactamente ${generateCount} actividades.
 
 DISTRIBUCIÓN DE DIFICULTAD:
 - ${easyCount} actividades: difficulty = "easy"
 - ${mediumCount} actividades: difficulty = "medium"
 - ${hardCount} actividades: difficulty = "hard"
 
-TIPOS DISPONIBLES: multiple_choice, true_false, fill_blank, solve, order_steps, multiple_select, drag_drop, step_by_step
+TIPOS OBLIGATORIOS (incluir todos):
+- multiple_choice, multiple_select, true_false, fill_blank, drag_drop, step_by_step
 
 REGLAS POR TIPO:
-- multiple_choice: 4 opciones, 1 correcta. correct_answer = texto exacto de la opción correcta.
-- true_false: options = ["Verdadero","Falso"], correct_answer = "Verdadero" o "Falso".
-- fill_blank: pregunta con ___ para completar. correct_answer = texto para llenar.
-- solve: problema a resolver. correct_answer = resultado numérico o expresión.
-- multiple_select: varias opciones, varias correctas. correct_answer = JSON array de textos correctos, ej: '["op1","op3"]'. options = array de strings.
-- order_steps: pasos a ordenar. options = pasos en orden MEZCLADO. correct_answer = JSON array en ORDEN CORRECTO.
-- drag_drop: drag_items = items a arrastrar (mezclados). drop_targets = etiquetas de destino. correct_answer = JSON object mapeando target → item.
-- step_by_step: steps = array de objetos {instruction, answer, hint}. correct_answer = "step_by_step".
+- multiple_choice: options mínimo 3. correct_answer = string EXACTO de una opción.
+- multiple_select: options mínimo 4. correct_answer = JSON array de strings correctos, ej: '["op1","op3"]'.
+- true_false: correct_answer = "true" o "false" (en minúsculas).
+- fill_blank: pregunta con ___. accepted_answers = array con mínimo 1 respuesta.
+- drag_drop: drag_items y drop_targets obligatorios (mínimo 2 cada uno). correct_answer = JSON object mapeando target→item.
+- step_by_step: steps = array de objetos {instruction, answer, hint} con mínimo 3 pasos. correct_answer = "step_by_step".
+- order_steps: options = pasos MEZCLADOS. correct_answer = JSON array en ORDEN CORRECTO.
+- solve: correct_answer = resultado numérico o expresión como string.
 
-REQUISITOS DE CALIDAD:
-- explanation_levels con basic, detailed, example para cada actividad.
-- Para matemáticas SIEMPRE usar LaTeX dentro de $...$: $\\mathbb{N}$, $x^2$, $\\frac{a}{b}$, $\\{1,2,3\\}$.
+CALIDAD PEDAGÓGICA:
+- Preguntas claras, sin ambigüedad.
+- Para matemáticas usar LaTeX dentro de $...$: $x^2$, $\\frac{a}{b}$, $\\mathbb{N}$, $\\{1,2,3\\}$.
+- hints: array con máximo 1 pista (string).
+- explanation: string con la explicación de la respuesta correcta.
+- explanation_levels: objeto con basic, detailed, example.
 - incorrect_feedback: objeto con al menos clave "default".
-- hints: array con máximo 1 pista.
 - points: easy=8, medium=10, hard=14.
-- order: 1 a ${count}.
 
-Devuelve SOLO el JSON array con exactamente ${count} objetos de actividad.`;
+EJEMPLOS DE REFERENCIA:
+{"type":"multiple_choice","question":"¿Cuánto es 3 + 5?","options":["6","7","8","9"],"correct_answer":"8","hints":["Suma los números paso a paso"],"explanation":"3 + 5 = 8","difficulty":"easy","points":8}
+{"type":"multiple_select","question":"Selecciona los números primos","options":["2","3","4","5"],"correct_answer":"[\\"2\\",\\"3\\",\\"5\\"]","hints":["Un número primo tiene solo dos divisores"],"explanation":"2, 3 y 5 son primos","difficulty":"medium","points":10}
+{"type":"true_false","question":"5 es un número par","correct_answer":"false","hints":["Revisa si es divisible entre 2"],"explanation":"5 no es divisible entre 2","difficulty":"easy","points":8}
+{"type":"fill_blank","question":"Completa: 7 + 3 = ___","accepted_answers":["10"],"hints":["Suma los dos números"],"explanation":"7 + 3 = 10","difficulty":"easy","points":8}
+{"type":"drag_drop","question":"Relaciona cada número con su tipo","drag_items":["2","-3","1/2"],"drop_targets":["Natural","Entero","Racional"],"correct_answer":"{\\"Natural\\":\\"2\\",\\"Entero\\":\\"-3\\",\\"Racional\\":\\"1/2\\"}","hints":["Clasifica según su tipo"],"explanation":"2 es natural, -3 es entero, 1/2 es racional","difficulty":"medium","points":10}
+{"type":"step_by_step","question":"Resuelve: 2 + 3 × 4","steps":[{"instruction":"Multiplica 3 × 4","answer":"12","hint":"Primero multiplicación"},{"instruction":"Suma 2 + 12","answer":"14","hint":"Ahora la suma"}],"correct_answer":"step_by_step","hints":["Recuerda la jerarquía de operaciones"],"explanation":"Resultado: 14","difficulty":"medium","points":10}
+
+FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
 
     const activitiesResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: activitiesPrompt,
