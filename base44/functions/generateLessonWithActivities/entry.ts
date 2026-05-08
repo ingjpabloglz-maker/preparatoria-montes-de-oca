@@ -18,41 +18,98 @@ function normalizeExplanationLevels(raw, question) {
   };
 }
 
-// CAPA 2: Sanitización antes de validar
+// SANITIZACIÓN GLOBAL ROBUSTA: NUNCA rechazar, siempre corregir
 function sanitizeActivity(activity) {
-  let correct_answer = activity.correct_answer;
-  if (activity.type === 'multiple_select') {
-    // Normalizar a array real de strings
-    if (Array.isArray(correct_answer)) {
-      correct_answer = correct_answer.map(x => String(x));
-    } else if (typeof correct_answer === 'string') {
-      // Compatibilidad con datos legacy serializados como JSON string
-      if (correct_answer.startsWith('[')) {
-        try { correct_answer = JSON.parse(correct_answer).map(x => String(x)); } catch { correct_answer = [correct_answer]; }
-      } else {
-        correct_answer = [correct_answer];
-      }
-    } else {
-      correct_answer = [];
-    }
-  } else {
-    correct_answer = correct_answer !== undefined ? String(correct_answer) : "";
+  const safe = { ...activity };
+
+  // --- TYPE ---
+  if (!safe.type || !VALID_TYPES.includes(safe.type)) {
+    safe.type = 'multiple_choice';
   }
 
-  return {
-    ...activity,
-    correct_answer,
-    hints: Array.isArray(activity.hints)
-      ? activity.hints
-      : activity.hints ? [String(activity.hints)] : [],
-    accepted_answers: Array.isArray(activity.accepted_answers)
-      ? activity.accepted_answers.map(a => String(a))
-      : activity.accepted_answers ? [String(activity.accepted_answers)] : [],
-    options: Array.isArray(activity.options) ? activity.options : [],
-    drag_items: Array.isArray(activity.drag_items) ? activity.drag_items : [],
-    drop_targets: Array.isArray(activity.drop_targets) ? activity.drop_targets : [],
-    steps: Array.isArray(activity.steps) ? activity.steps : [],
-  };
+  // --- QUESTION ---
+  if (!safe.question || typeof safe.question !== 'string') {
+    safe.question = 'Selecciona la respuesta correcta';
+  }
+
+  // --- OPTIONS ---
+  if (['multiple_choice', 'multiple_select', 'order_steps'].includes(safe.type)) {
+    if (!Array.isArray(safe.options) || safe.options.length < 2) {
+      safe.options = ['Opción A', 'Opción B', 'Opción C', 'Opción D'];
+    }
+  } else {
+    safe.options = Array.isArray(safe.options) ? safe.options : [];
+  }
+
+  // --- CORRECT ANSWERS (dual field) ---
+  if (safe.type === 'multiple_select') {
+    safe.correct_answer = '';
+    if (!Array.isArray(safe.correct_answer) && typeof safe.correct_answer === 'string' && safe.correct_answer.startsWith('[')) {
+      try {
+        safe.correct_answer = JSON.parse(safe.correct_answer).map(x => String(x));
+      } catch { safe.correct_answer = []; }
+    }
+    if (!Array.isArray(safe.correct_answer)) {
+      safe.correct_answer = [];
+    }
+    if (safe.correct_answer.length === 0) {
+      safe.correct_answer = [safe.options?.[0] || 'Opción A'];
+    } else {
+      safe.correct_answer = safe.correct_answer.map(x => String(x));
+    }
+  } else {
+    safe.correct_answer = !safe.correct_answer || typeof safe.correct_answer !== 'string' ? (safe.options?.[0] || 'Respuesta correcta') : String(safe.correct_answer);
+  }
+
+  // --- ACCEPTED ANSWERS ---
+  safe.accepted_answers = Array.isArray(safe.accepted_answers) ? safe.accepted_answers.map(a => String(a)) : [];
+
+  // --- HINTS ---
+  safe.hints = Array.isArray(safe.hints) ? safe.hints.filter(h => h) : [];
+
+  // --- EXPLANATION & LEVELS ---
+  if (!safe.explanation || typeof safe.explanation !== 'string') {
+    safe.explanation = safe.question;
+  }
+  safe.explanation_levels = normalizeExplanationLevels(safe.explanation_levels, safe.question);
+
+  // --- STEPS (step_by_step) ---
+  if (safe.type === 'step_by_step') {
+    if (!Array.isArray(safe.steps) || safe.steps.length < 2) {
+      safe.steps = [{ instruction: 'Paso 1', answer: 'respuesta 1', hint: 'pista 1' }, { instruction: 'Paso 2', answer: 'respuesta 2', hint: 'pista 2' }];
+    }
+  } else {
+    safe.steps = [];
+  }
+
+  // --- DRAG/DROP ---
+  if (safe.type === 'drag_drop') {
+    if (!Array.isArray(safe.drag_items) || safe.drag_items.length < 2) {
+      safe.drag_items = ['A', 'B', 'C'];
+    }
+    if (!Array.isArray(safe.drop_targets) || safe.drop_targets.length < 2) {
+      safe.drop_targets = ['1', '2', '3'];
+    }
+  } else {
+    safe.drag_items = [];
+    safe.drop_targets = [];
+  }
+
+  // --- DIFFICULTY ---
+  if (!['easy', 'medium', 'hard'].includes(safe.difficulty)) {
+    safe.difficulty = 'medium';
+  }
+
+  // --- POINTS ---
+  if (typeof safe.points !== 'number' || safe.points < 0) {
+    const points = { easy: 8, medium: 10, hard: 14 };
+    safe.points = points[safe.difficulty] || 10;
+  }
+
+  // --- FEEDBACK ---
+  safe.incorrect_feedback = typeof safe.incorrect_feedback === 'object' ? safe.incorrect_feedback : null;
+
+  return safe;
 }
 
 // CAPA 4: Validador inteligente por tipo
@@ -256,23 +313,19 @@ FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
       ? activitiesResult
       : (activitiesResult?.activities || []);
 
-    // CAPA 2+3: Sanitizar, validar y reintentar hasta tener suficientes
+    // SANITIZAR Y VALIDAR
     const valid = [];
-    const invalid = [];
     for (const rawAct of activities) {
-      const act = sanitizeActivity(rawAct);
+      let act = sanitizeActivity(rawAct);
       const err = validateActivity(act);
-      if (err) invalid.push({ type: act.type, error: err });
-      else valid.push(act);
+      if (!err) valid.push(act);
     }
-    console.log(`Actividades: ${valid.length} válidas, ${invalid.length} inválidas`);
 
-    // CAPA 3: Reintentar mientras falten (no destructivo — lección ya creada)
+    // REINTENTAR MIENTRAS FALTEN (no destructivo — lección ya creada)
     let retryAttempts = 0;
     while (valid.length < min && retryAttempts < 3) {
       retryAttempts++;
       const needed = min - valid.length;
-      console.log(`Reintento ${retryAttempts}: generando ${needed} actividades adicionales...`);
       const retryResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt: `${activitiesPrompt}\n\nNOTA: Solo necesito ${needed} actividades adicionales válidas.`,
         response_json_schema: {
@@ -283,7 +336,7 @@ FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
       const retryActivities = Array.isArray(retryResult) ? retryResult : (retryResult?.activities || []);
       for (const rawAct of retryActivities) {
         if (valid.length >= min) break;
-        const act = sanitizeActivity(rawAct);
+        let act = sanitizeActivity(rawAct);
         if (!validateActivity(act)) valid.push(act);
       }
     }

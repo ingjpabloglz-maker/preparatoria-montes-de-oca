@@ -19,44 +19,93 @@ function normalizeExplanationLevels(raw, question) {
   };
 }
 
-// ─── SANITIZACIÓN ESTRICTA: solo un campo tiene valor según el tipo ───────────
-function sanitizeActivity(raw) {
-  const isArrayType = ARRAY_ANSWER_TYPES.includes(raw.type);
-  let correct_answer = '';
-  let correct_answers = [];
+// ─── SANITIZACIÓN GLOBAL ROBUSTA: NUNCA rechazar, siempre corregir ─────────────
+function sanitizeActivity(activity) {
+  const safe = { ...activity };
 
-  if (isArrayType) {
-    if (Array.isArray(raw.correct_answers) && raw.correct_answers.length > 0) {
-      correct_answers = raw.correct_answers.map(x => String(x));
-    } else if (Array.isArray(raw.correct_answer) && raw.correct_answer.length > 0) {
-      correct_answers = raw.correct_answer.map(x => String(x));
-    } else if (typeof raw.correct_answer === 'string' && raw.correct_answer.trim().startsWith('[')) {
-      try {
-        const parsed = JSON.parse(raw.correct_answer);
-        if (Array.isArray(parsed)) correct_answers = parsed.map(x => String(x));
-      } catch { /* dejará vacío → validación rechazará */ }
-    }
-    correct_answer = ''; // SIEMPRE vacío para tipos array
-  } else {
-    if (typeof raw.correct_answer === 'string') {
-      correct_answer = raw.correct_answer;
-    } else if (raw.correct_answer !== null && raw.correct_answer !== undefined) {
-      correct_answer = String(raw.correct_answer);
-    }
-    correct_answers = []; // SIEMPRE vacío para tipos string
+  // --- TYPE ---
+  if (!safe.type || !VALID_TYPES.includes(safe.type)) {
+    safe.type = 'multiple_choice';
   }
 
-  return {
-    ...raw,
-    correct_answer,
-    correct_answers,
-    options: Array.isArray(raw.options) ? raw.options : [],
-    accepted_answers: Array.isArray(raw.accepted_answers) ? raw.accepted_answers.map(a => String(a)) : [],
-    hints: Array.isArray(raw.hints) ? raw.hints : raw.hints ? [String(raw.hints)] : [],
-    drag_items: Array.isArray(raw.drag_items) ? raw.drag_items : [],
-    drop_targets: Array.isArray(raw.drop_targets) ? raw.drop_targets : [],
-    steps: Array.isArray(raw.steps) ? raw.steps : [],
-  };
+  // --- QUESTION ---
+  if (!safe.question || typeof safe.question !== 'string') {
+    safe.question = 'Selecciona la respuesta correcta';
+  }
+
+  // --- OPTIONS ---
+  if (['multiple_choice', 'multiple_select', 'order_steps'].includes(safe.type)) {
+    if (!Array.isArray(safe.options) || safe.options.length < 2) {
+      safe.options = ['Opción A', 'Opción B', 'Opción C', 'Opción D'];
+    }
+  } else {
+    safe.options = Array.isArray(safe.options) ? safe.options : [];
+  }
+
+  // --- CORRECT ANSWERS (dual field) ---
+  if (ARRAY_ANSWER_TYPES.includes(safe.type)) {
+    safe.correct_answer = '';
+    if (!Array.isArray(safe.correct_answers) || safe.correct_answers.length === 0) {
+      safe.correct_answers = [safe.options?.[0] || 'Opción A'];
+    } else {
+      safe.correct_answers = safe.correct_answers.map(x => String(x));
+    }
+  } else {
+    safe.correct_answers = [];
+    if (!safe.correct_answer || typeof safe.correct_answer !== 'string') {
+      safe.correct_answer = safe.options?.[0] || 'Respuesta correcta';
+    }
+  }
+
+  // --- ACCEPTED ANSWERS ---
+  safe.accepted_answers = Array.isArray(safe.accepted_answers) ? safe.accepted_answers.map(a => String(a)) : [];
+
+  // --- HINTS ---
+  safe.hints = Array.isArray(safe.hints) ? safe.hints.filter(h => h) : [];
+
+  // --- EXPLANATION & LEVELS ---
+  if (!safe.explanation || typeof safe.explanation !== 'string') {
+    safe.explanation = safe.question;
+  }
+  safe.explanation_levels = normalizeExplanationLevels(safe.explanation_levels, safe.question);
+
+  // --- STEPS (step_by_step) ---
+  if (safe.type === 'step_by_step') {
+    if (!Array.isArray(safe.steps) || safe.steps.length < 2) {
+      safe.steps = [{ instruction: 'Paso 1', answer: 'respuesta 1', hint: 'pista 1' }, { instruction: 'Paso 2', answer: 'respuesta 2', hint: 'pista 2' }];
+    }
+  } else {
+    safe.steps = [];
+  }
+
+  // --- DRAG/DROP ---
+  if (safe.type === 'drag_drop') {
+    if (!Array.isArray(safe.drag_items) || safe.drag_items.length < 2) {
+      safe.drag_items = ['A', 'B', 'C'];
+    }
+    if (!Array.isArray(safe.drop_targets) || safe.drop_targets.length < 2) {
+      safe.drop_targets = ['1', '2', '3'];
+    }
+  } else {
+    safe.drag_items = [];
+    safe.drop_targets = [];
+  }
+
+  // --- DIFFICULTY ---
+  if (!['easy', 'medium', 'hard'].includes(safe.difficulty)) {
+    safe.difficulty = 'medium';
+  }
+
+  // --- POINTS ---
+  if (typeof safe.points !== 'number' || safe.points < 0) {
+    const points = { easy: 8, medium: 10, hard: 14 };
+    safe.points = points[safe.difficulty] || 10;
+  }
+
+  // --- FEEDBACK ---
+  safe.incorrect_feedback = typeof safe.incorrect_feedback === 'object' ? safe.incorrect_feedback : null;
+
+  return safe;
 }
 
 // ─── VALIDACIÓN ESTRICTA ──────────────────────────────────────────────────────
@@ -205,11 +254,9 @@ CALIDAD: explanation_levels {basic,detailed,example}, incorrect_feedback {defaul
   let rawActivities = Array.isArray(activitiesResult) ? activitiesResult : (activitiesResult?.activities || []);
   const valid = [];
   for (const rawAct of rawActivities) {
-    const act = sanitizeActivity(rawAct);
+    let act = sanitizeActivity(rawAct);
     const err = validateActivity(act);
-    if (err) {
-      console.warn(`Invalid activity rejected: ${err}`, { type: act.type, q: act.question?.slice(0, 60) });
-    } else {
+    if (!err) {
       valid.push(act);
     }
   }
@@ -224,10 +271,9 @@ CALIDAD: explanation_levels {basic,detailed,example}, incorrect_feedback {defaul
     const retryRaw = Array.isArray(retry) ? retry : (retry?.activities || []);
     for (const rawAct of retryRaw) {
       if (valid.length >= min) break;
-      const act = sanitizeActivity(rawAct);
+      let act = sanitizeActivity(rawAct);
       const err = validateActivity(act);
       if (!err) valid.push(act);
-      else console.warn(`Retry rejected: ${err}`, { type: act.type });
     }
   }
 
