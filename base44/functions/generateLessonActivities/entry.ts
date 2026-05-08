@@ -1,5 +1,34 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_steps','multiple_select','drag_drop','step_by_step'];
+
+function validateActivity(act) {
+  const q = act.question?.toString().trim();
+  if (!q) return 'question vacío';
+  if (!VALID_TYPES.includes(act.type)) return `tipo inválido: ${act.type}`;
+
+  if (act.type === 'multiple_choice' || act.type === 'multiple_select') {
+    if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
+    if (!act.correct_answer) return 'correct_answer faltante';
+  }
+  if (act.type === 'true_false') {
+    const ca = act.correct_answer?.toString().toLowerCase();
+    if (!['verdadero','falso','true','false'].includes(ca)) return `correct_answer inválido para true_false: ${ca}`;
+  }
+  if (act.type === 'fill_blank' || act.type === 'solve') {
+    if (!act.correct_answer && (!Array.isArray(act.accepted_answers) || act.accepted_answers.length === 0))
+      return 'correct_answer o accepted_answers requerido';
+  }
+  if (act.type === 'drag_drop') {
+    if (!Array.isArray(act.drag_items) || act.drag_items.length === 0) return 'drag_items vacío';
+    if (!Array.isArray(act.drop_targets) || act.drop_targets.length === 0) return 'drop_targets vacío';
+  }
+  if (act.type === 'step_by_step') {
+    if (!Array.isArray(act.steps) || act.steps.length < 2) return 'steps requiere mínimo 2 pasos';
+  }
+  return null; // válido
+}
+
 Deno.serve(async (req) => {
   try {
   const base44 = createClientFromRequest(req);
@@ -139,6 +168,44 @@ IMPORTANTE: devuelve SOLO el JSON array, sin texto adicional.`;
     }, { status: 400 });
   }
 
+  // Validar actividades generadas
+  const valid = [];
+  const invalid = [];
+  for (const act of activities) {
+    const err = validateActivity(act);
+    if (err) {
+      invalid.push({ type: act.type, question: act.question?.slice?.(0, 40), error: err });
+    } else {
+      valid.push(act);
+    }
+  }
+  console.log(`Validation: ${valid.length} válidas, ${invalid.length} inválidas`, { invalid });
+
+  // Si no hay suficientes válidas, hacer un reintento extra pidiendo solo las faltantes
+  if (valid.length < min) {
+    const needed = min - valid.length;
+    console.log(`Reintentando generar ${needed} actividades adicionales...`);
+    const retryPrompt = `${prompt}\n\nNOTA: Solo necesito ${needed} actividades adicionales válidas. Asegúrate de incluir todos los campos requeridos según el tipo.`;
+    const retryResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      prompt: retryPrompt,
+      response_json_schema: {
+        type: "object",
+        properties: { activities: { type: "array", items: { type: "object" } } }
+      }
+    });
+    const retryActivities = Array.isArray(retryResult) ? retryResult : (retryResult?.activities || []);
+    for (const act of retryActivities) {
+      if (valid.length >= min) break;
+      const err = validateActivity(act);
+      if (!err) valid.push(act);
+      else console.log('Retry activity también inválida:', err, act.type);
+    }
+  }
+
+  if (valid.length < min) {
+    return Response.json({ error: `Solo se generaron ${valid.length} actividades válidas (mínimo ${min}). Inválidas: ${JSON.stringify(invalid)}` }, { status: 500 });
+  }
+
   // Si replace_existing, eliminar actividades previas
   if (replace_existing) {
     const existing = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id });
@@ -147,13 +214,14 @@ IMPORTANTE: devuelve SOLO el JSON array, sin texto adicional.`;
     }
   }
 
-  // Crear actividades en BD
+  // Crear actividades válidas en BD
   const created = [];
-  for (const act of activities) {
+  for (let i = 0; i < valid.length; i++) {
+    const act = valid[i];
     const actData = {
       lesson_id,
-      type: act.type || 'multiple_choice',
-      question: act.question || '',
+      type: act.type,
+      question: act.question.trim(),
       options: act.options || [],
       correct_answer: act.correct_answer || '',
       accepted_answers: act.accepted_answers || [],
@@ -163,24 +231,22 @@ IMPORTANTE: devuelve SOLO el JSON array, sin texto adicional.`;
       hints: act.hints || [],
       difficulty: act.difficulty || 'medium',
       points: act.points || 10,
-      order: act.order || 1,
+      order: i + 1,
       grading_type: 'auto',
     };
 
-    if (act.type === 'step_by_step' && act.steps) {
-      actData.steps = act.steps;
-    }
+    if (act.type === 'step_by_step') actData.steps = act.steps;
     if (act.type === 'drag_drop') {
-      actData.drag_items = act.drag_items || [];
-      actData.drop_targets = act.drop_targets || [];
+      actData.drag_items = act.drag_items;
+      actData.drop_targets = act.drop_targets;
     }
 
     const newAct = await base44.asServiceRole.entities.CourseActivity.create(actData);
     created.push(newAct);
   }
 
-  console.log(`Generated ${created.length} activities for lesson ${lesson_id}`, {
-    lesson_title, is_mini_eval, count_requested: count, count_created: created.length
+  console.log(`Guardadas ${created.length} actividades para lección ${lesson_id}`, {
+    lesson_title, is_mini_eval, count_requested: count, valid: valid.length, invalid: invalid.length
   });
 
   return Response.json({
