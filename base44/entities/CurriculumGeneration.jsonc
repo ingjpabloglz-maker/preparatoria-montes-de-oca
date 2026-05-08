@@ -1,0 +1,96 @@
+{
+  "name": "CurriculumGeneration",
+  "type": "object",
+  "properties": {
+    "generation_id": {
+      "type": "string",
+      "description": "ID \u00fanico de la generaci\u00f3n (UUID)"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "ID de la materia"
+    },
+    "subject_name": {
+      "type": "string",
+      "description": "Nombre de la materia"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "completed",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Estado actual de la generaci\u00f3n"
+    },
+    "progress_percent": {
+      "type": "number",
+      "default": 0,
+      "description": "Porcentaje de avance (0-100)"
+    },
+    "total_steps": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de pasos estimados"
+    },
+    "completed_steps": {
+      "type": "number",
+      "default": 0,
+      "description": "Pasos completados hasta ahora"
+    },
+    "current_module": {
+      "type": "string",
+      "description": "Nombre del m\u00f3dulo que se est\u00e1 generando ahora"
+    },
+    "current_lesson": {
+      "type": "string",
+      "description": "Nombre de la lecci\u00f3n que se est\u00e1 generando ahora"
+    },
+    "logs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Log de eventos durante la generaci\u00f3n"
+    },
+    "blueprint": {
+      "type": "object",
+      "description": "Blueprint pedag\u00f3gico completo generado en la Fase 0"
+    },
+    "started_by": {
+      "type": "string",
+      "description": "Email del admin que inici\u00f3 la generaci\u00f3n"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Mensaje de error si el proceso fall\u00f3"
+    },
+    "overwrite": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si true, sobreescribe contenido existente"
+    },
+    "units_created": {
+      "type": "number",
+      "default": 0
+    },
+    "modules_created": {
+      "type": "number",
+      "default": 0
+    },
+    "lessons_created": {
+      "type": "number",
+      "default": 0
+    },
+    "activities_created": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "subject_id",
+    "generation_id"
+  ]
+}

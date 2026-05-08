@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Zap, RefreshCw, CheckCircle2, AlertTriangle, Loader2, BookOpen, ClipboardList, Sparkles, PlusCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import AdminGuard from '../components/auth/AdminGuard';
+import CurriculumGeneratorPanel from '../components/admin/CurriculumGeneratorPanel';
 
 export default function ManageActivities() {
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
@@ -176,6 +177,17 @@ export default function ManageActivities() {
               </Select>
             </CardContent>
           </Card>
+
+          {/* Panel: Generar currículo completo */}
+          {selectedSubjectId && (
+            <CurriculumGeneratorPanel
+              subject={selectedSubject}
+              onComplete={() => {
+                queryClient.invalidateQueries(['lessonsForSubject', selectedSubjectId]);
+                queryClient.invalidateQueries(['activitiesCount', selectedSubjectId]);
+              }}
+            />
+          )}
 
           {/* Panel: Generar lección completa con IA */}
           {selectedSubjectId && (
