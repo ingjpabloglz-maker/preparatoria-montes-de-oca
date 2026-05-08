@@ -30,18 +30,25 @@ function gradeAnswer(activity, user_answer) {
 
   // ─── multiple_select: scoring con penalización por respuestas incorrectas ──────
   if (activity.type === 'multiple_select') {
+    // Validación estricta: user_answer debe ser array no vacío
+    if (!Array.isArray(user_answer) || user_answer.length === 0) {
+      return { correct: false, points_obtained: 0, requires_review: false };
+    }
     // correct_answer SIEMPRE es array nativo (formato único)
     const correctArr = Array.isArray(correctMain) ? correctMain : [];
-    const userArr = Array.isArray(user_answer) ? user_answer : [];
+    if (correctArr.length === 0) {
+      return { correct: false, points_obtained: 0, requires_review: false };
+    }
 
+    // Normalizar y deduplicar con Set
     const correctSet = new Set(correctArr.map(x => normalizeAnswer(String(x))));
-    const userSet = new Set(userArr.map(x => normalizeAnswer(String(x))));
+    const userSet = new Set(user_answer.map(x => normalizeAnswer(String(x))));
 
     const correctHits = [...userSet].filter(x => correctSet.has(x)).length;
     const wrongHits = [...userSet].filter(x => !correctSet.has(x)).length;
 
-    const rawScore = correctSet.size > 0 ? (correctHits - wrongHits) / correctSet.size : 0;
-    const finalScore = Math.max(0, rawScore);
+    const rawScore = (correctHits - wrongHits) / correctSet.size;
+    const finalScore = Math.max(0, rawScore); // clamp: nunca negativo
     const isCorrect = finalScore === 1;
     const points_obtained = Math.round(points * finalScore);
 
