@@ -42,6 +42,11 @@ function normalize(str) {
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') || '';
 }
 
+// Divide una cadena por comas o espacios múltiples y normaliza cada token
+function splitTokens(str) {
+  return normalize(str).split(/[\s,]+/).filter(Boolean).sort();
+}
+
 function checkAnswer(userAnswer, activity) {
   const { correct_answer, accepted_answers = [], type, tolerance = 0 } = activity;
 
@@ -79,6 +84,14 @@ function checkAnswer(userAnswer, activity) {
     const uNum = parseFloat(ua.replace(',', '.'));
     const cNum = parseFloat(ca.replace(',', '.'));
     if (!isNaN(uNum) && !isNaN(cNum)) return Math.abs(uNum - cNum) <= tolerance;
+  }
+
+  // Para fill_blank/solve con múltiples valores: comparar conjuntos sin importar orden
+  if (type === 'fill_blank' || type === 'solve') {
+    const allValid = [correct_answer, ...accepted_answers];
+    for (const valid of allValid) {
+      if (JSON.stringify(splitTokens(String(userAnswer))) === JSON.stringify(splitTokens(valid))) return true;
+    }
   }
 
   const allValid = [correct_answer, ...accepted_answers].map(a => normalize(a));

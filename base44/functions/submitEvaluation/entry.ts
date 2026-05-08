@@ -25,6 +25,15 @@ function gradeAnswer(activity, user_answer) {
     return { correct: null, points_obtained: 0, requires_review: true };
   }
 
+  // ─── fill_blank / solve: comparar tokens sin importar orden ─────────────────
+  if (activity.type === 'fill_blank' || activity.type === 'solve') {
+    const splitTokens = (str) => normalizeAnswer(str).split(/[\s,]+/).filter(Boolean).sort();
+    const userTokens = JSON.stringify(splitTokens(String(user_answer)));
+    const allValid = [correctMain, ...acceptedList];
+    const isCorrect = allValid.some(v => JSON.stringify(splitTokens(v)) === userTokens);
+    return { correct: isCorrect, points_obtained: isCorrect ? points : 0, requires_review: false };
+  }
+
   // ─── multiple_select: comparación de conjuntos sin importar orden ────────────
   if (activity.type === 'multiple_select') {
     let correctArr = activity.correct_answer;
