@@ -7,6 +7,15 @@ function normalizeAnswer(answer) {
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+// ─── COMPARAR ARRAYS (para multiple_select) ───────────────────────────────────
+function arraysEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].map(normalizeAnswer).sort();
+  const sortedB = [...b].map(normalizeAnswer).sort();
+  return sortedA.every((val, i) => val === sortedB[i]);
+}
+
 // ─── GRADEAR UNA RESPUESTA ────────────────────────────────────────────────────
 function gradeAnswer(activity, user_answer) {
   const gradingType = activity.grading_type || 'auto';
@@ -14,6 +23,20 @@ function gradeAnswer(activity, user_answer) {
 
   if (gradingType === 'manual' || activity.requires_manual_review) {
     return { correct: null, points_obtained: 0, requires_review: true };
+  }
+
+  // ─── multiple_select: comparación de conjuntos sin importar orden ────────────
+  if (activity.type === 'multiple_select') {
+    let correctArr = activity.correct_answer;
+    if (typeof correctArr === 'string') {
+      try { correctArr = JSON.parse(correctArr); } catch (_) { correctArr = [correctArr]; }
+    }
+    let userArr = user_answer;
+    if (typeof userArr === 'string') {
+      try { userArr = JSON.parse(userArr); } catch (_) { userArr = [userArr]; }
+    }
+    const isCorrect = arraysEqual(userArr, correctArr);
+    return { correct: isCorrect, points_obtained: isCorrect ? points : 0, requires_review: false };
   }
 
   const correctMain = activity.correct_answer;
