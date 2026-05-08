@@ -309,6 +309,14 @@ function StepInput({ step, onSubmitStep }) {
 }
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
+function ActivityDataError({ type, message }) {
+  return (
+    <div className="bg-red-500/20 border border-red-400/40 rounded-xl p-4 text-red-200 text-sm">
+      <strong>Error en actividad ({type}):</strong> {message}
+    </div>
+  );
+}
+
 export default function ActivityCard({
   activity,
   activityNumber,
@@ -342,6 +350,10 @@ export default function ActivityCard({
   const [timeBonus, setTimeBonus] = useState(0);
   const [startTime] = useState(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    console.log('Activity loaded:', activity);
+  }, [activity]);
 
   const { playSound } = useSound();
   const hints = activity.hints || [];
@@ -487,6 +499,19 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
   }[activity.type] || 'Actividad';
 
   const difficultyColor = { easy: 'text-green-400', medium: 'text-amber-400', hard: 'text-red-400' }[activity.difficulty] || 'text-white/40';
+
+  if (!activity) return <div className="text-white/50 text-sm p-4">No hay datos de actividad.</div>;
+
+  // Validaciones por tipo
+  if (activity.type === 'drag_drop' && (!activity.drag_items?.length || !activity.drop_targets?.length)) {
+    return <ActivityDataError type="drag_drop" message="Faltan drag_items o drop_targets. Regenera las actividades." />;
+  }
+  if (activity.type === 'step_by_step' && (!activity.steps?.length)) {
+    return <ActivityDataError type="step_by_step" message="Faltan los pasos (steps). Regenera las actividades." />;
+  }
+  if (!['multiple_choice','true_false','fill_blank','solve','order_steps','multiple_select','drag_drop','step_by_step'].includes(activity.type)) {
+    return <ActivityDataError type={activity.type} message={`Tipo "${activity.type}" no reconocido.`} />;
+  }
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
