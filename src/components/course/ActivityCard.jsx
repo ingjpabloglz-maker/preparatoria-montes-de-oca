@@ -392,6 +392,7 @@ export default function ActivityCard({
 
   const isAnswerProvided = () => {
     if (activity.type === 'multiple_select') return multiSelected.length > 0;
+    if (activity.type === 'order_steps') return orderItems.length > 0;
     if (activity.type === 'drag_drop') return Object.keys(dragMapping).length === (activity.drop_targets?.length || 0);
     if (activity.type === 'step_by_step') return stepAnswers.length === (activity.steps?.length || 0);
     if (activity.type === 'fill_blank' || activity.type === 'solve') return fillValue.trim().length > 0;
