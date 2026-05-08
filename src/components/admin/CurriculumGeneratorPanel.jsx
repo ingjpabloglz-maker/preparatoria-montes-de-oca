@@ -73,6 +73,17 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
     }
   }, [genRecord?.logs, showLogs]);
 
+  const handleStop = async () => {
+    if (!genRecord?.id) return;
+    await base44.entities.CurriculumGeneration.update(genRecord.id, {
+      status: 'failed',
+      error_message: 'Generación detenida manualmente por el administrador.'
+    });
+    setStatus('failed');
+    clearInterval(pollRef.current);
+    toast.warning('Generación detenida manualmente.');
+  };
+
   const handleGenerate = async () => {
     if (!subject) return;
     setStatus('generating');
@@ -261,9 +272,20 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
         )}
 
         {isRunning && (
-          <p className="text-xs text-center text-gray-400">
-            Este proceso puede tomar 5–15 minutos. Puedes cerrar esta página, el proceso continuará en el servidor.
-          </p>
+          <div className="space-y-2">
+            <Button
+              onClick={handleStop}
+              variant="destructive"
+              className="w-full gap-2"
+              size="sm"
+            >
+              <XCircle className="w-4 h-4" />
+              Detener generación
+            </Button>
+            <p className="text-xs text-center text-gray-400">
+              Este proceso puede tomar 5–15 minutos. Puedes cerrar esta página, el proceso continuará en el servidor.
+            </p>
+          </div>
         )}
       </CardContent>
     </Card>
