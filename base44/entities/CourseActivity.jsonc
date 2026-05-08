@@ -34,7 +34,14 @@
     },
     "correct_answer": {
       "type": "string",
-      "description": "Respuesta correcta principal. Para multiple_select y order_steps: JSON array serializado como string. Para drag_drop: JSON object serializado como string."
+      "description": "Respuesta correcta principal (string). Usado por: multiple_choice, true_false, fill_blank, solve, drag_drop, step_by_step."
+    },
+    "correct_answers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Respuestas correctas como array nativo. Usado por: multiple_select, order_steps."
     },
     "accepted_answers": {
       "type": "array",
@@ -165,7 +172,6 @@
     "lesson_id",
     "type",
     "question",
-    "correct_answer",
     "order"
   ]
 }
