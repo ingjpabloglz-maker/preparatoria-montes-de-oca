@@ -47,13 +47,17 @@ async function appendLog(base44, genId, currentLogs, message) {
 }
 
 // ─── Generar lección + actividades (lógica inline) ───────────────────────────
-async function generateLessonBlock(base44, { module_id, subject_id, subject_name, topic, is_mini_eval, lesson_order }) {
+async function generateLessonBlock(base44, { module_id, subject_id, subject_name, topic, is_mini_eval, lesson_order, difficulty = 'medium', keywords = [] }) {
+  const keywordsHint = keywords.length ? `\nPalabras clave a incluir: ${keywords.join(', ')}` : '';
+  const difficultyHint = { easy: 'introductoria y accesible', medium: 'intermedia con ejemplos aplicados', hard: 'avanzada con razonamiento profundo' }[difficulty] || 'intermedia';
+
   const lessonResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
     prompt: `Eres un experto en diseño instruccional para preparatoria mexicana. Crea el contenido teórico completo para una lección.
 
 TEMA: "${topic}"
 MATERIA: "${subject_name}"
 TIPO: ${is_mini_eval ? 'MINI EVALUACIÓN (resumen y refuerzo)' : 'LECCIÓN NORMAL (enseñanza nueva)'}
+NIVEL DE DIFICULTAD: ${difficultyHint}${keywordsHint}
 
 Genera:
 - title: título claro y específico (máximo 8 palabras)
@@ -185,6 +189,16 @@ Deno.serve(async (req) => {
     const subject = subjects[0];
     if (!subject) return Response.json({ error: 'Materia no encontrada' }, { status: 404 });
 
+    // Verificar que existe temario activo
+    const syllabuses = await base44.asServiceRole.entities.SubjectSyllabus.filter({ subject_id, is_active: true });
+    const syllabus = syllabuses[0];
+    if (!syllabus || !syllabus.units?.length) {
+      return Response.json({
+        error: 'Esta materia no tiene un temario activo. Define el temario primero desde el panel de administración.',
+        no_syllabus: true
+      }, { status: 422 });
+    }
+
     // Verificar contenido existente si no overwrite
     if (!overwrite) {
       const existingUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
@@ -228,87 +242,11 @@ Deno.serve(async (req) => {
       try {
         await log(`🚀 Iniciando generación de currículo para "${subject.name}" (Nivel ${subject.level})`);
 
-        // ── FASE 0: Blueprint pedagógico ─────────────────────────────────────
-        await log('📐 Fase 0: Generando blueprint pedagógico...');
-        await updateProgress(base44, genId, { current_module: 'Diseñando estructura...', progress_percent: 2 });
+        // ── FASE 0: Usar temario como blueprint ──────────────────────────────
+        await log(`📋 Usando temario v${syllabus.version} como base`);
+        await updateProgress(base44, genId, { current_module: 'Leyendo temario...', progress_percent: 2 });
 
-        const blueprintResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
-          prompt: `Eres un experto en diseño curricular para preparatoria mexicana (sistema SEP). Diseña el plan de estudios COMPLETO para la materia:
-
-MATERIA: "${subject.name}"
-NIVEL: ${subject.level} (donde 1=primer semestre, 6=sexto semestre)
-DESCRIPCIÓN: "${subject.description || ''}"
-
-Genera un plan académico completo con:
-- 3 a 5 unidades temáticas principales
-- Cada unidad: 2 a 4 módulos
-- Cada módulo: 3 a 5 lecciones + 1 mini-evaluación al final
-
-Requisitos pedagógicos:
-1. Progresión lógica de lo simple a lo complejo
-2. Coherencia entre unidades (cada una construye sobre la anterior)
-3. Títulos concretos y específicos (no genéricos)
-4. La mini-evaluación de cada módulo debe cubrir todos los temas del módulo
-
-Devuelve SOLO JSON con esta estructura:
-{
-  "units": [
-    {
-      "title": "Nombre de la Unidad",
-      "order": 1,
-      "modules": [
-        {
-          "title": "Nombre del Módulo",
-          "order": 1,
-          "lessons": [
-            { "topic": "Tema específico de la lección", "order": 1, "is_mini_eval": false },
-            { "topic": "Evaluación del módulo: [tema]", "order": 2, "is_mini_eval": true }
-          ]
-        }
-      ]
-    }
-  ]
-}`,
-          response_json_schema: {
-            type: "object",
-            properties: {
-              units: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    title: { type: "string" },
-                    order: { type: "number" },
-                    modules: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          title: { type: "string" },
-                          order: { type: "number" },
-                          lessons: {
-                            type: "array",
-                            items: {
-                              type: "object",
-                              properties: {
-                                topic: { type: "string" },
-                                order: { type: "number" },
-                                is_mini_eval: { type: "boolean" }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        });
-
-        const blueprint = blueprintResult;
-        if (!blueprint?.units?.length) throw new Error('Blueprint inválido: sin unidades');
+        const blueprint = { units: syllabus.units };
 
         // Calcular total de pasos
         let totalLessons = 0;
@@ -403,6 +341,8 @@ Devuelve SOLO JSON con esta estructura:
                   topic: lessonBlueprint.topic,
                   is_mini_eval: lessonBlueprint.is_mini_eval || false,
                   lesson_order: lessonBlueprint.order,
+                  difficulty: lessonBlueprint.difficulty || 'medium',
+                  keywords: lessonBlueprint.keywords || [],
                 });
 
                 totalLessonsCreated++;

@@ -12,6 +12,7 @@ import { ArrowLeft, Zap, RefreshCw, CheckCircle2, AlertTriangle, Loader2, BookOp
 import { toast } from "sonner";
 import AdminGuard from '../components/auth/AdminGuard';
 import CurriculumGeneratorPanel from '../components/admin/CurriculumGeneratorPanel';
+import SyllabusEditor from '../components/admin/SyllabusEditor';
 
 export default function ManageActivities() {
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
@@ -177,6 +178,14 @@ export default function ManageActivities() {
               </Select>
             </CardContent>
           </Card>
+
+          {/* Panel: Temario */}
+          {selectedSubjectId && (
+            <SyllabusEditor
+              subject={selectedSubject}
+              onSyllabusReady={() => {}}
+            />
+          )}
 
           {/* Panel: Generar currículo completo */}
           {selectedSubjectId && (

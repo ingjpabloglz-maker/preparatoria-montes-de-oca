@@ -91,6 +91,9 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
       setHasExisting(true);
       setStatus('idle');
       toast.warning('Ya existe contenido. Activa "Sobreescribir" para reemplazarlo.');
+    } else if (data?.no_syllabus) {
+      setStatus('idle');
+      toast.error('Define el temario de la materia antes de generar el currículo.');
     } else {
       setStatus('failed');
       toast.error(`Error: ${data?.error || 'Desconocido'}`);

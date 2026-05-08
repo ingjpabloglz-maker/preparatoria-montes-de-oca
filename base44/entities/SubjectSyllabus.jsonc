@@ -1,0 +1,98 @@
+{
+  "name": "SubjectSyllabus",
+  "type": "object",
+  "properties": {
+    "subject_id": {
+      "type": "string",
+      "description": "ID de la materia a la que pertenece"
+    },
+    "version": {
+      "type": "number",
+      "default": 1,
+      "description": "Versi\u00f3n del temario (se incrementa con cada actualizaci\u00f3n)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Solo un temario puede estar activo por materia"
+    },
+    "units": {
+      "type": "array",
+      "description": "Unidades del temario",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "order": {
+            "type": "number"
+          },
+          "modules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "number"
+                },
+                "lessons": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "topic": {
+                        "type": "string"
+                      },
+                      "order": {
+                        "type": "number"
+                      },
+                      "difficulty": {
+                        "type": "string",
+                        "enum": [
+                          "easy",
+                          "medium",
+                          "hard"
+                        ],
+                        "default": "medium"
+                      },
+                      "keywords": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "is_mini_eval": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "raw_text": {
+      "type": "string",
+      "description": "Texto original pegado por el admin (para auditor\u00eda)"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Email del admin que cre\u00f3 el temario"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas internas del temario"
+    }
+  },
+  "required": [
+    "subject_id",
+    "units"
+  ]
+}
