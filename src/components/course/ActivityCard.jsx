@@ -9,13 +9,18 @@ import { useSound } from '@/contexts/SoundContext';
 import { base44 } from '@/api/base44Client';
 import { cn } from '@/lib/utils';
 
-// Detecta expresiones LaTeX sin delimitadores y las envuelve en $...$
+// Convierte delimitadores LaTeX \(...\) y \[...\] a $...$ y $$...$$
+// y envuelve expresiones LaTeX sueltas sin delimitadores
 function ensureMathDelimiters(text) {
   if (!text) return '';
-  const str = String(text);
-  // Si ya tiene delimitadores $, dejarlo como está
+  let str = String(text);
+  // \[ ... \] → $$ ... $$
+  str = str.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner) => `$$${inner}$$`);
+  // \( ... \) → $ ... $
+  str = str.replace(/\\\(([\s\S]*?)\\\)/g, (_, inner) => `$${inner}$`);
+  // Si ya tiene delimitadores $, listo
   if (str.includes('$')) return str;
-  // Si contiene comandos LaTeX comunes sin delimitadores, envolver todo
+  // Si contiene comandos LaTeX sueltos, envolver todo
   if (/\\(frac|sqrt|sum|int|prod|lim|infty|cdot|times|div|pm|leq|geq|neq|alpha|beta|gamma|delta|pi|theta|lambda|mu|sigma|omega|vec|hat|bar|dot|ddot|overline|underline|text|mathbb|mathrm|left|right|binom|log|sin|cos|tan|ln|exp)\b/.test(str)) {
     return `$${str}$`;
   }
@@ -682,7 +687,7 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
               <div className="mt-2 p-3 bg-violet-500/10 border border-violet-400/25 rounded-xl">
                 {aiLoading
                   ? <div className="flex items-center gap-2 text-violet-300 text-xs"><Loader2 className="w-3 h-3 animate-spin" /> Generando...</div>
-                  : <p className="text-violet-200 text-xs leading-relaxed">{aiResponse}</p>
+                  : <div className="text-violet-200 text-xs leading-relaxed prose prose-sm prose-invert max-w-none [&_p]:my-0.5 [&_.katex]:text-violet-100"><MdMath>{aiResponse}</MdMath></div>
                 }
               </div>
             )}

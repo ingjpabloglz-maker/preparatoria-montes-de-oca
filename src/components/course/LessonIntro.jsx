@@ -4,6 +4,15 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { base44 } from '@/api/base44Client';
+
+// Convierte \(...\) y \[...\] a $...$ y $$...$$
+function normalizeMathDelimiters(text) {
+  if (!text) return '';
+  let str = String(text);
+  str = str.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner) => `$$${inner}$$`);
+  str = str.replace(/\\\(([\s\S]*?)\\\)/g, (_, inner) => `$${inner}$`);
+  return str;
+}
 import { Button } from "@/components/ui/button";
 import { BookOpen, ClipboardList, CheckCircle2, Star, Zap, Info, Loader2 } from "lucide-react";
 import MathText from '../math/MathText';
@@ -448,7 +457,7 @@ IMPORTANTE: devuelve SOLO el JSON, sin bloques de código markdown.`,
           ) : (
             <div className="text-white/85 text-sm leading-relaxed prose prose-sm prose-invert max-w-none [&_h2]:text-white [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0.5 [&_.katex]:text-white">
               <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                {enrichedExplanation || lesson.explanation}
+                {normalizeMathDelimiters(enrichedExplanation || lesson.explanation)}
               </ReactMarkdown>
             </div>
           )}
