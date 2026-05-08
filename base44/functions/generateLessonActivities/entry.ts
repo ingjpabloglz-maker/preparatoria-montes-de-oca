@@ -2,12 +2,37 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_steps','multiple_select','drag_drop','step_by_step'];
 
+// CAPA 2: Sanitización antes de validar
+function sanitizeActivity(activity) {
+  return {
+    ...activity,
+    hints: Array.isArray(activity.hints)
+      ? activity.hints
+      : activity.hints ? [String(activity.hints)] : [],
+    correct_answer: activity.correct_answer !== undefined
+      ? String(activity.correct_answer)
+      : "",
+    accepted_answers: Array.isArray(activity.accepted_answers)
+      ? activity.accepted_answers.map(a => String(a))
+      : activity.accepted_answers ? [String(activity.accepted_answers)] : [],
+    options: Array.isArray(activity.options) ? activity.options : [],
+    drag_items: Array.isArray(activity.drag_items) ? activity.drag_items : [],
+    drop_targets: Array.isArray(activity.drop_targets) ? activity.drop_targets : [],
+    steps: Array.isArray(activity.steps) ? activity.steps : [],
+  };
+}
+
+// CAPA 4: Validador inteligente
 function validateActivity(act) {
   const q = act.question?.toString().trim();
   if (!q) return 'question vacío';
   if (!VALID_TYPES.includes(act.type)) return `tipo inválido: ${act.type}`;
 
-  if (act.type === 'multiple_choice' || act.type === 'multiple_select') {
+  if (act.type === 'multiple_choice') {
+    if (!Array.isArray(act.options) || act.options.length < 3) return 'options insuficientes (mínimo 3)';
+    if (!act.correct_answer) return 'correct_answer faltante';
+  }
+  if (act.type === 'multiple_select') {
     if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
     if (!act.correct_answer) return 'correct_answer faltante';
   }
@@ -15,18 +40,20 @@ function validateActivity(act) {
     const ca = act.correct_answer?.toString().toLowerCase();
     if (!['verdadero','falso','true','false'].includes(ca)) return `correct_answer inválido para true_false: ${ca}`;
   }
-  if (act.type === 'fill_blank' || act.type === 'solve') {
-    if (!act.correct_answer && (!Array.isArray(act.accepted_answers) || act.accepted_answers.length === 0))
-      return 'correct_answer o accepted_answers requerido';
+  if (act.type === 'fill_blank') {
+    if (act.accepted_answers.length === 0 && !act.correct_answer) return 'accepted_answers o correct_answer requerido';
+  }
+  if (act.type === 'solve') {
+    if (!act.correct_answer && act.accepted_answers.length === 0) return 'correct_answer o accepted_answers requerido';
   }
   if (act.type === 'drag_drop') {
-    if (!Array.isArray(act.drag_items) || act.drag_items.length === 0) return 'drag_items vacío';
-    if (!Array.isArray(act.drop_targets) || act.drop_targets.length === 0) return 'drop_targets vacío';
+    if (act.drag_items.length === 0) return 'drag_items vacío';
+    if (act.drop_targets.length === 0) return 'drop_targets vacío';
   }
   if (act.type === 'step_by_step') {
-    if (!Array.isArray(act.steps) || act.steps.length < 2) return 'steps requiere mínimo 2 pasos';
+    if (act.steps.length < 1) return 'steps requiere mínimo 1 paso';
   }
-  return null; // válido
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -168,10 +195,11 @@ IMPORTANTE: devuelve SOLO el JSON array, sin texto adicional.`;
     }, { status: 400 });
   }
 
-  // Validar actividades generadas
+  // CAPA 2+3: Sanitizar, validar y reintentar hasta tener suficientes
   const valid = [];
   const invalid = [];
-  for (const act of activities) {
+  for (const rawAct of activities) {
+    const act = sanitizeActivity(rawAct);
     const err = validateActivity(act);
     if (err) {
       invalid.push({ type: act.type, question: act.question?.slice?.(0, 40), error: err });
@@ -181,10 +209,12 @@ IMPORTANTE: devuelve SOLO el JSON array, sin texto adicional.`;
   }
   console.log(`Validation: ${valid.length} válidas, ${invalid.length} inválidas`, { invalid });
 
-  // Si no hay suficientes válidas, hacer un reintento extra pidiendo solo las faltantes
-  if (valid.length < min) {
+  // CAPA 3: Reintentar mientras falten actividades (no destructivo)
+  let retryAttempts = 0;
+  while (valid.length < min && retryAttempts < 3) {
+    retryAttempts++;
     const needed = min - valid.length;
-    console.log(`Reintentando generar ${needed} actividades adicionales...`);
+    console.log(`Reintento ${retryAttempts}: generando ${needed} actividades adicionales...`);
     const retryPrompt = `${prompt}\n\nNOTA: Solo necesito ${needed} actividades adicionales válidas. Asegúrate de incluir todos los campos requeridos según el tipo.`;
     const retryResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: retryPrompt,
@@ -194,11 +224,12 @@ IMPORTANTE: devuelve SOLO el JSON array, sin texto adicional.`;
       }
     });
     const retryActivities = Array.isArray(retryResult) ? retryResult : (retryResult?.activities || []);
-    for (const act of retryActivities) {
+    for (const rawAct of retryActivities) {
       if (valid.length >= min) break;
+      const act = sanitizeActivity(rawAct);
       const err = validateActivity(act);
       if (!err) valid.push(act);
-      else console.log('Retry activity también inválida:', err, act.type);
+      else console.log('Retry activity inválida:', err, act.type);
     }
   }
 

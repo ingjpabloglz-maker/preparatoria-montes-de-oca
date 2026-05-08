@@ -2,11 +2,37 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_steps','multiple_select','drag_drop','step_by_step'];
 
+// CAPA 2: Sanitización antes de validar
+function sanitizeActivity(activity) {
+  return {
+    ...activity,
+    hints: Array.isArray(activity.hints)
+      ? activity.hints
+      : activity.hints ? [String(activity.hints)] : [],
+    correct_answer: activity.correct_answer !== undefined
+      ? String(activity.correct_answer)
+      : "",
+    accepted_answers: Array.isArray(activity.accepted_answers)
+      ? activity.accepted_answers.map(a => String(a))
+      : activity.accepted_answers ? [String(activity.accepted_answers)] : [],
+    options: Array.isArray(activity.options) ? activity.options : [],
+    drag_items: Array.isArray(activity.drag_items) ? activity.drag_items : [],
+    drop_targets: Array.isArray(activity.drop_targets) ? activity.drop_targets : [],
+    steps: Array.isArray(activity.steps) ? activity.steps : [],
+  };
+}
+
+// CAPA 4: Validador inteligente
 function validateActivity(act) {
   const q = act.question?.toString().trim();
   if (!q) return 'question vacío';
   if (!VALID_TYPES.includes(act.type)) return `tipo inválido: ${act.type}`;
-  if (act.type === 'multiple_choice' || act.type === 'multiple_select') {
+
+  if (act.type === 'multiple_choice') {
+    if (!Array.isArray(act.options) || act.options.length < 3) return 'options insuficientes (mínimo 3)';
+    if (!act.correct_answer) return 'correct_answer faltante';
+  }
+  if (act.type === 'multiple_select') {
     if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
     if (!act.correct_answer) return 'correct_answer faltante';
   }
@@ -14,16 +40,18 @@ function validateActivity(act) {
     const ca = act.correct_answer?.toString().toLowerCase();
     if (!['verdadero','falso','true','false'].includes(ca)) return `correct_answer inválido para true_false: ${ca}`;
   }
-  if (act.type === 'fill_blank' || act.type === 'solve') {
-    if (!act.correct_answer && (!Array.isArray(act.accepted_answers) || act.accepted_answers.length === 0))
-      return 'correct_answer o accepted_answers requerido';
+  if (act.type === 'fill_blank') {
+    if (act.accepted_answers.length === 0 && !act.correct_answer) return 'accepted_answers o correct_answer requerido';
+  }
+  if (act.type === 'solve') {
+    if (!act.correct_answer && act.accepted_answers.length === 0) return 'correct_answer o accepted_answers requerido';
   }
   if (act.type === 'drag_drop') {
-    if (!Array.isArray(act.drag_items) || act.drag_items.length === 0) return 'drag_items vacío';
-    if (!Array.isArray(act.drop_targets) || act.drop_targets.length === 0) return 'drop_targets vacío';
+    if (act.drag_items.length === 0) return 'drag_items vacío';
+    if (act.drop_targets.length === 0) return 'drop_targets vacío';
   }
   if (act.type === 'step_by_step') {
-    if (!Array.isArray(act.steps) || act.steps.length < 2) return 'steps requiere mínimo 2 pasos';
+    if (act.steps.length < 1) return 'steps requiere mínimo 1 paso';
   }
   return null;
 }
@@ -176,19 +204,23 @@ Devuelve SOLO el JSON array con exactamente ${count} objetos de actividad.`;
       ? activitiesResult
       : (activitiesResult?.activities || []);
 
-    // Validar actividades
+    // CAPA 2+3: Sanitizar, validar y reintentar hasta tener suficientes
     const valid = [];
     const invalid = [];
-    for (const act of activities) {
+    for (const rawAct of activities) {
+      const act = sanitizeActivity(rawAct);
       const err = validateActivity(act);
       if (err) invalid.push({ type: act.type, error: err });
       else valid.push(act);
     }
     console.log(`Actividades: ${valid.length} válidas, ${invalid.length} inválidas`);
 
-    // Reintento si faltan
-    if (valid.length < min) {
+    // CAPA 3: Reintentar mientras falten (no destructivo — lección ya creada)
+    let retryAttempts = 0;
+    while (valid.length < min && retryAttempts < 3) {
+      retryAttempts++;
       const needed = min - valid.length;
+      console.log(`Reintento ${retryAttempts}: generando ${needed} actividades adicionales...`);
       const retryResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt: `${activitiesPrompt}\n\nNOTA: Solo necesito ${needed} actividades adicionales válidas.`,
         response_json_schema: {
@@ -197,14 +229,14 @@ Devuelve SOLO el JSON array con exactamente ${count} objetos de actividad.`;
         }
       });
       const retryActivities = Array.isArray(retryResult) ? retryResult : (retryResult?.activities || []);
-      for (const act of retryActivities) {
+      for (const rawAct of retryActivities) {
         if (valid.length >= min) break;
+        const act = sanitizeActivity(rawAct);
         if (!validateActivity(act)) valid.push(act);
       }
     }
 
     if (valid.length < min) {
-      // Si fallaron las actividades, eliminar la lección para no dejar huérfana
       await base44.asServiceRole.entities.CourseLesson.delete(lesson.id);
       return Response.json({
         error: `Solo se generaron ${valid.length} actividades válidas (mínimo ${min}). Lección eliminada para mantener consistencia.`
