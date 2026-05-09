@@ -166,6 +166,20 @@
         "type": "string"
       },
       "description": "Para type=drag_drop: etiquetas de los destinos"
+    },
+    "generated_by": {
+      "type": "string",
+      "enum": [
+        "admin_curriculum",
+        "admin_lesson",
+        "manual",
+        "fallback"
+      ],
+      "description": "Fuente que gener\u00f3 esta actividad: jam\u00e1s debe ser generada por un alumno"
+    },
+    "generation_batch_id": {
+      "type": "string",
+      "description": "ID del proceso de generaci\u00f3n (generation_id de CurriculumGeneration) que cre\u00f3 esta actividad"
     }
   },
   "required": [

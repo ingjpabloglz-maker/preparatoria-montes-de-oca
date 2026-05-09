@@ -1,0 +1,71 @@
+{
+  "name": "CourseLesson",
+  "type": "object",
+  "properties": {
+    "module_id": {
+      "type": "string",
+      "description": "ID del m\u00f3dulo al que pertenece"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "ID de la materia (para filtros r\u00e1pidos)"
+    },
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo de la lecci\u00f3n"
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Texto explicativo de la lecci\u00f3n (m\u00e1x 150 palabras)"
+    },
+    "ai_explanation": {
+      "type": "string",
+      "description": "Explicaci\u00f3n enriquecida generada por IA (cach\u00e9 compartido para todos los usuarios)"
+    },
+    "order": {
+      "type": "number",
+      "description": "Orden de la lecci\u00f3n dentro del m\u00f3dulo"
+    },
+    "is_mini_eval": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si es true, es la mini evaluaci\u00f3n final del m\u00f3dulo"
+    },
+    "ai_generated": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el contenido fue generado por IA (vs creado manualmente)"
+    },
+    "generation_completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la generaci\u00f3n de actividades est\u00e1 completa. Bloquea regeneraci\u00f3n autom\u00e1tica."
+    },
+    "generation_version": {
+      "type": "number",
+      "default": 1,
+      "description": "Versi\u00f3n de la generaci\u00f3n (se incrementa en cada regeneraci\u00f3n admin)"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de cu\u00e1ndo fue generado el contenido"
+    },
+    "generation_source": {
+      "type": "string",
+      "enum": [
+        "admin_curriculum",
+        "admin_lesson",
+        "manual",
+        "fallback"
+      ],
+      "description": "Fuente de la generaci\u00f3n: admin_curriculum=generateSubjectCurriculum, admin_lesson=generateLessonWithActivities, manual=creado a mano, fallback=contenido de emergencia"
+    }
+  },
+  "required": [
+    "module_id",
+    "subject_id",
+    "title",
+    "order"
+  ]
+}

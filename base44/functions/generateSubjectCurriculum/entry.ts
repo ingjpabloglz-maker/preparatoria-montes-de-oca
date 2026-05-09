@@ -300,13 +300,15 @@ function buildFallbackActivities(lessonTitle, subjectName, count = 5) {
 }
 
 // ─── Guardar actividades en DB ────────────────────────────────────────────────
-async function persistActivities(base44, lessonId, activities) {
+async function persistActivities(base44, lessonId, activities, generationBatchId = null) {
   let count = 0;
   for (let i = 0; i < activities.length; i++) {
     const act = activities[i];
     const isArrayType = ARRAY_ANSWER_TYPES.includes(act.type);
     const raw = {
       lesson_id: lessonId,
+      generated_by: 'admin_curriculum',
+      generation_batch_id: generationBatchId || null,
       type: act.type,
       question: act.question,
       options: act.options || [],
@@ -377,6 +379,11 @@ Devuelve SOLO JSON: { "title": "...", "explanation": "..." }`,
     explanation: lessonResult.explanation,
     order: lesson_order,
     is_mini_eval,
+    ai_generated: true,
+    generation_completed: false, // se marcará true al terminar las actividades
+    generation_version: 1,
+    generated_at: new Date().toISOString(),
+    generation_source: 'admin_curriculum',
   });
   console.log(`[DEBUG] DB lesson created: "${lesson.title}"`);
 
@@ -481,6 +488,10 @@ Devuelve SOLO JSON con campo "activities": array de ${count} objetos.`;
   }
 
   const activitiesCreated = await persistActivities(base44, lesson.id, valid);
+
+  // Marcar lección como completada (bloquea regeneración automática)
+  await base44.asServiceRole.entities.CourseLesson.update(lesson.id, { generation_completed: true });
+
   await logFn(`[LESSON_COMPLETED] "${lesson.title}" — ${activitiesCreated} activities persisted`);
 
   return { lesson, activities_count: activitiesCreated };
@@ -497,10 +508,17 @@ async function createFallbackLesson(base44, { module_id, subject_id, subject_nam
     explanation: `Esta lección cubre el tema "${topic}" dentro de ${subject_name}. El contenido detallado será enriquecido próximamente.`,
     order: lesson_order,
     is_mini_eval,
+    ai_generated: false,
+    generation_completed: true, // fallback es final, no regenerar
+    generation_version: 1,
+    generated_at: new Date().toISOString(),
+    generation_source: 'fallback',
   });
 
   const fallbackActivities = buildFallbackActivities(topic, subject_name, 5);
   const activitiesCreated = await persistActivities(base44, lesson.id, fallbackActivities);
+
+  await base44.asServiceRole.entities.CourseLesson.update(lesson.id, { generation_completed: true });
 
   await logFn(`[FALLBACK_CREATED] Fallback lesson "${topic}" created with ${activitiesCreated} basic activities`);
   return { lesson, activities_count: activitiesCreated, is_fallback: true };

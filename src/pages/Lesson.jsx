@@ -45,16 +45,19 @@ export default function Lesson() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: activities = [] } = useQuery({
+  const { data: activitiesData } = useQuery({
     queryKey: ['lessonActivities', lessonId],
     queryFn: async () => {
+      // Solo lectura — jamás genera contenido (arquitectura limpia: admin genera, alumno consume)
       const res = await base44.functions.invoke('getOrCreateLessonActivities', { lesson_id: lessonId });
-      return res.data?.activities || [];
+      return res.data;
     },
     enabled: !!lessonId,
-    staleTime: 30 * 60 * 1000, // actividades son estáticas por lección
+    staleTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
+  const activities = activitiesData?.activities || [];
+  const noActivities = activitiesData?.no_activities === true;
 
   const DIFFICULT_SUBJECT_KEYWORDS = ['matemática', 'matematica', 'cálculo', 'calculo', 'álgebra', 'algebra', 'química', 'quimica', 'física', 'fisica', 'trigonometría', 'trigonometria', 'estadística', 'estadistica', 'probabilidad'];
 
@@ -180,6 +183,27 @@ export default function Lesson() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-blue-900 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Lección sin actividades — error controlado, jamás autogenerar
+  if (activitiesData !== undefined && noActivities) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-blue-900 flex items-center justify-center p-6">
+        <div className="bg-white/10 border border-white/20 rounded-2xl p-8 max-w-md text-center text-white">
+          <BookOpen className="w-12 h-12 mx-auto mb-4 text-yellow-400 opacity-70" />
+          <h2 className="text-xl font-bold mb-2">Contenido en preparación</h2>
+          <p className="text-white/70 text-sm mb-6">
+            Esta lección aún no tiene actividades disponibles. El contenido será generado por el equipo académico próximamente.
+          </p>
+          <button
+            onClick={handleGoBack}
+            className="px-5 py-2 bg-white/20 hover:bg-white/30 rounded-full text-sm font-medium transition-colors"
+          >
+            Volver al mapa
+          </button>
+        </div>
       </div>
     );
   }
