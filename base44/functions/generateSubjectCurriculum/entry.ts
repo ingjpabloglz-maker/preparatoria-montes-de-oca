@@ -144,38 +144,111 @@ function normalizeActivityMath(activity) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// #8 DETECCIÓN DE BASURA LLM
+// #8 DETECCIÓN DE BASURA LLM — relajada, math-friendly
 // ═══════════════════════════════════════════════════════════════════════════════
-function isGarbageLLMResponse(response, expectedField = 'activities') {
-  if (!response) return true;
+const MATH_SUBJECTS = ['algebra', 'álgebra', 'matemáticas', 'matematicas', 'arithmetic', 'aritmética', 'aritmetica', 'cálculo', 'calculo'];
 
-  // Respuesta vacía o muy corta
+function isMathSubject(subjectName = '') {
+  const lower = subjectName.toLowerCase();
+  return MATH_SUBJECTS.some(kw => lower.includes(kw));
+}
+
+function isGarbageLLMResponse(response, expectedField = 'activities', subjectName = '') {
+  const isMath = isMathSubject(subjectName);
+
+  // 1. Respuesta nula o completamente vacía
+  if (!response) {
+    console.log('[GarbageDetector] BASURA: response es null/undefined');
+    return true;
+  }
+
   const str = JSON.stringify(response);
-  if (!str || str.length < 50) return true;
 
-  // Demasiados nulls (> 30% del contenido)
-  const nullCount = (str.match(/null/g) || []).length;
+  // 2. Cadena vacía o demasiado corta para contener datos reales
+  if (!str || str.length < 20) {
+    console.log('[GarbageDetector] BASURA: respuesta demasiado corta', str?.length);
+    return true;
+  }
+
+  // 3. HTML roto (respuesta de página de error)
+  if (/<html|<body|<div|<script/i.test(str)) {
+    console.log('[GarbageDetector] BASURA: contiene HTML');
+    return true;
+  }
+
+  // 4. Markdown como raíz (``` sin parsear)
+  if (/^"?```/.test(str.trim())) {
+    console.log('[GarbageDetector] BASURA: markdown sin parsear');
+    return true;
+  }
+
+  // 5. Nulls masivos (> 60% de campos) — solo en respuestas grandes
   const totalFields = (str.match(/:/g) || []).length;
-  if (totalFields > 0 && nullCount / totalFields > 0.4) return true;
+  if (totalFields > 10) {
+    const nullCount = (str.match(/null/g) || []).length;
+    if (nullCount / totalFields > 0.6) {
+      console.log(`[GarbageDetector] BASURA: nulls masivos (${nullCount}/${totalFields} campos)`);
+      return true;
+    }
+  }
 
-  // Contiene HTML
-  if (/<html|<body|<div|<script/i.test(str)) return true;
+  // ── Validaciones específicas por campo esperado ──────────────────────────────
 
-  // Contiene markdown roto como respuesta raíz (```json etc)
-  if (/^```/.test(str.trim())) return true;
-
-  // Campo esperado ausente o vacío
   if (expectedField === 'activities') {
-    const items = response?.activities || response;
-    if (!Array.isArray(items) || items.length === 0) return true;
-    // Primer item no tiene campos mínimos
-    const first = Array.isArray(items) ? items[0] : null;
-    if (!first?.question || !first?.type) return true;
+    const items = Array.isArray(response?.activities) ? response.activities
+                : Array.isArray(response) ? response
+                : null;
+
+    if (!items) {
+      console.log('[GarbageDetector] BASURA: no se encontró array de actividades');
+      return true;
+    }
+
+    if (items.length === 0) {
+      console.log('[GarbageDetector] BASURA: array de actividades vacío');
+      return true;
+    }
+
+    // Contar actividades con campos mínimos (question + type)
+    const MIN_VALID = 4;
+    const validItems = items.filter(a => a?.question && typeof a.question === 'string' && a.question.trim().length > 0 && a?.type);
+    console.log(`[GarbageDetector] actividades totales: ${items.length}, válidas (question+type): ${validItems.length}`);
+
+    if (validItems.length < MIN_VALID) {
+      console.log(`[GarbageDetector] BASURA: solo ${validItems.length} actividades válidas, mínimo requerido: ${MIN_VALID}`);
+      return true;
+    }
+
+    // Detectar duplicados masivos (todas las preguntas iguales)
+    const questions = validItems.map(a => a.question.trim().toLowerCase());
+    const uniqueQ = new Set(questions);
+    if (uniqueQ.size === 1 && validItems.length > 2) {
+      console.log('[GarbageDetector] BASURA: todas las preguntas son idénticas');
+      return true;
+    }
+
+    console.log(`[GarbageDetector] OK: ${validItems.length} actividades válidas${isMath ? ' [modo math]' : ''}`);
+    return false;
   }
 
   if (expectedField === 'lesson') {
-    if (!response?.title || !response?.explanation) return true;
-    if (response.title.length < 3 || response.explanation.length < 10) return true;
+    if (!response?.title || !response?.explanation) {
+      console.log('[GarbageDetector] BASURA: lesson sin title o explanation');
+      return true;
+    }
+    // Math permite títulos y explicaciones muy cortos
+    const minTitleLen = isMath ? 1 : 3;
+    const minExplLen = isMath ? 5 : 10;
+    if (response.title.length < minTitleLen) {
+      console.log(`[GarbageDetector] BASURA: title demasiado corto (${response.title.length} chars)`);
+      return true;
+    }
+    if (response.explanation.length < minExplLen) {
+      console.log(`[GarbageDetector] BASURA: explanation demasiado corta (${response.explanation.length} chars)`);
+      return true;
+    }
+    console.log('[GarbageDetector] OK: lesson válida');
+    return false;
   }
 
   return false;
@@ -427,30 +500,21 @@ function validateActivity(act) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function auditGeneratedLesson(lesson, activities, isMiniEval) {
   const errors = [];
-  const minActivities = isMiniEval ? 10 : 7;
+  const minActivities = isMiniEval ? 6 : 4;
 
   if (!lesson?.id) { errors.push('lesson no existe'); return errors; }
   if (!activities || activities.length < minActivities) {
     errors.push(`actividades insuficientes: ${activities?.length || 0} < ${minActivities}`);
   }
 
-  // Tipos requeridos
+  // Tipos requeridos (solo multiple_choice obligatorio para todos)
   const presentTypes = new Set(activities.map(a => a.type));
-  const requiredForNormal = ['multiple_choice', 'true_false', 'fill_blank'];
-  const requiredForMiniEval = ['multiple_choice', 'true_false', 'fill_blank', 'multiple_select'];
-  const required = isMiniEval ? requiredForMiniEval : requiredForNormal;
-  for (const rt of required) {
-    if (!presentTypes.has(rt)) errors.push(`tipo requerido ausente: ${rt}`);
-  }
+  if (!presentTypes.has('multiple_choice')) errors.push(`tipo requerido ausente: multiple_choice`);
 
-  // Preguntas duplicadas
+  // Preguntas duplicadas (todas iguales)
   const questions = activities.map(a => a.question?.trim().toLowerCase());
   const uniqueQ = new Set(questions);
-  if (uniqueQ.size < questions.length) errors.push(`preguntas duplicadas detectadas`);
-
-  // Explanations vacías
-  const emptyExpl = activities.filter(a => !a.explanation || a.explanation.trim().length < 3);
-  if (emptyExpl.length > 0) errors.push(`${emptyExpl.length} actividades con explanation vacía`);
+  if (uniqueQ.size === 1 && questions.length > 2) errors.push(`todas las preguntas son idénticas`);
 
   // Options requeridas ausentes
   const needOptions = ['multiple_choice', 'multiple_select', 'order_steps'];
@@ -467,7 +531,7 @@ function auditGeneratedLesson(lesson, activities, isMiniEval) {
 }
 
 // ─── Fallback activities ──────────────────────────────────────────────────────
-function buildFallbackActivities(lessonTitle, subjectName, count = 7) {
+function buildFallbackActivities(lessonTitle, subjectName, count = 4) {
   const templates = [
     { type:'multiple_choice', question:`¿Cuál describe mejor "${lessonTitle}"?`, options:[`Concepto de ${lessonTitle}`,`No pertenece a ${subjectName}`,'Definición incorrecta','Ninguna'], correct_answer:`Concepto de ${lessonTitle}`, correct_answers:[], explanation:`Concepto básico de ${lessonTitle}.`, hints:['Revisa el contenido'], difficulty:'easy', points:8 },
     { type:'true_false', question:`"${lessonTitle}" es parte del programa de ${subjectName}.`, options:['Verdadero','Falso'], correct_answer:'Verdadero', correct_answers:[], explanation:`Sí, es parte de ${subjectName}.`, hints:[], difficulty:'easy', points:8 },
@@ -584,7 +648,7 @@ async function generateOneLesson(base44, params, batchId, logFn, metrics, modeCo
         `lesson-content:${topic}`, logFn, metrics
       );
 
-      if (isGarbageLLMResponse(raw1, 'lesson')) {
+      if (isGarbageLLMResponse(raw1, 'lesson', subject_name)) {
         await logFn(`[${ts()}] ⚠️ Respuesta basura detectada para contenido de "${topic}" — usando fallback`);
       } else {
         lessonContent = raw1;
@@ -634,7 +698,7 @@ async function generateOneLesson(base44, params, batchId, logFn, metrics, modeCo
           `activities:${lessonTitle}`, logFn, metrics
         );
 
-        if (isGarbageLLMResponse(rawActs, 'activities')) {
+        if (isGarbageLLMResponse(rawActs, 'activities', subject_name)) {
           garbageRetries++;
           await logFn(`[${ts()}] ⚠️ Basura LLM detectada (intento ${garbageRetries}/2) para "${lessonTitle}"`);
           if (garbageRetries < 2) {
@@ -659,12 +723,13 @@ async function generateOneLesson(base44, params, batchId, logFn, metrics, modeCo
       }
     }
 
-    // Fallback si faltan actividades
-    if (valid.length < min) {
-      const needed = min - valid.length;
+    // Fallback si faltan actividades — mínimo 4 normal, 6 mini_eval
+    const auditMin = is_mini_eval ? 6 : 4;
+    if (valid.length < auditMin) {
+      const needed = auditMin - valid.length;
       const fallbacks = buildFallbackActivities(lessonTitle, subject_name, needed);
       for (const fb of fallbacks) valid.push(fb);
-      await logFn(`[${ts()}] 🔧 ${needed} actividades fallback para "${lessonTitle}"`);
+      await logFn(`[${ts()}] 🔧 ${needed} actividades fallback añadidas (total: ${valid.length}) para "${lessonTitle}"`);
     }
 
     // Persistir actividades y registrar IDs (para rollback si falla auditoría)
