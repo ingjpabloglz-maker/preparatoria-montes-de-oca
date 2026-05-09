@@ -581,22 +581,221 @@ async function persistActivities(base44, lessonId, activities, batchId = null) {
   return count;
 }
 
-// ─── Estructura desde temario ─────────────────────────────────────────────────
-function buildStructureFromSyllabus(syllabus) {
-  return syllabus.units.map(unit => ({
+// ═══════════════════════════════════════════════════════════════════════════════
+// LESSON GROUPING — agrupa subtemas relacionados en lecciones compactas
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Grupos semánticos conocidos: si los temas de un módulo caen en un grupo,
+// se fusionan en una sola lección con un título pedagógico.
+const TOPIC_GROUPS = [
+  { pattern: /natural|entero|racional|irracional|real|complejo|número|numeros|clasificaci/i, title: 'Números reales y su clasificación' },
+  { pattern: /suma|resta|multiplicaci|divisi|operaci|básica|aritmética|fundamental/i, title: 'Operaciones fundamentales' },
+  { pattern: /media|mediana|moda|tendencia central|promedio/i, title: 'Medidas de tendencia central' },
+  { pattern: /dispersi|varianza|desviaci|estándar|rango/i, title: 'Medidas de dispersión' },
+  { pattern: /fraccion|fracción|decimal|porcentaje|proporci/i, title: 'Fracciones, decimales y porcentajes' },
+  { pattern: /potencia|exponente|raíz|radical|logaritmo/i, title: 'Potencias, radicales y logaritmos' },
+  { pattern: /ecuaci|inecuaci|sistema|inequaci/i, title: 'Ecuaciones e inecuaciones' },
+  { pattern: /función|funcion|dominio|rango|imagen|gráfica|grafica/i, title: 'Funciones y sus representaciones' },
+  { pattern: /polinomio|monomio|binomio|trinomio|álgebra|algebraic/i, title: 'Expresiones algebraicas y polinomios' },
+  { pattern: /factor|factoriz|product notable/i, title: 'Factorización y productos notables' },
+  { pattern: /trigonom|seno|coseno|tangente|ángulo|angle|círculo unitario/i, title: 'Trigonometría básica' },
+  { pattern: /geom|área|perímet|volumen|figura|polígono|circunferencia/i, title: 'Geometría y medición' },
+  { pattern: /probabilidad|evento|espacio muestral|estadística|frecuencia/i, title: 'Probabilidad y estadística' },
+  { pattern: /célula|tejido|órgano|organismo|biolog/i, title: 'Organización biológica' },
+  { pattern: /fotosíntesis|respiraci|metabolismo|energía celular/i, title: 'Procesos metabólicos celulares' },
+  { pattern: /átomo|molécula|elemento|compuesto|enlace|quím/i, title: 'Estructura atómica y química' },
+  { pattern: /fuerza|movimiento|velocidad|aceleración|física|cinemática|dinámica/i, title: 'Física: movimiento y fuerzas' },
+  { pattern: /sujeto|predicado|oración|sintaxis|gramática/i, title: 'Sintaxis y gramática oracional' },
+  { pattern: /liter|poesía|narrativa|género|autor|obra/i, title: 'Géneros y corrientes literarias' },
+  { pattern: /revolución|guerra|historia|independencia|coloni/i, title: 'Contexto histórico y político' },
+];
+
+// Palabras de "microtema" que NO deben crear lección individual
+const MICRO_TOPIC_WORDS = [
+  /^definici/i, /^concepto de/i, /^introducción a/i, /^nociones de/i,
+  /^qué es/i, /^generalidades/i, /^historia de/i, /^origen de/i,
+];
+
+function isMicroTopic(topic) {
+  return MICRO_TOPIC_WORDS.some(rx => rx.test(topic.trim()));
+}
+
+function topicsAreRelated(topicsArr) {
+  // Dos temas son "relacionados" si más del 50% cae en el mismo grupo semántico
+  for (const g of TOPIC_GROUPS) {
+    const matches = topicsArr.filter(t => g.pattern.test(t));
+    if (matches.length >= 2 && matches.length / topicsArr.length >= 0.4) return g.title;
+  }
+  return null;
+}
+
+/**
+ * groupTopicsIntoLessons
+ * Recibe el array de lecciones raw del módulo y devuelve lecciones agrupadas.
+ * Reglas:
+ *  - máx 4 lecciones por módulo (contando mini_eval)
+ *  - 2-3 lecciones normales + 1 mini_eval
+ *  - fusiona microtemas y subtemas relacionados
+ */
+function groupTopicsIntoLessons(rawLessons, moduleName, subjectName) {
+  // Separar mini_eval del resto
+  const miniEvals = rawLessons.filter(l => l.is_mini_eval);
+  const normals = rawLessons.filter(l => !l.is_mini_eval);
+
+  const originalCount = normals.length;
+  const grouped = [];
+
+  // PASO 1 — Agrupar por grupo semántico detectado
+  const used = new Set();
+  for (const g of TOPIC_GROUPS) {
+    const matches = normals.filter((l, i) => !used.has(i) && g.pattern.test(l.topic));
+    if (matches.length >= 2) {
+      const indices = matches.map(m => normals.indexOf(m));
+      indices.forEach(i => used.add(i));
+      grouped.push({
+        topic: g.title,
+        order: grouped.length + 1,
+        difficulty: matches.some(m => m.difficulty === 'hard') ? 'hard' : matches.some(m => m.difficulty === 'medium') ? 'medium' : 'easy',
+        keywords: [...new Set(matches.flatMap(m => m.keywords || []))].slice(0, 6),
+        is_mini_eval: false,
+        _grouped_from: matches.map(m => m.topic),
+      });
+    }
+  }
+
+  // PASO 2 — Agrupar microtemas restantes con el siguiente tema normal
+  const remaining = normals.filter((_, i) => !used.has(i));
+  let i = 0;
+  while (i < remaining.length) {
+    const current = remaining[i];
+    const next = remaining[i + 1];
+
+    if (isMicroTopic(current.topic) && next) {
+      // Fusionar microtema con el siguiente
+      grouped.push({
+        topic: next.topic, // usar el título del tema sustantivo
+        order: grouped.length + 1,
+        difficulty: next.difficulty || 'medium',
+        keywords: [...new Set([...(current.keywords || []), ...(next.keywords || [])])].slice(0, 6),
+        is_mini_eval: false,
+        _grouped_from: [current.topic, next.topic],
+      });
+      i += 2;
+    } else {
+      // Intentar fusionar lotes de 2-3 temas pequeños restantes si aún superamos el límite
+      const stillLeft = remaining.length - i;
+      const alreadyGrouped = grouped.length;
+      const maxNormal = 3; // máximo 3 lecciones normales por módulo
+
+      if (alreadyGrouped < maxNormal && stillLeft <= 3) {
+        // Fusionar todos los que quedan en 1 lección
+        const batch = remaining.slice(i);
+        const batchTopics = batch.map(b => b.topic);
+        const inferredTitle = topicsAreRelated(batchTopics)
+          || (batch.length > 1 ? `${batchTopics[0]} y temas relacionados` : batch[0].topic);
+        grouped.push({
+          topic: inferredTitle,
+          order: grouped.length + 1,
+          difficulty: batch.some(b => b.difficulty === 'hard') ? 'hard' : 'medium',
+          keywords: [...new Set(batch.flatMap(b => b.keywords || []))].slice(0, 6),
+          is_mini_eval: false,
+          _grouped_from: batchTopics,
+        });
+        i = remaining.length; // done
+      } else if (alreadyGrouped >= maxNormal) {
+        // Ya tenemos suficientes lecciones — fusionar el resto en la última
+        const last = grouped[grouped.length - 1];
+        last._grouped_from = [...(last._grouped_from || [last.topic]), current.topic];
+        i++;
+      } else {
+        grouped.push({
+          topic: current.topic,
+          order: grouped.length + 1,
+          difficulty: current.difficulty || 'medium',
+          keywords: current.keywords || [],
+          is_mini_eval: false,
+          _grouped_from: [current.topic],
+        });
+        i++;
+      }
+    }
+  }
+
+  // PASO 3 — Enforcing máx 3 normales por módulo (fusionar exceso)
+  while (grouped.length > 3) {
+    const last = grouped.pop();
+    const prev = grouped[grouped.length - 1];
+    prev._grouped_from = [...(prev._grouped_from || [prev.topic]), ...(last._grouped_from || [last.topic])];
+    prev.topic = topicsAreRelated([prev.topic, last.topic]) || prev.topic;
+    prev.keywords = [...new Set([...(prev.keywords || []), ...(last.keywords || [])])].slice(0, 6);
+  }
+
+  // PASO 4 — Asignar orden final + añadir mini_eval
+  const finalLessons = grouped.map((l, idx) => ({ ...l, order: idx + 1 }));
+
+  // Solo 1 mini_eval por módulo (la última)
+  if (miniEvals.length > 0) {
+    finalLessons.push({
+      topic: miniEvals[0].topic || `Mini evaluación: ${moduleName}`,
+      order: finalLessons.length + 1,
+      difficulty: 'medium',
+      keywords: miniEvals[0].keywords || [],
+      is_mini_eval: true,
+      _grouped_from: miniEvals.map(m => m.topic),
+    });
+  }
+
+  // Log de agrupación
+  const savedLessons = originalCount - grouped.length;
+  const savePct = originalCount > 0 ? Math.round((savedLessons / originalCount) * 100) : 0;
+  if (originalCount > grouped.length) {
+    console.log(`[GroupTopics] "${moduleName}": ${originalCount} temas → ${grouped.length} lecciones (-${savePct}% carga). Agrupaciones: ${grouped.filter(g => (g._grouped_from || []).length > 1).map(g => `"${g.topic}" (${g._grouped_from.length} temas)`).join(', ')}`);
+  }
+
+  return finalLessons;
+}
+
+// ─── Estructura desde temario con grouping ────────────────────────────────────
+// Límites globales del currículo
+const MAX_UNITS = 4;
+const MAX_MODULES = 10;
+const MAX_TOTAL_LESSONS = 26;
+
+function buildStructureFromSyllabus(syllabus, subjectName = '') {
+  // 1. Tomar máx 4 unidades
+  const units = (syllabus.units || []).slice(0, MAX_UNITS);
+
+  // 2. Calcular cuántos módulos por unidad podemos tomar
+  const totalRawModules = units.reduce((s, u) => s + (u.modules || []).length, 0);
+  const moduleSlot = Math.min(totalRawModules, MAX_MODULES);
+
+  let moduleCount = 0;
+  let lessonCount = 0;
+
+  return units.map((unit, ui) => ({
     title: unit.title,
-    order: unit.order,
-    modules: (unit.modules || []).map(mod => ({
-      title: mod.title,
-      order: mod.order,
-      lessons: (mod.lessons || []).map(lesson => ({
-        topic: lesson.topic,
-        order: lesson.order,
-        difficulty: lesson.difficulty || 'medium',
-        keywords: lesson.keywords || [],
-        is_mini_eval: lesson.is_mini_eval || false,
-      })),
-    })),
+    order: ui + 1,
+    modules: (unit.modules || [])
+      .filter(() => moduleCount < moduleSlot)
+      .map((mod, mi) => {
+        if (moduleCount >= moduleSlot) return null;
+        moduleCount++;
+
+        // Aplicar grouping pedagógico
+        const grouped = groupTopicsIntoLessons(mod.lessons || [], mod.title, subjectName);
+
+        // Truncar si superamos el límite global de lecciones
+        const available = MAX_TOTAL_LESSONS - lessonCount;
+        const lessons = grouped.slice(0, Math.max(available, 1));
+        lessonCount += lessons.length;
+
+        return {
+          title: mod.title,
+          order: mi + 1,
+          lessons,
+        };
+      })
+      .filter(Boolean),
   }));
 }
 
@@ -842,16 +1041,22 @@ Deno.serve(async (req) => {
     const recovered = await recoverStuckJobs(base44, subject_id);
     if (recovered > 0) console.log(`[Watchdog] ${recovered} jobs recuperados`);
 
-    // Calcular estructura (para preview y lock)
-    const structure = buildStructureFromSyllabus(syllabus);
+    // Calcular estructura (para preview y lock) — con lesson grouping
+    const structure = buildStructureFromSyllabus(syllabus, subject.name);
     let totalLessons = 0;
     let totalModules = 0;
+    // Contar también los temas originales del temario para el log
+    let rawTopicCount = 0;
+    for (const u of syllabus.units || []) for (const m of u.modules || []) rawTopicCount += (m.lessons || []).length;
     for (const u of structure) {
       for (const m of u.modules) {
         totalModules++;
         totalLessons += m.lessons.length;
       }
     }
+    const groupingSavePct = rawTopicCount > 0 ? Math.round(((rawTopicCount - totalLessons) / rawTopicCount) * 100) : 0;
+    console.log(`[Blueprint] "${subject.name}": ${rawTopicCount} temas originales → ${totalLessons} lecciones agrupadas (-${groupingSavePct}% carga de tokens)`);
+
 
     // ── PREVIEW MODE — retorna estimaciones sin generar ──────────────────────
     if (preview_only) {
@@ -988,6 +1193,9 @@ Deno.serve(async (req) => {
       try {
         await updateJob(base44, job.id, { status: 'processing' });
         await log(`[${ts()}] 🚀 Iniciando "${subject.name}" (Nivel ${subject.level}) — ${totalLessons} lecciones`);
+        if (rawTopicCount > totalLessons) {
+          await log(`[${ts()}] 🗂️ Grouped ${rawTopicCount} topics into ${totalLessons} lessons (-${groupingSavePct}% token load)`);
+        }
         if (safe_mode) await log(`[${ts()}] 🛡️ MODO SEGURO activo — solo 1 módulo a la vez`);
         await syncLegacyProgress(base44, genId, { total_steps: totalLessons, progress_percent: 5 });
 
