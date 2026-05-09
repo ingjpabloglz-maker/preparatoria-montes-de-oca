@@ -1,0 +1,46 @@
+{
+  "name": "ActivityEnrichment",
+  "type": "object",
+  "properties": {
+    "activity_id": {
+      "type": "string",
+      "description": "ID de la actividad enriquecida"
+    },
+    "hints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Pistas generadas on-demand"
+    },
+    "detailed_explanation": {
+      "type": "string",
+      "description": "Explicaci\u00f3n detallada paso a paso"
+    },
+    "example_explanation": {
+      "type": "string",
+      "description": "Ejemplo concreto para entender la respuesta"
+    },
+    "incorrect_feedback": {
+      "type": "object",
+      "description": "Feedback espec\u00edfico por error o respuesta del usuario"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de generaci\u00f3n"
+    },
+    "generated_for_error_type": {
+      "type": "string",
+      "description": "Tipo de error o modo que dispar\u00f3 la generaci\u00f3n"
+    },
+    "generation_version": {
+      "type": "number",
+      "default": 1,
+      "description": "Versi\u00f3n del enriquecimiento"
+    }
+  },
+  "required": [
+    "activity_id"
+  ]
+}

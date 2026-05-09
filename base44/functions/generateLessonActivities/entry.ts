@@ -3,20 +3,13 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_steps','multiple_select','drag_drop','step_by_step'];
 const ARRAY_ANSWER_TYPES = ['multiple_select', 'order_steps'];
 
-// ─── NORMALIZACIÓN: explanation_levels siempre válido ─────────────────────────
+// ─── NORMALIZACIÓN: explanation_levels — solo basic, detailed/example on-demand ──
 function normalizeExplanationLevels(raw, question) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return {
-      basic: `La respuesta correcta es: ${question}`,
-      detailed: `Se resuelve aplicando el concepto correspondiente.`,
-      example: `Ejemplo: aplica el mismo procedimiento en un caso similar.`
-    };
-  }
-  return {
-    basic: typeof raw.basic === 'string' && raw.basic.trim() ? raw.basic : `Respuesta correcta.`,
-    detailed: typeof raw.detailed === 'string' && raw.detailed.trim() ? raw.detailed : `Explicación paso a paso del procedimiento.`,
-    example: typeof raw.example === 'string' && raw.example.trim() ? raw.example : `Ejemplo similar aplicado.`
-  };
+  const basicFallback = `La respuesta correcta es la indicada.`;
+  const basic = (raw && typeof raw === 'object' && !Array.isArray(raw) && typeof raw.basic === 'string' && raw.basic.trim())
+    ? raw.basic
+    : (typeof raw === 'string' && raw.trim() ? raw : basicFallback);
+  return { basic, detailed: '', example: '' };
 }
 
 // ─── SANITIZACIÓN GLOBAL ROBUSTA: NUNCA rechazar, siempre corregir ─────────────
@@ -71,10 +64,10 @@ function sanitizeActivity(raw) {
   // --- ACCEPTED ANSWERS ---
   safe.accepted_answers = Array.isArray(safe.accepted_answers) ? safe.accepted_answers.map(a => String(a)) : [];
 
-  // --- HINTS ---
-  safe.hints = Array.isArray(safe.hints) ? safe.hints.filter(h => h) : [];
+  // --- HINTS — vacío por defecto, se generan on-demand ---
+  safe.hints = [];
 
-  // --- EXPLANATION & LEVELS ---
+  // --- EXPLANATION & LEVELS — solo basic, detailed/example on-demand ---
   if (!safe.explanation || typeof safe.explanation !== 'string') {
     safe.explanation = safe.question;
   }
@@ -113,8 +106,8 @@ function sanitizeActivity(raw) {
     safe.points = points[safe.difficulty] || 10;
   }
 
-  // --- FEEDBACK ---
-  safe.incorrect_feedback = typeof safe.incorrect_feedback === 'object' ? safe.incorrect_feedback : null;
+  // --- FEEDBACK — on-demand, no se pregena ---
+  safe.incorrect_feedback = null;
 
   return safe;
 }
@@ -151,20 +144,20 @@ function normalizeForPersistence(activity) {
     a.correct_answers = [];
   }
 
-  // --- explanation_levels ---
+  // --- explanation_levels — solo basic, detailed/example on-demand ---
   const expl = a.explanation || a.question || 'Explicación no disponible';
   if (!a.explanation_levels || Array.isArray(a.explanation_levels)) {
-    a.explanation_levels = { basic: expl, detailed: expl, example: 'Sin ejemplo' };
+    a.explanation_levels = { basic: expl, detailed: '', example: '' };
   } else if (typeof a.explanation_levels === 'string') {
-    a.explanation_levels = { basic: a.explanation_levels, detailed: a.explanation_levels, example: 'Sin ejemplo' };
+    a.explanation_levels = { basic: a.explanation_levels, detailed: '', example: '' };
   } else if (typeof a.explanation_levels === 'object') {
     a.explanation_levels = {
-      basic: typeof a.explanation_levels.basic === 'string' ? a.explanation_levels.basic : expl,
-      detailed: typeof a.explanation_levels.detailed === 'string' ? a.explanation_levels.detailed : expl,
-      example: typeof a.explanation_levels.example === 'string' ? a.explanation_levels.example : 'Sin ejemplo',
+      basic: typeof a.explanation_levels.basic === 'string' && a.explanation_levels.basic.trim() ? a.explanation_levels.basic : expl,
+      detailed: '',
+      example: '',
     };
   } else {
-    a.explanation_levels = { basic: expl, detailed: expl, example: 'Sin ejemplo' };
+    a.explanation_levels = { basic: expl, detailed: '', example: '' };
   }
 
   // --- options ---
@@ -311,18 +304,17 @@ REGLA CRÍTICA: NUNCA incluir ambos campos correct_answer y correct_answers en l
 CALIDAD PEDAGÓGICA:
 - Preguntas claras, sin ambigüedad.
 - Para matemáticas usar LaTeX dentro de $...$: $x^2$, $\\frac{a}{b}$.
-- hints: array con máximo 1 pista (string).
-- explanation: string con la explicación de la respuesta correcta.
-- explanation_levels: objeto con basic, detailed, example.
-- incorrect_feedback: objeto con al menos clave "default".
+- explanation: string corto con la explicación básica de la respuesta correcta (1-2 oraciones).
+- explanation_levels: SOLO incluir {basic: "..."} — NO generar detailed ni example.
+- NO incluir hints ni incorrect_feedback.
 - points: easy=8, medium=10, hard=14.
 
 EJEMPLOS CORRECTOS:
-{"type":"multiple_choice","question":"¿Cuánto es 3+5?","options":["6","7","8","9"],"correct_answer":"8","hints":["Suma paso a paso"],"explanation":"3+5=8","difficulty":"easy","points":8}
-{"type":"multiple_select","question":"Selecciona los primos","options":["2","3","4","5"],"correct_answers":["2","3","5"],"hints":["Solo divisibles por 1 y sí mismos"],"explanation":"2,3,5 son primos","difficulty":"medium","points":10}
-{"type":"order_steps","question":"Ordena para resolver $2x=8$","options":["Verificar","Dividir entre 2","Plantear la ecuación"],"correct_answers":["Plantear la ecuación","Dividir entre 2","Verificar"],"explanation":"Este es el orden correcto","difficulty":"medium","points":10}
-{"type":"true_false","question":"5 es par","correct_answer":"Falso","hints":["Divisible entre 2?"],"explanation":"5 no es divisible entre 2","difficulty":"easy","points":8}
-{"type":"fill_blank","question":"7 + 3 = ___","correct_answer":"10","accepted_answers":["10"],"hints":["Suma"],"explanation":"7+3=10","difficulty":"easy","points":8}
+{"type":"multiple_choice","question":"¿Cuánto es 3+5?","options":["6","7","8","9"],"correct_answer":"8","explanation":"3+5=8","explanation_levels":{"basic":"3 más 5 es igual a 8."},"difficulty":"easy","points":8}
+{"type":"multiple_select","question":"Selecciona los primos","options":["2","3","4","5"],"correct_answers":["2","3","5"],"explanation":"2,3,5 son primos","explanation_levels":{"basic":"Un número primo solo es divisible por 1 y por sí mismo."},"difficulty":"medium","points":10}
+{"type":"order_steps","question":"Ordena para resolver $2x=8$","options":["Verificar","Dividir entre 2","Plantear la ecuación"],"correct_answers":["Plantear la ecuación","Dividir entre 2","Verificar"],"explanation":"Este es el orden correcto","explanation_levels":{"basic":"Se plantea primero, luego se opera y finalmente se verifica."},"difficulty":"medium","points":10}
+{"type":"true_false","question":"5 es par","correct_answer":"Falso","explanation":"5 no es divisible entre 2","explanation_levels":{"basic":"Los números pares son divisibles entre 2. 5 no lo es."},"difficulty":"easy","points":8}
+{"type":"fill_blank","question":"7 + 3 = ___","correct_answer":"10","accepted_answers":["10"],"explanation":"7+3=10","explanation_levels":{"basic":"Al sumar 7 y 3 obtenemos 10."},"difficulty":"easy","points":8}
 
 FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
 

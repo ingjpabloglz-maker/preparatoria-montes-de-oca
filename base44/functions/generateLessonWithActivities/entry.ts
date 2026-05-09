@@ -2,20 +2,13 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_steps','multiple_select','drag_drop','step_by_step'];
 
-// NORMALIZACIÓN: explanation_levels siempre válido
+// NORMALIZACIÓN: explanation_levels — solo basic, detailed/example on-demand
 function normalizeExplanationLevels(raw, question) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return {
-      basic: `La respuesta correcta es: ${question}`,
-      detailed: `Se resuelve aplicando el concepto correspondiente.`,
-      example: `Ejemplo: aplica el mismo procedimiento en un caso similar.`
-    };
-  }
-  return {
-    basic: typeof raw.basic === 'string' && raw.basic.trim() ? raw.basic : `Respuesta correcta.`,
-    detailed: typeof raw.detailed === 'string' && raw.detailed.trim() ? raw.detailed : `Explicación paso a paso del procedimiento.`,
-    example: typeof raw.example === 'string' && raw.example.trim() ? raw.example : `Ejemplo similar aplicado.`
-  };
+  const basicFallback = `La respuesta correcta es la indicada.`;
+  const basic = (raw && typeof raw === 'object' && !Array.isArray(raw) && typeof raw.basic === 'string' && raw.basic.trim())
+    ? raw.basic
+    : (typeof raw === 'string' && raw.trim() ? raw : basicFallback);
+  return { basic, detailed: '', example: '' };
 }
 
 // SANITIZACIÓN GLOBAL ROBUSTA: NUNCA rechazar, siempre corregir
@@ -64,10 +57,10 @@ function sanitizeActivity(activity) {
   // --- ACCEPTED ANSWERS ---
   safe.accepted_answers = Array.isArray(safe.accepted_answers) ? safe.accepted_answers.map(a => String(a)) : [];
 
-  // --- HINTS ---
-  safe.hints = Array.isArray(safe.hints) ? safe.hints.filter(h => h) : [];
+  // --- HINTS — vacío por defecto, se generan on-demand ---
+  safe.hints = [];
 
-  // --- EXPLANATION & LEVELS ---
+  // --- EXPLANATION & LEVELS — solo basic, detailed/example on-demand ---
   if (!safe.explanation || typeof safe.explanation !== 'string') {
     safe.explanation = safe.question;
   }
@@ -106,8 +99,8 @@ function sanitizeActivity(activity) {
     safe.points = points[safe.difficulty] || 10;
   }
 
-  // --- FEEDBACK ---
-  safe.incorrect_feedback = typeof safe.incorrect_feedback === 'object' ? safe.incorrect_feedback : null;
+  // --- FEEDBACK — on-demand, no se pregena ---
+  safe.incorrect_feedback = null;
 
   return safe;
 }
@@ -144,20 +137,20 @@ function normalizeForPersistence(activity) {
     a.correct_answers = [];
   }
 
-  // --- explanation_levels ---
+  // --- explanation_levels — solo basic, detailed/example on-demand ---
   const expl = a.explanation || a.question || 'Explicación no disponible';
   if (!a.explanation_levels || Array.isArray(a.explanation_levels)) {
-    a.explanation_levels = { basic: expl, detailed: expl, example: 'Sin ejemplo' };
+    a.explanation_levels = { basic: expl, detailed: '', example: '' };
   } else if (typeof a.explanation_levels === 'string') {
-    a.explanation_levels = { basic: a.explanation_levels, detailed: a.explanation_levels, example: 'Sin ejemplo' };
+    a.explanation_levels = { basic: a.explanation_levels, detailed: '', example: '' };
   } else if (typeof a.explanation_levels === 'object') {
     a.explanation_levels = {
-      basic: typeof a.explanation_levels.basic === 'string' ? a.explanation_levels.basic : expl,
-      detailed: typeof a.explanation_levels.detailed === 'string' ? a.explanation_levels.detailed : expl,
-      example: typeof a.explanation_levels.example === 'string' ? a.explanation_levels.example : 'Sin ejemplo',
+      basic: typeof a.explanation_levels.basic === 'string' && a.explanation_levels.basic.trim() ? a.explanation_levels.basic : expl,
+      detailed: '',
+      example: '',
     };
   } else {
-    a.explanation_levels = { basic: expl, detailed: expl, example: 'Sin ejemplo' };
+    a.explanation_levels = { basic: expl, detailed: '', example: '' };
   }
 
   // --- options ---
@@ -334,19 +327,18 @@ REGLAS POR TIPO:
 CALIDAD PEDAGÓGICA:
 - Preguntas claras, sin ambigüedad.
 - Para matemáticas usar LaTeX dentro de $...$: $x^2$, $\\frac{a}{b}$, $\\mathbb{N}$, $\\{1,2,3\\}$.
-- hints: array con máximo 1 pista (string).
-- explanation: string con la explicación de la respuesta correcta.
-- explanation_levels: objeto con basic, detailed, example.
-- incorrect_feedback: objeto con al menos clave "default".
+- explanation: string corto con la explicación básica (1-2 oraciones).
+- explanation_levels: SOLO incluir {basic: "..."} — NO generar detailed ni example.
+- NO incluir hints ni incorrect_feedback.
 - points: easy=8, medium=10, hard=14.
 
 EJEMPLOS DE REFERENCIA:
-{"type":"multiple_choice","question":"¿Cuánto es 3 + 5?","options":["6","7","8","9"],"correct_answer":"8","hints":["Suma los números paso a paso"],"explanation":"3 + 5 = 8","difficulty":"easy","points":8}
-{"type":"multiple_select","question":"Selecciona los números primos","options":["2","3","4","5"],"correct_answer":["2","3","5"],"hints":["Un número primo tiene solo dos divisores"],"explanation":"2, 3 y 5 son primos","difficulty":"medium","points":10}
-{"type":"true_false","question":"5 es un número par","correct_answer":"false","hints":["Revisa si es divisible entre 2"],"explanation":"5 no es divisible entre 2","difficulty":"easy","points":8}
-{"type":"fill_blank","question":"Completa: 7 + 3 = ___","accepted_answers":["10"],"hints":["Suma los dos números"],"explanation":"7 + 3 = 10","difficulty":"easy","points":8}
-{"type":"drag_drop","question":"Relaciona cada número con su tipo","drag_items":["2","-3","1/2"],"drop_targets":["Natural","Entero","Racional"],"correct_answer":"{\\"Natural\\":\\"2\\",\\"Entero\\":\\"-3\\",\\"Racional\\":\\"1/2\\"}","hints":["Clasifica según su tipo"],"explanation":"2 es natural, -3 es entero, 1/2 es racional","difficulty":"medium","points":10}
-{"type":"step_by_step","question":"Resuelve: 2 + 3 × 4","steps":[{"instruction":"Multiplica 3 × 4","answer":"12","hint":"Primero multiplicación"},{"instruction":"Suma 2 + 12","answer":"14","hint":"Ahora la suma"}],"correct_answer":"step_by_step","hints":["Recuerda la jerarquía de operaciones"],"explanation":"Resultado: 14","difficulty":"medium","points":10}
+{"type":"multiple_choice","question":"¿Cuánto es 3 + 5?","options":["6","7","8","9"],"correct_answer":"8","explanation":"3 + 5 = 8","explanation_levels":{"basic":"Al sumar 3 y 5 obtenemos 8."},"difficulty":"easy","points":8}
+{"type":"multiple_select","question":"Selecciona los números primos","options":["2","3","4","5"],"correct_answer":["2","3","5"],"explanation":"2, 3 y 5 son primos","explanation_levels":{"basic":"Un número primo solo es divisible entre 1 y sí mismo."},"difficulty":"medium","points":10}
+{"type":"true_false","question":"5 es un número par","correct_answer":"false","explanation":"5 no es divisible entre 2","explanation_levels":{"basic":"Los números pares son divisibles entre 2. El 5 no lo es."},"difficulty":"easy","points":8}
+{"type":"fill_blank","question":"Completa: 7 + 3 = ___","accepted_answers":["10"],"explanation":"7 + 3 = 10","explanation_levels":{"basic":"Al sumar 7 y 3 el resultado es 10."},"difficulty":"easy","points":8}
+{"type":"drag_drop","question":"Relaciona cada número con su tipo","drag_items":["2","-3","1/2"],"drop_targets":["Natural","Entero","Racional"],"correct_answer":"{\\"Natural\\":\\"2\\",\\"Entero\\":\\"-3\\",\\"Racional\\":\\"1/2\\"}","explanation":"2 es natural, -3 es entero, 1/2 es racional","explanation_levels":{"basic":"Cada número pertenece a un conjunto específico según sus características."},"difficulty":"medium","points":10}
+{"type":"step_by_step","question":"Resuelve: 2 + 3 × 4","steps":[{"instruction":"Multiplica 3 × 4","answer":"12","hint":"Primero multiplicación"},{"instruction":"Suma 2 + 12","answer":"14","hint":"Ahora la suma"}],"correct_answer":"step_by_step","explanation":"Resultado: 14","explanation_levels":{"basic":"Se resuelve siguiendo la jerarquía de operaciones: primero multiplicación, luego suma."},"difficulty":"medium","points":10}
 
 FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
 

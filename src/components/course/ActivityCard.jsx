@@ -395,6 +395,10 @@ export default function ActivityCard({
   const [showAiExplanation, setShowAiExplanation] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResponse, setAiResponse] = useState(null);
+  const [enrichedLevels, setEnrichedLevels] = useState({});
+  const [enrichLoading, setEnrichLoading] = useState(false);
+  const [onDemandFeedback, setOnDemandFeedback] = useState(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [timeBonus, setTimeBonus] = useState(0);
   const [startTime] = useState(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -404,9 +408,10 @@ export default function ActivityCard({
   }, [activity]);
 
   const { playSound } = useSound();
-  const hints = activity.hints || [];
-  const hasHint = hints.length > 0;
-  const hintPenalty = activity.hint_penalty ?? 2; // puntos que se descuentan por usar pista
+  const [hints, setHints] = useState(activity.hints || []);
+  const [hintLoading, setHintLoading] = useState(false);
+  const hasHint = true; // siempre mostrar botón (on-demand)
+  const hintPenalty = activity.hint_penalty ?? 2;
 
   // Timer
   useEffect(() => {
@@ -462,6 +467,8 @@ export default function ActivityCard({
     setSubmitted(true);
     playSound(correct ? 'correct_answer' : 'incorrect_answer');
     onAnswer(activity.id, correct, points, answer, timeSpent, 1);
+    // On-demand: generar feedback de error si falló
+    if (!correct) handleOnDemandFeedback(answer);
   };
 
   const handleStepAnswer = (stepIndex, answer) => {
@@ -478,9 +485,26 @@ export default function ActivityCard({
     }
   };
 
-  const handleUseHint = () => {
-    setShowHint(true);
+  const handleUseHint = async () => {
     setHintUsed(true);
+    if (hints.length > 0) {
+      setShowHint(true);
+      return;
+    }
+    setHintLoading(true);
+    try {
+      const res = await base44.functions.invoke('generateActivityEnrichment', {
+        activity_id: activity.id,
+        mode: 'hint',
+      });
+      const newHints = res?.data?.data || res?.data || [];
+      setHints(Array.isArray(newHints) ? newHints : [newHints]);
+      setShowHint(true);
+    } catch {
+      setHints(['Revisa el concepto de la lección antes de responder.']);
+      setShowHint(true);
+    }
+    setHintLoading(false);
   };
 
   const handleAskAI = async () => {
@@ -520,6 +544,10 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
     setShowAiExplanation(false);
     setTimeBonus(0);
     setStepAnswers([]);
+    setHints(activity.hints || []);
+    setEnrichedLevels({});
+    setOnDemandFeedback(null);
+    setExplanationLevel('basic');
     onNext();
   };
 
@@ -530,9 +558,43 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
   };
 
   const getCurrentExplanation = () => {
-    const levels = activity.explanation_levels;
-    if (!levels) return activity.explanation;
-    return levels[explanationLevel] || activity.explanation;
+    const levels = { ...(activity.explanation_levels || {}), ...enrichedLevels };
+    return levels[explanationLevel] || activity.explanation || '';
+  };
+
+  const handleEnrichLevel = async (level) => {
+    setExplanationLevel(level);
+    if (enrichedLevels[level]) return; // ya en cache local
+    const mode = level === 'detailed' ? 'detailed_explanation' : 'example';
+    setEnrichLoading(true);
+    try {
+      const res = await base44.functions.invoke('generateActivityEnrichment', {
+        activity_id: activity.id,
+        mode,
+      });
+      const data = res?.data?.data || res?.data || '';
+      const example = res?.data?.example || '';
+      setEnrichedLevels(prev => ({
+        ...prev,
+        detailed: mode === 'detailed_explanation' ? data : (prev.detailed || ''),
+        example: mode === 'detailed_explanation' ? example : data,
+      }));
+    } catch { /* silently fallback to basic */ }
+    setEnrichLoading(false);
+  };
+
+  const handleOnDemandFeedback = async (userAnswer) => {
+    if (onDemandFeedback) return;
+    setFeedbackLoading(true);
+    try {
+      const res = await base44.functions.invoke('generateActivityEnrichment', {
+        activity_id: activity.id,
+        mode: 'incorrect_feedback',
+        user_answer: String(userAnswer),
+      });
+      setOnDemandFeedback(res?.data?.data || res?.data || null);
+    } catch { /* silent */ }
+    setFeedbackLoading(false);
   };
 
   const typeLabel = {
@@ -598,13 +660,16 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
         )}
       </div>
 
-      {/* Hint (antes de responder) */}
-      {!submitted && showHint && hints[0] && (
+      {/* Hint on-demand (antes de responder) */}
+      {!submitted && showHint && (
         <div className="bg-amber-500/15 border border-amber-400/30 rounded-xl p-3 mb-4 flex items-start gap-2 animate-in fade-in duration-200">
           <Lightbulb className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
           <div>
-            <span className="text-amber-200 text-sm">{hints[0]}</span>
-            {hintPenalty > 0 && (
+            {hintLoading
+              ? <span className="text-amber-300 text-sm flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Generando pista...</span>
+              : <span className="text-amber-200 text-sm">{hints[0] || 'Revisa el contenido de la lección.'}</span>
+            }
+            {!hintLoading && hintPenalty > 0 && (
               <span className="block text-amber-400/60 text-xs mt-0.5">−{hintPenalty} pts si aciertas</span>
             )}
           </div>
@@ -676,24 +741,37 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
             )}
           </div>
 
-          {/* Feedback específico por respuesta incorrecta */}
-          {!isCorrect && getIncorrectFeedback() && (
-            <p className="text-sm text-red-200/80 mb-2">{getIncorrectFeedback()}</p>
+          {/* Feedback on-demand por respuesta incorrecta */}
+          {!isCorrect && (
+            <div className="mb-2">
+              {feedbackLoading
+                ? <span className="text-xs text-red-300/60 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Analizando tu respuesta...</span>
+                : onDemandFeedback
+                  ? <p className="text-sm text-red-200/80">{onDemandFeedback}</p>
+                  : getIncorrectFeedback()
+                    ? <p className="text-sm text-red-200/80">{getIncorrectFeedback()}</p>
+                    : null
+              }
+            </div>
           )}
 
           {/* Explicación siempre visible */}
           {(activity.explanation || activity.explanation_levels) && (
             <div className="mt-2">
-              {activity.explanation_levels && (
-                <div className="flex gap-1.5 mb-2">
-                  {['basic', 'detailed', 'example'].map(level => (
-                    <button key={level} onClick={() => setExplanationLevel(level)}
-                      className={`text-xs px-2 py-1 rounded-lg border transition-all ${explanationLevel === level ? 'bg-white/20 border-white/40 text-white' : 'bg-white/5 border-white/15 text-white/50 hover:bg-white/10'}`}>
-                      {level === 'basic' ? 'Básico' : level === 'detailed' ? 'Detallado' : 'Ejemplo'}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="flex gap-1.5 mb-2">
+                {[
+                  { key: 'basic', label: 'Básico' },
+                  { key: 'detailed', label: 'Detallado' },
+                  { key: 'example', label: 'Ejemplo' },
+                ].map(({ key, label }) => (
+                  <button key={key}
+                    onClick={() => key === 'basic' ? setExplanationLevel('basic') : handleEnrichLevel(key)}
+                    className={`text-xs px-2 py-1 rounded-lg border transition-all flex items-center gap-1 ${explanationLevel === key ? 'bg-white/20 border-white/40 text-white' : 'bg-white/5 border-white/15 text-white/50 hover:bg-white/10'}`}>
+                    {enrichLoading && explanationLevel === key && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
+                    {label}
+                  </button>
+                ))}
+              </div>
               <div className="text-white/75 text-xs leading-relaxed prose prose-sm prose-invert max-w-none [&_.katex]:text-white/90 [&_p]:my-0.5">
                 <MdMath>{getCurrentExplanation()}</MdMath>
               </div>

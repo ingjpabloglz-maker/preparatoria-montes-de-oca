@@ -270,8 +270,9 @@ const JSON_RULES = `JSON OBLIGATORIO:
 - drag_drop: drag_items=[], drop_targets=[], correct_answer=JSON mapeo
 - step_by_step: steps=[{instruction,answer,hint}], correct_answer="step_by_step"
 - fill_blank/solve: correct_answer=string, accepted_answers=[]
-- explanation_levels: {basic:string} SIEMPRE. Omitir detailed/example.
-- hints: máx 2 pistas. points: easy=8,medium=10,hard=14
+- explanation_levels: SOLO {basic:string}. NO generar detailed ni example.
+- NO incluir hints ni incorrect_feedback (se generan on-demand).
+- points: easy=8,medium=10,hard=14
 - Matemáticas: LaTeX inline $expr$`;
 
 function buildLessonContentPrompt(topic, subjectName, isMiniEval, difficulty, keywords) {
@@ -385,7 +386,7 @@ function normalizeExplanationLevels(raw, question) {
   const basic = (raw && typeof raw === 'object' && !Array.isArray(raw) && typeof raw.basic === 'string' && raw.basic.trim())
     ? raw.basic
     : (typeof raw === 'string' && raw.trim() ? raw : `La respuesta correcta es la indicada.`);
-  // Solo generar basic; detailed/example se generan on-demand
+  // Solo basic pregenerado; detailed/example on-demand via generateActivityEnrichment
   return { basic, detailed: '', example: '' };
 }
 
@@ -407,7 +408,8 @@ function sanitizeActivity(activity) {
       safe.correct_answer = safe.options?.[0] || 'Respuesta correcta';
   }
   safe.accepted_answers = Array.isArray(safe.accepted_answers) ? safe.accepted_answers.map(a => String(a)) : [];
-  safe.hints = Array.isArray(safe.hints) ? safe.hints.filter(h => h).slice(0, 2) : [];
+  // hints y incorrect_feedback on-demand — no se pregenera
+  safe.hints = [];
   if (!safe.explanation || typeof safe.explanation !== 'string') safe.explanation = safe.question;
   safe.explanation_levels = normalizeExplanationLevels(safe.explanation_levels, safe.question);
   if (safe.type === 'step_by_step') {
@@ -421,7 +423,7 @@ function sanitizeActivity(activity) {
   if (!['easy','medium','hard'].includes(safe.difficulty)) safe.difficulty = 'medium';
   if (typeof safe.points !== 'number' || safe.points < 0)
     safe.points = { easy:8, medium:10, hard:14 }[safe.difficulty] || 10;
-  safe.incorrect_feedback = typeof safe.incorrect_feedback === 'object' ? safe.incorrect_feedback : null;
+  safe.incorrect_feedback = null;
   return safe;
 }
 
