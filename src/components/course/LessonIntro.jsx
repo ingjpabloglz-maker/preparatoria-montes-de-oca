@@ -396,17 +396,17 @@ IMPORTANTE: devuelve SOLO el JSON, sin bloques de código markdown.`,
   const generateVisuals = async (visuals) => {
     if (!visuals?.length) return;
     setLoadingVisuals(true);
-    const generated = await Promise.all(
-      visuals.slice(0, 2).map(async (v) => {
-        try {
-          const res = await base44.integrations.Core.GenerateImage({ prompt: v.prompt });
-          return { ...v, url: res?.url || null };
-        } catch {
-          return { ...v, url: null };
-        }
-      })
-    );
-    setLessonVisuals(generated.filter(v => v.url));
+    // Secuencial — sin Promise.all
+    const generated = [];
+    for (const v of visuals.slice(0, 2)) {
+      try {
+        const res = await base44.integrations.Core.GenerateImage({ prompt: v.prompt });
+        if (res?.url) generated.push({ ...v, url: res.url });
+      } catch {
+        // silent — imagen no crítica
+      }
+    }
+    setLessonVisuals(generated);
     setLoadingVisuals(false);
   };
 

@@ -1,69 +1,32 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  generateSubjectCurriculum
-//  Arquitectura: 1 LLM call a la vez, secuencial, con rate limiter + checkpoints
+//  generateSubjectCurriculum — HARDENED v3
+//  Sistemas activos:
+//    ✅ Watchdog de jobs colgados
+//    ✅ Locks reales por materia
+//    ✅ Transacciones por lección (atomicidad)
+//    ✅ Validación post-generación
+//    ✅ Cache de prompts
+//    ✅ Métricas reales
+//    ✅ Modo safe_mode
+//    ✅ Detección de basura LLM
+//    ✅ Normalizador matemático
+//    ✅ Circuit breaker (5 fallos consecutivos)
+//    ✅ Sin Promise.all, sin recursión, sin generación desde frontend
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_steps','multiple_select','drag_drop','step_by_step'];
 const ARRAY_ANSWER_TYPES = ['multiple_select', 'order_steps'];
-const FALLBACK_TYPES = ['multiple_choice', 'true_false', 'fill_blank'];
+const BACKOFF_DELAYS = [0, 5000, 15000, 45000];
+const WATCHDOG_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos
+const CIRCUIT_BREAKER_THRESHOLD = 5; // fallos consecutivos
 
-// ─── Timestamp para logs ──────────────────────────────────────────────────────
+// ─── Timestamp ────────────────────────────────────────────────────────────────
 function ts() {
   return new Date().toLocaleTimeString('es-MX', { hour12: false });
 }
 
-// ─── Rate Limiter Global ──────────────────────────────────────────────────────
-// safeInvokeLLM: 1 call a la vez, backoff exponencial, detección de rate limit
-const BACKOFF_DELAYS = [0, 5000, 15000, 45000]; // ms por intento (0=primer intento)
-
-async function safeInvokeLLM(base44, prompt, options = {}, label = 'LLM', logFn = null) {
-  const maxRetries = 3;
-  let lastErr = null;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const delay = BACKOFF_DELAYS[attempt] || 45000;
-    if (attempt > 0) {
-      if (logFn) await logFn(`[${ts()}] Retry ${attempt}/${maxRetries} para "${label}" (espera ${delay/1000}s...)`);
-      await sleep(delay);
-    }
-
-    try {
-      const result = await withTimeout(
-        base44.asServiceRole.integrations.Core.InvokeLLM({
-          prompt,
-          ...options,
-        }),
-        90000,
-        label
-      );
-      if (logFn && attempt > 0) await logFn(`[${ts()}] ✅ Retry ${attempt} exitoso para "${label}"`);
-      return result;
-    } catch (err) {
-      lastErr = err;
-      const isRateLimit = err.message?.toLowerCase().includes('rate limit') ||
-                          err.message?.toLowerCase().includes('too many') ||
-                          err.message?.toLowerCase().includes('429');
-      const isTimeout = err.message?.includes('LLM_TIMEOUT') || err.message?.includes('TIMEOUT');
-
-      if (logFn) {
-        if (isRateLimit) {
-          await logFn(`[${ts()}] ⚠️ Rate limit detectado para "${label}"`);
-          await logFn(`[${ts()}] Retry ${attempt + 1}/${maxRetries} en ${BACKOFF_DELAYS[attempt + 1] ? BACKOFF_DELAYS[attempt + 1]/1000 : 45}s`);
-        } else if (isTimeout) {
-          await logFn(`[${ts()}] ⏱️ Timeout en "${label}"`);
-        } else {
-          await logFn(`[${ts()}] ❌ Error en "${label}": ${err.message}`);
-        }
-      }
-      if (attempt === maxRetries) break;
-    }
-  }
-  throw lastErr;
-}
-
-// ─── Utilidades ───────────────────────────────────────────────────────────────
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -73,6 +36,257 @@ function withTimeout(promise, ms, label) {
     const timer = setTimeout(() => reject(new Error(`[LLM_TIMEOUT] "${label}" superó ${ms}ms`)), ms);
     promise.then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #1 WATCHDOG — recoverStuckJobs
+// ═══════════════════════════════════════════════════════════════════════════════
+async function recoverStuckJobs(base44, subjectId) {
+  try {
+    const allJobs = await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ subject_id: subjectId });
+    const now = Date.now();
+    let recovered = 0;
+
+    for (const job of allJobs) {
+      if (job.status !== 'processing') continue;
+      const lastActivity = job.last_activity_at ? new Date(job.last_activity_at).getTime() : 0;
+      const inactiveMs = now - lastActivity;
+
+      if (inactiveMs > WATCHDOG_TIMEOUT_MS) {
+        const logs = [...(job.logs || []), `[${ts()}] ⚠️ Watchdog timeout: job inactive for ${Math.round(inactiveMs/60000)} minutes — marking as failed`];
+        await base44.asServiceRole.entities.CurriculumGenerationJob.update(job.id, {
+          status: 'failed',
+          error_message: 'Watchdog timeout: job inactive for 5+ minutes',
+          finished_at: new Date().toISOString(),
+          logs: logs.slice(-100),
+        });
+        console.log(`[Watchdog] Job ${job.id} marcado como failed (inactivo ${Math.round(inactiveMs/60000)}min)`);
+        recovered++;
+      }
+    }
+    return recovered;
+  } catch (e) {
+    console.warn('[Watchdog] Error:', e.message);
+    return 0;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #2 LOCK — verificar si hay job activo para esta materia
+// ═══════════════════════════════════════════════════════════════════════════════
+async function checkSubjectLock(base44, subjectId) {
+  const allJobs = await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ subject_id: subjectId });
+  const active = allJobs.find(j => j.status === 'processing' || j.status === 'paused');
+  return active || null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #9 NORMALIZADOR MATEMÁTICO
+// ═══════════════════════════════════════════════════════════════════════════════
+function normalizeMathContent(text) {
+  if (!text || typeof text !== 'string') return text;
+  let t = text;
+
+  // Operadores
+  t = t.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/‒/g, '-').replace(/–/g, '-');
+
+  // Exponentes unicode comunes
+  t = t.replace(/²/g, '^2').replace(/³/g, '^3').replace(/¹/g, '^1').replace(/⁴/g, '^4');
+  t = t.replace(/₀/g, '_0').replace(/₁/g, '_1').replace(/₂/g, '_2');
+
+  // Fracciones unicode
+  t = t.replace(/½/g, '1/2').replace(/⅓/g, '1/3').replace(/¼/g, '1/4').replace(/¾/g, '3/4');
+
+  // LaTeX roto: backslashes inválidos (no seguidos de letras o llaves)
+  t = t.replace(/\\(?![a-zA-Z{\\])/g, '');
+
+  // Markdown roto: *** o __ sin cierre
+  t = t.replace(/\*{3,}/g, '**').replace(/_{3,}/g, '__');
+
+  // HTML residual
+  t = t.replace(/<[^>]+>/g, '');
+
+  // Espacios excesivos
+  t = t.replace(/\s{3,}/g, '  ').trim();
+
+  return t;
+}
+
+function normalizeActivityMath(activity) {
+  const a = { ...activity };
+  a.question = normalizeMathContent(a.question);
+  a.explanation = normalizeMathContent(a.explanation);
+  a.correct_answer = normalizeMathContent(a.correct_answer);
+  if (Array.isArray(a.options)) a.options = a.options.map(normalizeMathContent);
+  if (Array.isArray(a.correct_answers)) a.correct_answers = a.correct_answers.map(normalizeMathContent);
+  if (Array.isArray(a.accepted_answers)) a.accepted_answers = a.accepted_answers.map(normalizeMathContent);
+  if (a.explanation_levels) {
+    a.explanation_levels = {
+      basic: normalizeMathContent(a.explanation_levels.basic),
+      detailed: normalizeMathContent(a.explanation_levels.detailed),
+      example: normalizeMathContent(a.explanation_levels.example),
+    };
+  }
+  return a;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #8 DETECCIÓN DE BASURA LLM
+// ═══════════════════════════════════════════════════════════════════════════════
+function isGarbageLLMResponse(response, expectedField = 'activities') {
+  if (!response) return true;
+
+  // Respuesta vacía o muy corta
+  const str = JSON.stringify(response);
+  if (!str || str.length < 50) return true;
+
+  // Demasiados nulls (> 30% del contenido)
+  const nullCount = (str.match(/null/g) || []).length;
+  const totalFields = (str.match(/:/g) || []).length;
+  if (totalFields > 0 && nullCount / totalFields > 0.4) return true;
+
+  // Contiene HTML
+  if (/<html|<body|<div|<script/i.test(str)) return true;
+
+  // Contiene markdown roto como respuesta raíz (```json etc)
+  if (/^```/.test(str.trim())) return true;
+
+  // Campo esperado ausente o vacío
+  if (expectedField === 'activities') {
+    const items = response?.activities || response;
+    if (!Array.isArray(items) || items.length === 0) return true;
+    // Primer item no tiene campos mínimos
+    const first = Array.isArray(items) ? items[0] : null;
+    if (!first?.question || !first?.type) return true;
+  }
+
+  if (expectedField === 'lesson') {
+    if (!response?.title || !response?.explanation) return true;
+    if (response.title.length < 3 || response.explanation.length < 10) return true;
+  }
+
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #5 CACHE DE PROMPTS
+// ═══════════════════════════════════════════════════════════════════════════════
+const SYSTEM_PROMPT_BASE = `Eres experto en diseño instruccional para preparatoria mexicana. Generas contenido educativo de alta calidad, riguroso y pedagógicamente correcto.`;
+
+const PEDAGOGICAL_RULES = `REGLAS PEDAGÓGICAS:
+- Contenido alineado al programa de preparatoria mexicana SEP
+- Lenguaje claro, preciso, apropiado para adolescentes
+- Ejemplos contextualizados a la realidad mexicana
+- Dificultad progresiva dentro de la lección`;
+
+const JSON_RULES_ACTIVITIES = `REGLAS JSON CRÍTICAS:
+- multiple_choice: options=[4 opciones], correct_answer=texto exacto de una opción
+- true_false: options=["Verdadero","Falso"], correct_answer="Verdadero" o "Falso"
+- multiple_select: correct_answers=ARRAY de strings. NO usar correct_answer
+- order_steps: correct_answers=ARRAY en orden correcto. NO usar correct_answer
+- drag_drop: drag_items=array, drop_targets=array, correct_answer=JSON string del mapeo
+- step_by_step: steps=[{instruction,answer,hint}], correct_answer="step_by_step"
+- fill_blank / solve: correct_answer=string, accepted_answers=array de variantes válidas
+- NUNCA mezclar correct_answer y correct_answers en la misma actividad
+- explanation_levels: {basic: string, detailed: string, example: string} — SIEMPRE presentes
+- hints: array de máx 2 pistas progresivas
+- points: easy=8, medium=10, hard=14
+- Para matemáticas usar LaTeX inline: $expresión$`;
+
+function buildLessonContentPrompt(topic, subjectName, isMiniEval, difficulty, keywords) {
+  const diffHint = { easy: 'introductoria', medium: 'intermedia', hard: 'avanzada' }[difficulty] || 'intermedia';
+  const kwHint = keywords?.length ? `\nPalabras clave: ${keywords.join(', ')}` : '';
+  return `${SYSTEM_PROMPT_BASE}
+
+TEMA: "${topic}"
+MATERIA: "${subjectName}"
+TIPO: ${isMiniEval ? 'MINI EVALUACIÓN (evaluación formativa del módulo)' : 'LECCIÓN NORMAL'}
+DIFICULTAD: ${diffHint}${kwHint}
+
+${PEDAGOGICAL_RULES}
+
+Genera un objeto JSON con:
+- title: título claro y específico (máx 8 palabras)
+- explanation: explicación teórica completa (mín 80 palabras, máx 150). Para matemáticas usa LaTeX: $x^2$, $\\frac{a}{b}$.
+
+Devuelve SOLO JSON válido: {"title":"...","explanation":"..."}`;
+}
+
+function buildActivitiesPrompt(lessonTitle, subjectName, lessonExpl, isMiniEval, count, easyCount, mediumCount, hardCount) {
+  const typeInstructions = isMiniEval
+    ? 'DISTRIBUCIÓN REQUERIDA: mínimo 2 multiple_choice, 2 true_false, 1 fill_blank, 1 multiple_select, 1 drag_drop, 1 step_by_step, 1 order_steps, 1 solve.'
+    : 'DISTRIBUCIÓN REQUERIDA: mínimo 2 multiple_choice, 1 true_false, 1 fill_blank, 1 solve, 1 order_steps.';
+
+  return `${SYSTEM_PROMPT_BASE}
+
+LECCIÓN: "${lessonTitle}"
+MATERIA: "${subjectName}"
+CONTENIDO DE LA LECCIÓN: "${lessonExpl}"
+TIPO: ${isMiniEval ? 'MINI EVALUACIÓN' : 'LECCIÓN NORMAL'}
+
+${PEDAGOGICAL_RULES}
+
+Genera exactamente ${count} actividades interactivas.
+${typeInstructions}
+DIFICULTAD: ${easyCount} easy, ${mediumCount} medium, ${hardCount} hard.
+TIPOS DISPONIBLES: multiple_choice, true_false, fill_blank, solve, order_steps, multiple_select, drag_drop, step_by_step.
+
+${JSON_RULES_ACTIVITIES}
+
+Devuelve SOLO JSON válido: {"activities":[...]}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Rate Limiter + Garbage Detection
+// ═══════════════════════════════════════════════════════════════════════════════
+async function safeInvokeLLM(base44, prompt, options = {}, label = 'LLM', logFn = null, metrics = null) {
+  const maxRetries = 3;
+  let lastErr = null;
+  let retryCount = 0;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const delay = BACKOFF_DELAYS[attempt] || 45000;
+    if (attempt > 0) {
+      retryCount++;
+      if (logFn) await logFn(`[${ts()}] 🔄 Retry ${attempt}/${maxRetries} para "${label}" (espera ${delay/1000}s...)`);
+      await sleep(delay);
+    }
+
+    try {
+      if (metrics) metrics.total_llm_calls++;
+
+      const result = await withTimeout(
+        base44.asServiceRole.integrations.Core.InvokeLLM({ prompt, ...options }),
+        90000,
+        label
+      );
+
+      // Estimar tokens (~4 chars = 1 token)
+      if (metrics) {
+        metrics.total_tokens_estimated += Math.round(prompt.length / 4);
+        if (retryCount > 0) metrics.total_retries += retryCount;
+      }
+
+      if (logFn && attempt > 0) await logFn(`[${ts()}] ✅ Retry ${attempt} exitoso para "${label}"`);
+      return result;
+    } catch (err) {
+      lastErr = err;
+      const isRateLimit = err.message?.toLowerCase().includes('rate limit') ||
+                          err.message?.toLowerCase().includes('too many') ||
+                          err.message?.toLowerCase().includes('429');
+      const isTimeout = err.message?.includes('LLM_TIMEOUT') || err.message?.includes('TIMEOUT');
+
+      if (metrics && isRateLimit) metrics.rate_limit_hits = (metrics.rate_limit_hits || 0) + 1;
+
+      if (logFn) {
+        if (isRateLimit) await logFn(`[${ts()}] ⚠️ Rate limit para "${label}" — retry ${attempt + 1}/${maxRetries} en ${BACKOFF_DELAYS[attempt + 1] ? BACKOFF_DELAYS[attempt + 1]/1000 : 45}s`);
+        else if (isTimeout) await logFn(`[${ts()}] ⏱️ Timeout en "${label}"`);
+        else await logFn(`[${ts()}] ❌ Error en "${label}": ${err.message}`);
+      }
+      if (attempt === maxRetries) break;
+    }
+  }
+  throw lastErr;
 }
 
 async function updateJob(base44, jobId, patch) {
@@ -87,7 +301,7 @@ async function updateJob(base44, jobId, patch) {
 }
 
 async function appendLog(base44, jobId, currentLogs, message) {
-  const logs = [...(currentLogs || []), message].slice(-100);
+  const logs = [...(currentLogs || []), message].slice(-150);
   try {
     await base44.asServiceRole.entities.CurriculumGenerationJob.update(jobId, {
       logs,
@@ -98,7 +312,6 @@ async function appendLog(base44, jobId, currentLogs, message) {
   return logs;
 }
 
-// También actualiza el CurriculumGeneration legacy para compatibilidad con UI existente
 async function syncLegacyProgress(base44, genId, patch) {
   try {
     const recs = await base44.asServiceRole.entities.CurriculumGeneration.filter({ generation_id: genId });
@@ -109,7 +322,7 @@ async function syncLegacyProgress(base44, genId, patch) {
 // ─── Normalización y sanitización ────────────────────────────────────────────
 function normalizeExplanationLevels(raw, question) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { basic: `La respuesta correcta es correcta.`, detailed: `Explicación del procedimiento.`, example: `Aplica el mismo procedimiento.` };
+    return { basic: `La respuesta correcta es la indicada.`, detailed: `Explicación del procedimiento.`, example: `Aplica el mismo procedimiento.` };
   }
   return {
     basic: typeof raw.basic === 'string' && raw.basic.trim() ? raw.basic : `Respuesta correcta.`,
@@ -136,7 +349,7 @@ function sanitizeActivity(activity) {
       safe.correct_answer = safe.options?.[0] || 'Respuesta correcta';
   }
   safe.accepted_answers = Array.isArray(safe.accepted_answers) ? safe.accepted_answers.map(a => String(a)) : [];
-  safe.hints = Array.isArray(safe.hints) ? safe.hints.filter(h => h) : [];
+  safe.hints = Array.isArray(safe.hints) ? safe.hints.filter(h => h).slice(0, 2) : [];
   if (!safe.explanation || typeof safe.explanation !== 'string') safe.explanation = safe.question;
   safe.explanation_levels = normalizeExplanationLevels(safe.explanation_levels, safe.question);
   if (safe.type === 'step_by_step') {
@@ -193,7 +406,6 @@ function normalizeForPersistence(activity) {
 function validateActivity(act) {
   if (!act.question?.toString().trim()) return 'question vacío';
   if (!VALID_TYPES.includes(act.type)) return `tipo inválido: ${act.type}`;
-  const isArrayType = ARRAY_ANSWER_TYPES.includes(act.type);
   if (act.type === 'multiple_choice') {
     if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
     if (!act.correct_answer?.trim()) return 'correct_answer vacío';
@@ -220,30 +432,72 @@ function validateActivity(act) {
   if (act.type === 'step_by_step') {
     if (!Array.isArray(act.steps) || act.steps.length < 2) return 'steps requiere mínimo 2';
   }
+  // Explanation no vacía
+  if (!act.explanation || act.explanation.trim().length < 3) return 'explanation vacía';
   return null;
 }
 
-// ─── Fallback activities (sin LLM) ────────────────────────────────────────────
-function buildFallbackActivities(lessonTitle, subjectName, count = 5) {
+// ═══════════════════════════════════════════════════════════════════════════════
+// #4 VALIDACIÓN POST-GENERACIÓN
+// ═══════════════════════════════════════════════════════════════════════════════
+function auditGeneratedLesson(lesson, activities, isMiniEval) {
+  const errors = [];
+  const minActivities = isMiniEval ? 10 : 7;
+
+  if (!lesson?.id) { errors.push('lesson no existe'); return errors; }
+  if (!activities || activities.length < minActivities) {
+    errors.push(`actividades insuficientes: ${activities?.length || 0} < ${minActivities}`);
+  }
+
+  // Tipos requeridos
+  const presentTypes = new Set(activities.map(a => a.type));
+  const requiredForNormal = ['multiple_choice', 'true_false', 'fill_blank'];
+  const requiredForMiniEval = ['multiple_choice', 'true_false', 'fill_blank', 'multiple_select'];
+  const required = isMiniEval ? requiredForMiniEval : requiredForNormal;
+  for (const rt of required) {
+    if (!presentTypes.has(rt)) errors.push(`tipo requerido ausente: ${rt}`);
+  }
+
+  // Preguntas duplicadas
+  const questions = activities.map(a => a.question?.trim().toLowerCase());
+  const uniqueQ = new Set(questions);
+  if (uniqueQ.size < questions.length) errors.push(`preguntas duplicadas detectadas`);
+
+  // Explanations vacías
+  const emptyExpl = activities.filter(a => !a.explanation || a.explanation.trim().length < 3);
+  if (emptyExpl.length > 0) errors.push(`${emptyExpl.length} actividades con explanation vacía`);
+
+  // Options requeridas ausentes
+  const needOptions = ['multiple_choice', 'multiple_select', 'order_steps'];
+  const missingOptions = activities.filter(a => needOptions.includes(a.type) && (!Array.isArray(a.options) || a.options.length < 2));
+  if (missingOptions.length > 0) errors.push(`${missingOptions.length} actividades sin options`);
+
+  // Correct answers malformadas
+  for (const a of activities) {
+    const err = validateActivity(a);
+    if (err) errors.push(`actividad malformada (${a.type}): ${err}`);
+  }
+
+  return errors;
+}
+
+// ─── Fallback activities ──────────────────────────────────────────────────────
+function buildFallbackActivities(lessonTitle, subjectName, count = 7) {
   const templates = [
-    { type:'multiple_choice', question:`¿Cuál describe mejor "${lessonTitle}"?`,
-      options:[`Concepto de ${lessonTitle}`,`No pertenece a ${subjectName}`,'Definición incorrecta','Ninguna'],
-      correct_answer:`Concepto de ${lessonTitle}`, correct_answers:[], explanation:`Concepto básico de ${lessonTitle}.`, hints:['Revisa el contenido'], difficulty:'easy', points:8 },
-    { type:'true_false', question:`"${lessonTitle}" es parte del programa de ${subjectName}.`,
-      options:['Verdadero','Falso'], correct_answer:'Verdadero', correct_answers:[], explanation:`Sí, es parte de ${subjectName}.`, hints:['Piensa en el contexto'], difficulty:'easy', points:8 },
-    { type:'fill_blank', question:`El tema principal de esta lección es ___.`,
-      options:[], correct_answer:lessonTitle, correct_answers:[], accepted_answers:[lessonTitle], explanation:`El tema es "${lessonTitle}".`, hints:['Lee el título'], difficulty:'easy', points:8 },
-    { type:'multiple_choice', question:`¿A qué materia pertenece "${lessonTitle}"?`,
-      options:[subjectName,'Matemáticas','Historia','Química'], correct_answer:subjectName, correct_answers:[], explanation:`"${lessonTitle}" es de ${subjectName}.`, hints:['Recuerda tu materia'], difficulty:'easy', points:8 },
-    { type:'true_false', question:`Es importante estudiar "${lessonTitle}" para comprender ${subjectName}.`,
-      options:['Verdadero','Falso'], correct_answer:'Verdadero', correct_answers:[], explanation:`Sí, es esencial.`, hints:['Considera la importancia'], difficulty:'easy', points:8 },
+    { type:'multiple_choice', question:`¿Cuál describe mejor "${lessonTitle}"?`, options:[`Concepto de ${lessonTitle}`,`No pertenece a ${subjectName}`,'Definición incorrecta','Ninguna'], correct_answer:`Concepto de ${lessonTitle}`, correct_answers:[], explanation:`Concepto básico de ${lessonTitle}.`, hints:['Revisa el contenido'], difficulty:'easy', points:8 },
+    { type:'true_false', question:`"${lessonTitle}" es parte del programa de ${subjectName}.`, options:['Verdadero','Falso'], correct_answer:'Verdadero', correct_answers:[], explanation:`Sí, es parte de ${subjectName}.`, hints:[], difficulty:'easy', points:8 },
+    { type:'fill_blank', question:`El tema principal de esta lección es ___.`, options:[], correct_answer:lessonTitle, correct_answers:[], accepted_answers:[lessonTitle], explanation:`El tema es "${lessonTitle}".`, hints:['Lee el título'], difficulty:'easy', points:8 },
+    { type:'multiple_choice', question:`¿A qué materia pertenece "${lessonTitle}"?`, options:[subjectName,'Matemáticas','Historia','Química'], correct_answer:subjectName, correct_answers:[], explanation:`"${lessonTitle}" es de ${subjectName}.`, hints:[], difficulty:'easy', points:8 },
+    { type:'true_false', question:`Es importante estudiar "${lessonTitle}" para comprender ${subjectName}.`, options:['Verdadero','Falso'], correct_answer:'Verdadero', correct_answers:[], explanation:`Sí, es esencial.`, hints:[], difficulty:'easy', points:8 },
+    { type:'fill_blank', question:`La materia "${subjectName}" pertenece al nivel ___ de preparatoria.`, options:[], correct_answer:'preparatoria', correct_answers:[], accepted_answers:['preparatoria','bachillerato'], explanation:`Es parte del plan de preparatoria.`, hints:[], difficulty:'easy', points:8 },
+    { type:'multiple_choice', question:`¿Cuál es el objetivo principal de "${lessonTitle}"?`, options:[`Aprender sobre ${lessonTitle}`,`No tiene objetivo`,'Practicar otra materia','Ninguno de los anteriores'], correct_answer:`Aprender sobre ${lessonTitle}`, correct_answers:[], explanation:`El objetivo es comprender ${lessonTitle}.`, hints:[], difficulty:'easy', points:8 },
   ];
   const result = [];
   for (let i = 0; result.length < count; i++) result.push({ ...templates[i % templates.length] });
   return result;
 }
 
-// ─── Persistir actividades inmediatamente ─────────────────────────────────────
+// ─── Persistir actividades ────────────────────────────────────────────────────
 async function persistActivities(base44, lessonId, activities, batchId = null) {
   let count = 0;
   for (let i = 0; i < activities.length; i++) {
@@ -278,8 +532,7 @@ async function persistActivities(base44, lessonId, activities, batchId = null) {
   return count;
 }
 
-// ─── FASE 1: Leer estructura desde temario ────────────────────────────────────
-// (Ya tenemos el syllabus estructurado, no necesitamos LLM para esto)
+// ─── Estructura desde temario ─────────────────────────────────────────────────
 function buildStructureFromSyllabus(syllabus) {
   return syllabus.units.map(unit => ({
     title: unit.title,
@@ -298,14 +551,15 @@ function buildStructureFromSyllabus(syllabus) {
   }));
 }
 
-// ─── FASE 2: Generar 1 lección (secuencial) ───────────────────────────────────
-async function generateOneLesson(base44, params, batchId, logFn) {
+// ═══════════════════════════════════════════════════════════════════════════════
+// GENERAR 1 LECCIÓN — con transacciones, validación post-gen, math normalizer
+// ═══════════════════════════════════════════════════════════════════════════════
+async function generateOneLesson(base44, params, batchId, logFn, metrics) {
   const { module_id, subject_id, subject_name, topic, is_mini_eval, lesson_order, difficulty, keywords } = params;
-
   const t0 = Date.now();
   await logFn(`[${ts()}] 📝 Generando lección: "${topic}" ${is_mini_eval ? '(mini-eval)' : ''}`);
 
-  // ── Verificar si ya existe (anti-duplicados / checkpoint recovery) ──────────
+  // ── Checkpoint recovery ──────────────────────────────────────────────────
   const existing = await base44.asServiceRole.entities.CourseLesson.filter({ module_id, subject_id });
   const existingForOrder = existing.filter(l => l.order === lesson_order);
   if (existingForOrder.length > 0) {
@@ -317,141 +571,199 @@ async function generateOneLesson(base44, params, batchId, logFn) {
         return { lesson: existLesson, activities_count: existActs.length, skipped: true };
       }
     }
+    // Lección incompleta — limpiar (rollback de estado anterior)
+    const orphanActs = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: existLesson.id });
+    for (const a of orphanActs) await base44.asServiceRole.entities.CourseActivity.delete(a.id);
+    await base44.asServiceRole.entities.CourseLesson.delete(existLesson.id);
+    await logFn(`[${ts()}] 🧹 Lección incompleta anterior eliminada (rollback): "${topic}"`);
   }
 
-  const keywordsHint = keywords?.length ? `\nPalabras clave: ${keywords.join(', ')}` : '';
-  const diffHint = { easy:'introductoria', medium:'intermedia', hard:'avanzada' }[difficulty] || 'intermedia';
-
-  // LLM #1: Contenido teórico (secuencial, con rate limiter)
-  let lessonContent = null;
-  try {
-    lessonContent = await safeInvokeLLM(
-      base44,
-      `Eres experto en diseño instruccional para preparatoria mexicana.
-TEMA: "${topic}"
-MATERIA: "${subject_name}"
-TIPO: ${is_mini_eval ? 'MINI EVALUACIÓN' : 'LECCIÓN NORMAL'}
-DIFICULTAD: ${diffHint}${keywordsHint}
-
-Genera:
-- title: título claro (máx 8 palabras)
-- explanation: explicación teórica (máx 150 palabras). Para matemáticas usa LaTeX: $x^2$, $\\frac{a}{b}$.
-
-Devuelve SOLO JSON: {"title":"...","explanation":"..."}`,
-      {
-        response_json_schema: {
-          type: 'object',
-          properties: { title: { type: 'string' }, explanation: { type: 'string' } },
-          required: ['title', 'explanation'],
-        },
-      },
-      `lesson-content:${topic}`,
-      logFn
-    );
-  } catch (err) {
-    await logFn(`[${ts()}] ❌ LLM falló para contenido de "${topic}": ${err.message}`);
-  }
-
-  const lessonTitle = lessonContent?.title || topic;
-  const lessonExpl = lessonContent?.explanation || `Esta lección cubre "${topic}" dentro de ${subject_name}.`;
-
-  // Crear lección inmediatamente
-  const lesson = await base44.asServiceRole.entities.CourseLesson.create({
-    module_id,
-    subject_id,
-    title: lessonTitle,
-    explanation: lessonExpl,
-    order: lesson_order,
-    is_mini_eval: is_mini_eval || false,
-    ai_generated: !!lessonContent,
-    generation_completed: false,
-    generation_version: 1,
-    generated_at: new Date().toISOString(),
-    generation_source: lessonContent ? 'admin_curriculum' : 'fallback',
-  });
-
-  await logFn(`[${ts()}] 🏗️ Lección creada en DB: "${lessonTitle}"`);
-
-  // LLM #2: Actividades (secuencial)
-  const min = is_mini_eval ? 10 : 7;
-  const max = is_mini_eval ? 14 : 10;
-  const count = Math.floor(Math.random() * (max - min + 1)) + min;
-  const easyCount = Math.round(count * 0.4);
-  const hardCount = Math.round(count * 0.2);
-  const mediumCount = count - easyCount - hardCount;
-
-  const typeInstructions = is_mini_eval
-    ? 'MÍNIMO: 2 multiple_choice, 2 true_false, 1 fill_blank, 1 multiple_select, 1 drag_drop, 1 step_by_step, 1 order_steps.'
-    : 'MÍNIMO: 2 multiple_choice, 1 true_false, 1 fill_blank, 1 solve.';
-
-  const valid = [];
-  let activitiesRaw = null;
+  // ═════════════════════════════════
+  // BEGIN TRANSACTION
+  // ═════════════════════════════════
+  let createdLesson = null;
+  let createdActivityIds = [];
 
   try {
-    activitiesRaw = await safeInvokeLLM(
-      base44,
-      `Eres experto en diseño instruccional. Genera ${count} actividades para:
-TEMA: "${lessonTitle}"
-MATERIA: "${subject_name}"
-CONTENIDO: "${lessonExpl}"
-TIPO: ${is_mini_eval ? 'MINI EVALUACIÓN' : 'LECCIÓN NORMAL'}
-${typeInstructions}
-DIFICULTAD: ${easyCount} easy, ${mediumCount} medium, ${hardCount} hard.
-TIPOS DISPONIBLES: multiple_choice, true_false, fill_blank, solve, order_steps, multiple_select, drag_drop, step_by_step.
-REGLAS CRÍTICAS:
-- multiple_choice: 4 opciones, correct_answer=texto exacto de opción.
-- true_false: options=["Verdadero","Falso"], correct_answer="Verdadero" o "Falso".
-- multiple_select: correct_answers=ARRAY. NO usar correct_answer.
-- order_steps: correct_answers=ARRAY orden correcto. NO usar correct_answer.
-- drag_drop: drag_items, drop_targets, correct_answer=JSON object.
-- step_by_step: steps=[{instruction,answer,hint}], correct_answer="step_by_step".
-NUNCA combinar correct_answer y correct_answers en la misma actividad.
-CALIDAD: explanation_levels {basic,detailed,example}, hints (máx 1), points: easy=8, medium=10, hard=14.
-Matemáticas: LaTeX en $...$.
-Devuelve SOLO JSON: {"activities":[...]}`,
-      {
-        response_json_schema: {
-          type: 'object',
-          properties: { activities: { type: 'array', items: { type: 'object' } } },
-        },
-      },
-      `activities:${lessonTitle}`,
-      logFn
-    );
-  } catch (err) {
-    await logFn(`[${ts()}] ⚠️ LLM actividades falló para "${lessonTitle}": ${err.message} — usando fallback`);
-  }
+    // LLM #1: Contenido teórico con garbage detection
+    let lessonContent = null;
+    let lessonTitle = topic;
+    let lessonExpl = `Esta lección cubre "${topic}" dentro de ${subject_name}.`;
 
-  if (activitiesRaw) {
-    const rawList = Array.isArray(activitiesRaw) ? activitiesRaw : (activitiesRaw?.activities || []);
-    for (const rawAct of rawList) {
-      const act = sanitizeActivity(rawAct);
-      if (!validateActivity(act)) valid.push(act);
+    try {
+      const prompt1 = buildLessonContentPrompt(topic, subject_name, is_mini_eval, difficulty, keywords);
+      const raw1 = await safeInvokeLLM(
+        base44, prompt1,
+        { response_json_schema: { type:'object', properties:{ title:{type:'string'}, explanation:{type:'string'} }, required:['title','explanation'] } },
+        `lesson-content:${topic}`, logFn, metrics
+      );
+
+      if (isGarbageLLMResponse(raw1, 'lesson')) {
+        await logFn(`[${ts()}] ⚠️ Respuesta basura detectada para contenido de "${topic}" — usando fallback`);
+      } else {
+        lessonContent = raw1;
+        lessonTitle = normalizeMathContent(raw1.title) || topic;
+        lessonExpl = normalizeMathContent(raw1.explanation) || lessonExpl;
+      }
+    } catch (err) {
+      await logFn(`[${ts()}] ❌ LLM falló para contenido de "${topic}": ${err.message} — usando fallback`);
     }
+
+    // Crear lección (inicio de transacción)
+    createdLesson = await base44.asServiceRole.entities.CourseLesson.create({
+      module_id, subject_id,
+      title: lessonTitle,
+      explanation: lessonExpl,
+      order: lesson_order,
+      is_mini_eval: is_mini_eval || false,
+      ai_generated: !!lessonContent,
+      generation_completed: false,
+      generation_version: 1,
+      generated_at: new Date().toISOString(),
+      generation_source: lessonContent ? 'admin_curriculum' : 'fallback',
+    });
+
+    await logFn(`[${ts()}] 🏗️ Lección creada: "${lessonTitle}"`);
+
+    // LLM #2: Actividades con garbage detection + retry
+    const min = is_mini_eval ? 10 : 7;
+    const max = is_mini_eval ? 14 : 10;
+    const count = Math.floor(Math.random() * (max - min + 1)) + min;
+    const easyCount = Math.round(count * 0.4);
+    const hardCount = Math.round(count * 0.2);
+    const mediumCount = count - easyCount - hardCount;
+
+    const valid = [];
+    let activitiesRaw = null;
+    let garbageRetries = 0;
+
+    while (garbageRetries < 2) {
+      try {
+        const prompt2 = buildActivitiesPrompt(lessonTitle, subject_name, lessonExpl, is_mini_eval, count, easyCount, mediumCount, hardCount);
+        const rawActs = await safeInvokeLLM(
+          base44, prompt2,
+          { response_json_schema: { type:'object', properties:{ activities:{type:'array', items:{type:'object'}} } } },
+          `activities:${lessonTitle}`, logFn, metrics
+        );
+
+        if (isGarbageLLMResponse(rawActs, 'activities')) {
+          garbageRetries++;
+          await logFn(`[${ts()}] ⚠️ Basura LLM detectada (intento ${garbageRetries}/2) para "${lessonTitle}"`);
+          if (garbageRetries < 2) {
+            await sleep(5000);
+            continue;
+          }
+        } else {
+          activitiesRaw = rawActs;
+          break;
+        }
+      } catch (err) {
+        await logFn(`[${ts()}] ⚠️ LLM actividades falló: ${err.message}`);
+        break;
+      }
+    }
+
+    if (activitiesRaw) {
+      const rawList = Array.isArray(activitiesRaw) ? activitiesRaw : (activitiesRaw?.activities || []);
+      for (const rawAct of rawList) {
+        const act = normalizeActivityMath(sanitizeActivity(rawAct));
+        if (!validateActivity(act)) valid.push(act);
+      }
+    }
+
+    // Fallback si faltan actividades
+    if (valid.length < min) {
+      const needed = min - valid.length;
+      const fallbacks = buildFallbackActivities(lessonTitle, subject_name, needed);
+      for (const fb of fallbacks) valid.push(fb);
+      await logFn(`[${ts()}] 🔧 ${needed} actividades fallback para "${lessonTitle}"`);
+    }
+
+    // Persistir actividades y registrar IDs (para rollback si falla auditoría)
+    for (let i = 0; i < valid.length; i++) {
+      const act = valid[i];
+      const isArrayType = ARRAY_ANSWER_TYPES.includes(act.type);
+      const raw = {
+        lesson_id: createdLesson.id,
+        generated_by: 'admin_curriculum',
+        generation_batch_id: batchId || null,
+        type: act.type,
+        question: act.question,
+        options: act.options || [],
+        correct_answer: isArrayType ? '' : (act.correct_answer || ''),
+        correct_answers: isArrayType ? (act.correct_answers || []) : [],
+        accepted_answers: act.accepted_answers || [],
+        explanation: act.explanation || '',
+        explanation_levels: act.explanation_levels,
+        incorrect_feedback: act.incorrect_feedback || null,
+        hints: act.hints || [],
+        difficulty: act.difficulty || 'medium',
+        points: act.points || 10,
+        order: i + 1,
+        grading_type: 'auto',
+        steps: act.type === 'step_by_step' ? (act.steps || []) : [],
+        drag_items: act.type === 'drag_drop' ? (act.drag_items || []) : [],
+        drop_targets: act.type === 'drag_drop' ? (act.drop_targets || []) : [],
+      };
+      const actData = normalizeForPersistence(raw);
+      const created = await base44.asServiceRole.entities.CourseActivity.create(actData);
+      createdActivityIds.push(created.id);
+    }
+
+    await logFn(`[${ts()}] 💾 ${createdActivityIds.length} actividades guardadas`);
+
+    // ═════════════════════════════════
+    // #4 VALIDACIÓN POST-GENERACIÓN (auditoría)
+    // ═════════════════════════════════
+    const auditErrors = auditGeneratedLesson(createdLesson, valid, is_mini_eval);
+    if (auditErrors.length > 0) {
+      // ROLLBACK: eliminar actividades y lección
+      await logFn(`[${ts()}] 🚨 Auditoría FALLIDA para "${lessonTitle}" — ROLLBACK:`);
+      for (const e of auditErrors) await logFn(`[${ts()}]   → ${e}`);
+
+      for (const actId of createdActivityIds) {
+        try { await base44.asServiceRole.entities.CourseActivity.delete(actId); } catch(e) { /* silent */ }
+      }
+      try { await base44.asServiceRole.entities.CourseLesson.delete(createdLesson.id); } catch(e) { /* silent */ }
+
+      throw new Error(`Auditoría fallida: ${auditErrors[0]}`);
+    }
+
+    // ═════════════════════════════════
+    // COMMIT — marcar lección completada
+    // ═════════════════════════════════
+    await base44.asServiceRole.entities.CourseLesson.update(createdLesson.id, { generation_completed: true });
+
+    const elapsed = Math.round((Date.now() - t0) / 1000);
+    if (metrics) {
+      metrics.lessons_generated++;
+      metrics.activities_generated += createdActivityIds.length;
+    }
+
+    await logFn(`[${ts()}] ✅ COMMIT "${lessonTitle}" — ${createdActivityIds.length} actividades — ${elapsed}s`);
+    return { lesson: createdLesson, activities_count: createdActivityIds.length, elapsed_seconds: elapsed };
+
+  } catch (err) {
+    // ═════════════════════════════════
+    // ROLLBACK COMPLETO
+    // ═════════════════════════════════
+    await logFn(`[${ts()}] 🔴 ROLLBACK para "${topic}": ${err.message}`);
+
+    for (const actId of createdActivityIds) {
+      try { await base44.asServiceRole.entities.CourseActivity.delete(actId); } catch(e) { /* silent */ }
+    }
+    if (createdLesson?.id) {
+      try { await base44.asServiceRole.entities.CourseLesson.delete(createdLesson.id); } catch(e) { /* silent */ }
+    }
+
+    if (metrics) metrics.lessons_failed++;
+    throw err;
   }
-
-  // Completar con fallback si faltan
-  if (valid.length < min) {
-    const needed = min - valid.length;
-    const fallbacks = buildFallbackActivities(lessonTitle, subject_name, needed);
-    for (const fb of fallbacks) valid.push(fb);
-    await logFn(`[${ts()}] 🔧 ${needed} actividades fallback agregadas para "${lessonTitle}"`);
-  }
-
-  // Persistir actividades inmediatamente
-  const activitiesCreated = await persistActivities(base44, lesson.id, valid, batchId);
-  await logFn(`[${ts()}] 💾 ${activitiesCreated} actividades guardadas`);
-
-  // Marcar lección como completada — checkpoint
-  await base44.asServiceRole.entities.CourseLesson.update(lesson.id, { generation_completed: true });
-
-  const elapsed = Math.round((Date.now() - t0) / 1000);
-  await logFn(`[${ts()}] ✅ Lección completada en ${elapsed}s — "${lessonTitle}" (${activitiesCreated} actividades)`);
-
-  return { lesson, activities_count: activitiesCreated, elapsed_seconds: elapsed };
 }
 
-// ─── HANDLER PRINCIPAL ────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// HANDLER PRINCIPAL
+// ═══════════════════════════════════════════════════════════════════════════════
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -460,7 +772,7 @@ Deno.serve(async (req) => {
     if (user.role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = await req.json();
-    const { subject_id, overwrite = false } = body;
+    const { subject_id, overwrite = false, safe_mode = false, preview_only = false } = body;
     if (!subject_id) return Response.json({ error: 'subject_id requerido' }, { status: 400 });
 
     const subjects = await base44.asServiceRole.entities.Subject.filter({ id: subject_id });
@@ -470,23 +782,71 @@ Deno.serve(async (req) => {
     const syllabuses = await base44.asServiceRole.entities.SubjectSyllabus.filter({ subject_id, is_active: true });
     const syllabus = syllabuses[0];
     if (!syllabus?.units?.length) {
+      return Response.json({ error: 'Sin temario activo.', no_syllabus: true }, { status: 422 });
+    }
+
+    // #1 WATCHDOG — recuperar jobs colgados antes de continuar
+    const recovered = await recoverStuckJobs(base44, subject_id);
+    if (recovered > 0) console.log(`[Watchdog] ${recovered} jobs recuperados`);
+
+    // Calcular estructura (para preview y lock)
+    const structure = buildStructureFromSyllabus(syllabus);
+    let totalLessons = 0;
+    let totalModules = 0;
+    for (const u of structure) {
+      for (const m of u.modules) {
+        totalModules++;
+        totalLessons += m.lessons.length;
+      }
+    }
+
+    // ── PREVIEW MODE — retorna estimaciones sin generar ──────────────────────
+    if (preview_only) {
+      const avgSecsPerLesson = 35; // estimación conservadora
+      const avgTokensPerLesson = 1800;
+      const estimatedMinutes = Math.ceil((totalLessons * avgSecsPerLesson) / 60);
+      const estimatedTokens = totalLessons * avgTokensPerLesson;
+
       return Response.json({
-        error: 'Esta materia no tiene un temario activo. Define el temario primero.',
-        no_syllabus: true,
-      }, { status: 422 });
+        preview: true,
+        subject_name: subject.name,
+        units: structure.length,
+        modules: totalModules,
+        total_lessons: totalLessons,
+        estimated_minutes: estimatedMinutes,
+        estimated_tokens: estimatedTokens,
+        structure_summary: structure.map(u => ({
+          title: u.title,
+          modules: u.modules.map(m => ({
+            title: m.title,
+            lessons_count: m.lessons.length,
+          })),
+        })),
+      });
+    }
+
+    // #2 LOCK — verificar job activo para esta materia
+    const activeJob = await checkSubjectLock(base44, subject_id);
+    if (activeJob) {
+      return Response.json({
+        error: `Ya existe un job ${activeJob.status} para esta materia (ID: ${activeJob.id}). Espera que termine o cancélalo.`,
+        locked: true,
+        active_job_id: activeJob.id,
+        active_job_status: activeJob.status,
+      }, { status: 409 });
     }
 
     if (!overwrite) {
       const existingUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
       if (existingUnits.length > 0) {
         return Response.json({
-          error: `La materia ya tiene ${existingUnits.length} unidades. Usa overwrite=true para sobreescribir.`,
+          error: `La materia ya tiene ${existingUnits.length} unidades. Usa overwrite=true.`,
           has_content: true,
         }, { status: 409 });
       }
     }
 
-    // Crear job de generación
+    // Crear job
     const batchId = crypto.randomUUID();
     const job = await base44.asServiceRole.entities.CurriculumGenerationJob.create({
       subject_id,
@@ -494,7 +854,7 @@ Deno.serve(async (req) => {
       batch_id: batchId,
       generation_version: 1,
       status: 'pending',
-      total_lessons: 0,
+      total_lessons: totalLessons,
       completed_lessons: 0,
       failed_lessons: 0,
       skipped_lessons: 0,
@@ -507,7 +867,7 @@ Deno.serve(async (req) => {
       rate_limit_hits: 0,
     });
 
-    // Crear CurriculumGeneration legacy (para UI existente)
+    // Legacy CurriculumGeneration
     const genId = crypto.randomUUID();
     const genRecord = await base44.asServiceRole.entities.CurriculumGeneration.create({
       generation_id: genId,
@@ -515,7 +875,7 @@ Deno.serve(async (req) => {
       subject_name: subject.name,
       status: 'in_progress',
       progress_percent: 0,
-      total_steps: 1,
+      total_steps: totalLessons,
       completed_steps: 0,
       current_module: '',
       current_lesson: '',
@@ -534,14 +894,27 @@ Deno.serve(async (req) => {
       job_id: job.id,
       batch_id: batchId,
       record_id: genRecord.id,
+      total_lessons: totalLessons,
+      safe_mode,
     };
 
-    // ── Background: generación SECUENCIAL con cola robusta ──────────────────
+    // ── Background: generación secuencial ────────────────────────────────────
     (async () => {
       let logs = [];
+
+      // Métricas en memoria durante la ejecución
+      const metrics = {
+        total_llm_calls: 0,
+        total_tokens_estimated: 0,
+        total_retries: 0,
+        rate_limit_hits: 0,
+        lessons_generated: 0,
+        lessons_failed: 0,
+        activities_generated: 0,
+      };
+
       const log = async (msg) => {
         logs = await appendLog(base44, job.id, logs, msg);
-        // Sync legacy también
         try {
           const recs = await base44.asServiceRole.entities.CurriculumGeneration.filter({ generation_id: genId });
           if (recs[0]) {
@@ -555,20 +928,11 @@ Deno.serve(async (req) => {
 
       try {
         await updateJob(base44, job.id, { status: 'processing' });
-        await log(`[${ts()}] 🚀 Iniciando generación de "${subject.name}" (Nivel ${subject.level})`);
-        await log(`[${ts()}] 📋 Temario v${syllabus.version} cargado`);
-        await log(`[${ts()}] ⚙️  MODO: Secuencial — 1 LLM call a la vez`);
-
-        // FASE 1: Construir estructura desde temario (sin LLM)
-        const structure = buildStructureFromSyllabus(syllabus);
-        let totalLessons = 0;
-        for (const u of structure) for (const m of u.modules) totalLessons += m.lessons.length;
-
-        await log(`[${ts()}] 📐 FASE 1 completada: ${structure.length} unidades, ${totalLessons} lecciones planificadas`);
-        await updateJob(base44, job.id, { total_lessons: totalLessons });
+        await log(`[${ts()}] 🚀 Iniciando "${subject.name}" (Nivel ${subject.level}) — ${totalLessons} lecciones`);
+        if (safe_mode) await log(`[${ts()}] 🛡️ MODO SEGURO activo — solo 1 módulo a la vez`);
         await syncLegacyProgress(base44, genId, { total_steps: totalLessons, progress_percent: 5 });
 
-        // Limpiar contenido si overwrite
+        // Limpiar si overwrite
         if (overwrite) {
           await log(`[${ts()}] 🗑️ Limpiando contenido existente...`);
           const existingUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
@@ -588,9 +952,6 @@ Deno.serve(async (req) => {
           await log(`[${ts()}] ✅ Contenido anterior eliminado`);
         }
 
-        // FASE 2: Generación secuencial lección por lección
-        await log(`[${ts()}] 🎯 FASE 2: Generando contenido secuencialmente...`);
-
         let completedLessons = 0;
         let failedLessons = 0;
         let skippedLessons = 0;
@@ -598,6 +959,7 @@ Deno.serve(async (req) => {
         let totalModulesCreated = 0;
         let totalActivitiesCreated = 0;
         const lessonTimes = [];
+        let consecutiveFailures = 0; // #10 Circuit Breaker counter
 
         for (const unitBlueprint of structure) {
           await log(`[${ts()}] 📦 Unidad ${unitBlueprint.order}: "${unitBlueprint.title}"`);
@@ -611,6 +973,13 @@ Deno.serve(async (req) => {
           totalUnitsCreated++;
 
           for (const modBlueprint of unitBlueprint.modules) {
+            // #10 CIRCUIT BREAKER check
+            const freshJob = await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ id: job.id });
+            if (freshJob[0]?.status === 'paused' || freshJob[0]?.status === 'failed') {
+              await log(`[${ts()}] 🛑 Job detenido externamente — saliendo`);
+              return;
+            }
+
             await log(`[${ts()}] 📁 Módulo ${modBlueprint.order}: "${modBlueprint.title}"`);
             await updateJob(base44, job.id, { current_module: modBlueprint.title });
             await syncLegacyProgress(base44, genId, { current_module: modBlueprint.title });
@@ -623,8 +992,26 @@ Deno.serve(async (req) => {
             });
             totalModulesCreated++;
 
-            // ── GENERACIÓN SECUENCIAL: 1 lección a la vez ──────────────────
             for (const lessonBlueprint of modBlueprint.lessons) {
+              // #10 CIRCUIT BREAKER
+              if (consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+                await log(`[${ts()}] 🔴 Circuit breaker activated — ${consecutiveFailures} lecciones consecutivas fallaron`);
+                await updateJob(base44, job.id, {
+                  status: 'paused',
+                  error_message: `Circuit breaker: ${consecutiveFailures} fallos consecutivos`,
+                  completed_lessons: completedLessons,
+                  failed_lessons: failedLessons,
+                  skipped_lessons: skippedLessons,
+                  activities_created: totalActivitiesCreated,
+                  total_llm_calls: metrics.total_llm_calls,
+                  total_tokens_estimated: metrics.total_tokens_estimated,
+                  avg_retry_count: metrics.total_retries,
+                  rate_limit_hits: metrics.rate_limit_hits,
+                });
+                await syncLegacyProgress(base44, genId, { status: 'failed', error_message: 'Circuit breaker activado' });
+                return;
+              }
+
               await updateJob(base44, job.id, {
                 current_lesson: lessonBlueprint.topic,
                 completed_lessons: completedLessons,
@@ -634,6 +1021,9 @@ Deno.serve(async (req) => {
                 activities_created: totalActivitiesCreated,
                 units_created: totalUnitsCreated,
                 modules_created: totalModulesCreated,
+                total_llm_calls: metrics.total_llm_calls,
+                total_tokens_estimated: metrics.total_tokens_estimated,
+                rate_limit_hits: metrics.rate_limit_hits,
               });
               await syncLegacyProgress(base44, genId, {
                 current_lesson: lessonBlueprint.topic,
@@ -646,10 +1036,8 @@ Deno.serve(async (req) => {
                 units_created: totalUnitsCreated,
               });
 
-              let result = null;
               try {
-                // Una sola lección a la vez — sin Promise.all, sin paralelismo
-                result = await generateOneLesson(base44, {
+                const result = await generateOneLesson(base44, {
                   module_id: module.id,
                   subject_id,
                   subject_name: subject.name,
@@ -658,39 +1046,57 @@ Deno.serve(async (req) => {
                   lesson_order: lessonBlueprint.order,
                   difficulty: lessonBlueprint.difficulty || 'medium',
                   keywords: lessonBlueprint.keywords || [],
-                }, batchId, log);
+                }, batchId, log, metrics);
 
                 if (result.skipped) {
                   skippedLessons++;
+                  consecutiveFailures = 0; // reset en skip
                 } else {
                   completedLessons++;
                   totalActivitiesCreated += result.activities_count;
                   if (result.elapsed_seconds) lessonTimes.push(result.elapsed_seconds);
+                  consecutiveFailures = 0; // reset en éxito
                 }
               } catch (lessonErr) {
-                // Modo resiliente: 1 lección falla → continúa con la siguiente
                 failedLessons++;
-                await log(`[${ts()}] ❌ Falló lección "${lessonBlueprint.topic}": ${lessonErr.message}`);
-                await log(`[${ts()}] ➡️  Continuando con la siguiente lección...`);
+                consecutiveFailures++;
+                await log(`[${ts()}] ❌ Falló "${lessonBlueprint.topic}": ${lessonErr.message} [fallos consecutivos: ${consecutiveFailures}]`);
               }
 
-              // Tiempo estimado restante
+              // ETA
               if (lessonTimes.length > 0 && (completedLessons + failedLessons + skippedLessons) < totalLessons) {
                 const avgSecs = lessonTimes.reduce((a, b) => a + b, 0) / lessonTimes.length;
                 const remaining = totalLessons - (completedLessons + failedLessons + skippedLessons);
                 const etaMin = Math.round((avgSecs * remaining) / 60);
-                if (etaMin > 0) await log(`[${ts()}] ⏳ ETA estimado: ~${etaMin} min restantes`);
+                if (etaMin > 0) await log(`[${ts()}] ⏳ ETA: ~${etaMin} min restantes`);
+                await updateJob(base44, job.id, { avg_lesson_seconds: Math.round(avgSecs) });
               }
+            } // end lessons
+
+            // #7 SAFE MODE — pausa entre módulos
+            if (safe_mode) {
+              await log(`[${ts()}] 🛡️ Safe mode: módulo "${modBlueprint.title}" completado. Job pausado — reanudar manualmente.`);
+              await updateJob(base44, job.id, {
+                status: 'paused',
+                completed_lessons: completedLessons,
+                failed_lessons: failedLessons,
+                skipped_lessons: skippedLessons,
+                activities_created: totalActivitiesCreated,
+                total_llm_calls: metrics.total_llm_calls,
+                total_tokens_estimated: metrics.total_tokens_estimated,
+              });
+              return; // el admin debe reanudar manualmente
             }
 
             await log(`[${ts()}] ✅ Módulo "${modBlueprint.title}" completado`);
-          }
-        }
+          } // end modules
+        } // end units
 
-        // ── Resumen final ──────────────────────────────────────────────────
+        // Resumen final
         const totalDuration = Math.round((Date.now() - startTime) / 1000);
         const avgTime = lessonTimes.length > 0 ? Math.round(lessonTimes.reduce((a, b) => a + b, 0) / lessonTimes.length) : 0;
         const totalMins = Math.round(totalDuration / 60);
+        const successRate = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
         await updateJob(base44, job.id, {
           status: 'completed',
@@ -704,6 +1110,10 @@ Deno.serve(async (req) => {
           activities_created: totalActivitiesCreated,
           avg_lesson_seconds: avgTime,
           total_duration_seconds: totalDuration,
+          total_llm_calls: metrics.total_llm_calls,
+          total_tokens_estimated: metrics.total_tokens_estimated,
+          avg_retry_count: metrics.total_retries,
+          rate_limit_hits: metrics.rate_limit_hits,
           current_unit: '',
           current_module: '',
           current_lesson: '',
@@ -714,21 +1124,21 @@ Deno.serve(async (req) => {
           progress_percent: 100,
           completed_steps: completedLessons,
           total_steps: totalLessons,
-          current_module: '',
-          current_lesson: '',
+          current_module: '', current_lesson: '',
           units_created: totalUnitsCreated,
           modules_created: totalModulesCreated,
           lessons_created: completedLessons,
           activities_created: totalActivitiesCreated,
         });
 
-        await log(`[${ts()}] 🎉 ═══════════ GENERACIÓN COMPLETADA ═══════════`);
-        await log(`[${ts()}] ✅ Exitosas: ${completedLessons} | ⏭️ Saltadas: ${skippedLessons} | ❌ Fallidas: ${failedLessons}`);
-        await log(`[${ts()}] ⏱️  Duración total: ${totalMins} min | Promedio: ${avgTime}s/lección`);
-        await log(`[${ts()}] 📦 ${totalUnitsCreated} unidades | 📁 ${totalModulesCreated} módulos | 📝 ${completedLessons} lecciones | ⚡ ${totalActivitiesCreated} actividades`);
+        await log(`[${ts()}] 🎉 ═══ GENERACIÓN COMPLETADA ═══`);
+        await log(`[${ts()}] ✅ ${completedLessons} exitosas | ⏭️ ${skippedLessons} saltadas | ❌ ${failedLessons} fallidas | 📊 ${successRate}% éxito`);
+        await log(`[${ts()}] ⏱️ ${totalMins} min total | ${avgTime}s/lección promedio`);
+        await log(`[${ts()}] 🤖 ${metrics.total_llm_calls} llamadas LLM | ~${Math.round(metrics.total_tokens_estimated/1000)}k tokens estimados`);
+        await log(`[${ts()}] 📦 ${totalUnitsCreated} unidades | 📁 ${totalModulesCreated} módulos | ⚡ ${totalActivitiesCreated} actividades`);
 
       } catch (bgErr) {
-        console.error('[generateSubjectCurriculum] Background error:', bgErr.message);
+        console.error('[generateSubjectCurriculum] Error fatal:', bgErr.message);
         await updateJob(base44, job.id, { status: 'failed', error_message: bgErr.message });
         await syncLegacyProgress(base44, genId, { status: 'failed', error_message: bgErr.message });
         await appendLog(base44, job.id, logs, `[${ts()}] 💥 Error fatal: ${bgErr.message}`);
