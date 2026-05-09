@@ -399,6 +399,7 @@ export default function ActivityCard({
   const [enrichLoading, setEnrichLoading] = useState(false);
   const [onDemandFeedback, setOnDemandFeedback] = useState(null);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const lastEnrichRef = React.useRef(0); // cooldown timestamp
   const [timeBonus, setTimeBonus] = useState(0);
   const [startTime] = useState(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -562,9 +563,15 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
     return levels[explanationLevel] || activity.explanation || '';
   };
 
+  const COOLDOWN_MS = 5000;
+
   const handleEnrichLevel = async (level) => {
     setExplanationLevel(level);
     if (enrichedLevels[level]) return; // ya en cache local
+    // Cooldown 5s entre requests
+    const now = Date.now();
+    if (now - lastEnrichRef.current < COOLDOWN_MS) return;
+    lastEnrichRef.current = now;
     const mode = level === 'detailed' ? 'detailed_explanation' : 'example';
     setEnrichLoading(true);
     try {
@@ -585,6 +592,10 @@ Explica en 2-3 oraciones cortas, de forma clara y empática, por qué su respues
 
   const handleOnDemandFeedback = async (userAnswer) => {
     if (onDemandFeedback) return;
+    // Cooldown 5s
+    const now = Date.now();
+    if (now - lastEnrichRef.current < COOLDOWN_MS) return;
+    lastEnrichRef.current = now;
     setFeedbackLoading(true);
     try {
       const res = await base44.functions.invoke('generateActivityEnrichment', {

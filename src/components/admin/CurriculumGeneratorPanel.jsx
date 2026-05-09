@@ -73,15 +73,34 @@ function PreviewModal({ preview, onConfirm, onCancel, safeMode, setSafeMode, ove
             </div>
           </div>
 
-          {/* Tokens */}
-          <div className={cn(
-            "rounded-lg p-3 text-sm flex items-center justify-between",
-            generationMode === 'lightweight' ? 'bg-green-50 text-green-800' :
-            generationMode === 'rich' ? 'bg-violet-50 text-violet-800' : 'bg-gray-50 text-gray-700'
-          )}>
-            <span>Tokens estimados ({generationMode})</span>
-            <span className="font-mono font-semibold">~{Math.round(preview.estimated_tokens / 1000)}k tokens</span>
-          </div>
+          {/* Tokens + ahorro on-demand */}
+          {(() => {
+            // Tokens "legacy" (modo rich sin on-demand) = estimated_tokens * 2.8
+            const legacyTokens = Math.round(preview.estimated_tokens * 2.8 / 1000);
+            const currentTokens = Math.round(preview.estimated_tokens / 1000);
+            const savedTokens = legacyTokens - currentTokens;
+            const savePct = Math.round((savedTokens / legacyTokens) * 100);
+            return (
+              <div className="space-y-2">
+                <div className={cn(
+                  "rounded-lg p-3 text-sm flex items-center justify-between",
+                  generationMode === 'lightweight' ? 'bg-green-50 text-green-800' :
+                  generationMode === 'rich' ? 'bg-violet-50 text-violet-800' : 'bg-gray-50 text-gray-700'
+                )}>
+                  <span>Tokens generación ({generationMode})</span>
+                  <span className="font-mono font-semibold">~{currentTokens}k tokens</span>
+                </div>
+                <div className="rounded-lg p-3 text-sm bg-emerald-50 text-emerald-800 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-emerald-600" />
+                    Ahorro vs. generación completa
+                  </span>
+                  <span className="font-mono font-semibold text-emerald-700">~{savedTokens}k tokens ({savePct}%)</span>
+                </div>
+                <p className="text-xs text-gray-400">Hints, explicaciones detalladas y feedback se generan on-demand únicamente cuando el alumno los solicita.</p>
+              </div>
+            );
+          })()}
 
           {/* Modo de generación */}
           <div>
