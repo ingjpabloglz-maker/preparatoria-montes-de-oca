@@ -219,47 +219,48 @@ function isGarbageLLMResponse(response, expectedField = 'activities', subjectNam
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// #5 CACHE DE PROMPTS
+// #5 PROMPTS
 // ═══════════════════════════════════════════════════════════════════════════════
-// ── Prompt cache compacto ──────────────────────────────────────────────────────
-const SYS = `Experto en diseño instruccional para preparatoria SEP México. Genera contenido educativo riguroso.`;
 
-const RULES_SHORT = `REGLAS: contenido SEP México, lenguaje claro para adolescentes, ejemplos contextualizados.`;
+const MATH_SUBJECT_KEYWORDS = ['matemáticas', 'matematicas', 'álgebra', 'algebra', 'aritmética', 'aritmetica', 'ecuaciones', 'estadística', 'estadistica'];
 
-const JSON_RULES = `JSON OBLIGATORIO:
-- multiple_choice: options=[4], correct_answer=texto exacto de opción
-- true_false: options=["Verdadero","Falso"], correct_answer="Verdadero"|"Falso"
-- multiple_select: correct_answers=ARRAY, NO correct_answer
-- order_steps: correct_answers=ARRAY orden correcto, NO correct_answer
-- drag_drop: drag_items=[], drop_targets=[], correct_answer=JSON mapeo
-- step_by_step: steps=[{instruction,answer,hint}], correct_answer="step_by_step"
-- fill_blank/solve: correct_answer=string, accepted_answers=[]
-- explanation_levels: SOLO {basic:string}. NO generar detailed ni example.
-- NO incluir hints ni incorrect_feedback (se generan on-demand).
-- points: easy=8,medium=10,hard=14
-- Matemáticas: LaTeX inline $expr$`;
+function isMathSubject(subjectName = '') {
+  const lower = subjectName.toLowerCase();
+  return MATH_SUBJECT_KEYWORDS.some(k => lower.includes(k));
+}
 
 function buildLessonContentPrompt(topic, subjectName, isMiniEval, difficulty, keywords) {
   const diff = { easy: 'básica', medium: 'intermedia', hard: 'avanzada' }[difficulty] || 'intermedia';
-  const kw = keywords?.length ? ` [${keywords.slice(0,4).join(', ')}]` : '';
-  return `${SYS}
-TEMA:"${topic}" MATERIA:"${subjectName}" DIFICULTAD:${diff}${kw}
-${RULES_SHORT}
-Genera JSON: {"title":"título ≤8 palabras","explanation":"texto 60-120 palabras. LaTeX para fórmulas: $x^2$"}
-SOLO JSON.`;
+  return `Genera un título y explicación para una lección de preparatoria.
+Tema: "${topic}"
+Materia: "${subjectName}"
+Dificultad: ${diff}
+JSON: {"title":"título corto","explanation":"texto 60-100 palabras"}
+Solo JSON.`;
 }
 
-function buildActivitiesPrompt(lessonTitle, subjectName, lessonExpl, isMiniEval, count, easyCount, mediumCount, hardCount, advancedType) {
-  const baseTypes = 'multiple_choice,true_false,fill_blank';
-  const advLine = advancedType ? `. 1 actividad tipo ${advancedType}` : '';
-  return `${SYS}
-LECCIÓN:"${lessonTitle}" MATERIA:"${subjectName}"
-CONTEXTO:"${lessonExpl.slice(0,200)}"
-${RULES_SHORT}
-Genera ${count} actividades. Incluye: ${baseTypes}${advLine}.
-Dificultad: ${easyCount} easy, ${mediumCount} medium, ${hardCount} hard.
-${JSON_RULES}
-SOLO JSON: {"activities":[...]}`;
+function buildMathActivitiesPrompt(lessonTitle, isMiniEval) {
+  const count = isMiniEval ? 6 : 4;
+  const example = '{"activities":[{"question":"¿Cuánto es 3 + 4?","type":"multiple_choice","options":["5","6","7","8"],"correct_answer":"7","explanation_levels":{"basic":"3 más 4 es igual a 7"}},{"question":"Completa: 2 × ___ = 10","type":"fill_blank","options":[],"correct_answer":"5","explanation_levels":{"basic":"2 por 5 es 10"}},{"question":"¿Es verdad que 5 > 3?","type":"true_false","options":["Verdadero","Falso"],"correct_answer":"Verdadero","explanation_levels":{"basic":"5 es mayor que 3"}}]}';
+  return 'Genera ' + count + ' actividades matematicas en JSON valido para preparatoria.\n' +
+    'Leccion: "' + lessonTitle + '"\n\n' +
+    'Ejemplo de formato:\n' + example + '\n\n' +
+    'Reglas:\n' +
+    '- Solo tipos: multiple_choice, fill_blank, true_false\n' +
+    '- Preguntas matematicas reales sobre el tema de la leccion\n' +
+    '- correct_answer debe ser texto exacto de options (para multiple_choice)\n' +
+    '- NO texto vacio en ningun campo\n' +
+    '- Solo JSON valido, sin markdown ni texto extra';
+}
+
+function buildActivitiesPrompt(lessonTitle, subjectName, lessonExpl, isMiniEval) {
+  const count = isMiniEval ? 6 : 4;
+  const advancedType = ADVANCED_TYPES[Math.floor(Math.random() * ADVANCED_TYPES.length)];
+  return 'Genera ' + count + ' actividades educativas en JSON para preparatoria.\n' +
+    'Leccion: "' + lessonTitle + '" Materia: "' + subjectName + '"\n' +
+    'Incluye tipos: multiple_choice, true_false, fill_blank. 1 actividad tipo ' + advancedType + '.\n' +
+    'JSON: {"activities":[{"question":"...","type":"multiple_choice","options":["a","b","c","d"],"correct_answer":"a","explanation_levels":{"basic":"..."}}]}\n' +
+    'Solo JSON valido.';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -783,6 +784,7 @@ function buildStructureFromSyllabus(syllabus, subjectName = '') {
 // ═══════════════════════════════════════════════════════════════════════════════
 async function generateOneLesson(base44, params, batchId, logFn, metrics, modeConfig) {
   const { module_id, subject_id, subject_name, topic, is_mini_eval, lesson_order, difficulty, keywords } = params;
+  const isMath = isMathSubject(subject_name);
   const cfg = modeConfig || GENERATION_MODES.standard;
   const t0 = Date.now();
   await logFn(`[${ts()}] 📝 Generando lección: "${topic}" ${is_mini_eval ? '(mini-eval)' : ''}`);
@@ -853,24 +855,18 @@ async function generateOneLesson(base44, params, batchId, logFn, metrics, modeCo
 
     await logFn(`[${ts()}] 🏗️ Lección creada: "${lessonTitle}"`);
 
-    // LLM #2: Actividades con garbage detection + retry
-    const min = is_mini_eval ? cfg.mini_min : cfg.normal_min;
-    const max = is_mini_eval ? cfg.mini_max : cfg.normal_max;
-    const count = Math.floor(Math.random() * (max - min + 1)) + min;
-    const easyCount = Math.round(count * 0.4);
-    const hardCount = Math.round(count * 0.2);
-    const mediumCount = count - easyCount - hardCount;
-    // 1 tipo avanzado aleatorio por lección (o ninguno en lightweight si es normal)
-    const advancedType = ADVANCED_TYPES[Math.floor(Math.random() * ADVANCED_TYPES.length)];
-
+    // LLM #2: Actividades
     const valid = [];
     let activitiesRaw = null;
 
     try {
-      const prompt2 = buildActivitiesPrompt(lessonTitle, subject_name, lessonExpl, is_mini_eval, count, easyCount, mediumCount, hardCount, advancedType);
+      const prompt2 = isMath
+        ? buildMathActivitiesPrompt(lessonTitle, is_mini_eval)
+        : buildActivitiesPrompt(lessonTitle, subject_name, lessonExpl, is_mini_eval);
+      const llmOptions = { response_json_schema: { type:'object', properties:{ activities:{type:'array', items:{type:'object'}} } } };
+      if (isMath) llmOptions.temperature = 0.3;
       const rawActs = await safeInvokeLLM(
-        base44, prompt2,
-        { response_json_schema: { type:'object', properties:{ activities:{type:'array', items:{type:'object'}} } } },
+        base44, prompt2, llmOptions,
         `activities:${lessonTitle}`, logFn, metrics
       );
 
