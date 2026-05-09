@@ -151,110 +151,141 @@ function normalizeActivityMath(activity) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// #8 DETECCIÓN DE BASURA LLM — relajada, math-friendly
+// #8 DETECCIÓN DE BASURA LLM — ultra-permisiva, math-safe
+// Solo rechaza basura REAL: null, HTML, JSON roto, actividades completamente vacías
 // ═══════════════════════════════════════════════════════════════════════════════
-const MATH_SUBJECTS = ['algebra', 'álgebra', 'matemáticas', 'matematicas', 'arithmetic', 'aritmética', 'aritmetica', 'cálculo', 'calculo'];
 
-function isMathSubject(subjectName = '') {
+// Cualquier materia técnica/numérica — se aplican reglas relajadas
+const LENIENT_SUBJECT_KEYWORDS = [
+  'algebra', 'álgebra', 'matemáticas', 'matematicas', 'arithmetic', 'aritmética', 'aritmetica',
+  'cálculo', 'calculo', 'estadística', 'estadistica', 'probabilidad', 'geometría', 'geometria',
+  'trigonometría', 'trigonometria', 'ecuaciones', 'física', 'fisica', 'química', 'quimica',
+  'biología', 'biologia', 'ciencias', 'contabilidad', 'economía', 'economia',
+];
+
+function isLenientSubject(subjectName = '') {
   const lower = subjectName.toLowerCase();
-  return MATH_SUBJECTS.some(kw => lower.includes(kw));
+  // Por defecto, casi todas las materias son lenient — solo rechazar si es materia puramente humanística
+  // Si el nombre tiene alguna keyword técnica → lenient; de lo contrario también lenient por default
+  return true; // Aplicar reglas relajadas a TODAS las materias para evitar falsos positivos
 }
 
 function isGarbageLLMResponse(response, expectedField = 'activities', subjectName = '') {
-  const isMath = isMathSubject(subjectName);
-
-  // 1. Respuesta nula o completamente vacía
-  if (!response) {
+  // ── REGLA 1: Null absoluto ───────────────────────────────────────────────────
+  if (response === null || response === undefined) {
     console.log('[GarbageDetector] BASURA: response es null/undefined');
     return true;
   }
 
-  const str = JSON.stringify(response);
-
-  // 2. Cadena vacía o demasiado corta para contener datos reales
-  if (!str || str.length < 20) {
-    console.log('[GarbageDetector] BASURA: respuesta demasiado corta', str?.length);
+  let str;
+  try {
+    str = typeof response === 'string' ? response : JSON.stringify(response);
+  } catch (e) {
+    console.log('[GarbageDetector] BASURA: JSON.stringify falló —', e.message);
     return true;
   }
 
-  // 3. HTML roto (respuesta de página de error)
-  if (/<html|<body|<div|<script/i.test(str)) {
-    console.log('[GarbageDetector] BASURA: contiene HTML');
+  // ── REGLA 2: Respuesta vacía o truncada ─────────────────────────────────────
+  if (!str || str.length < 5) {
+    console.log(`[GarbageDetector] BASURA: respuesta vacía o truncada (${str?.length} chars)`);
     return true;
   }
 
-  // 4. Markdown como raíz (``` sin parsear)
-  if (/^"?```/.test(str.trim())) {
-    console.log('[GarbageDetector] BASURA: markdown sin parsear');
+  // ── REGLA 3: HTML masivo (error page del servidor) ───────────────────────────
+  if (/<html[\s>]|<body[\s>]|<!DOCTYPE/i.test(str)) {
+    console.log('[GarbageDetector] BASURA: respuesta es página HTML');
     return true;
   }
 
-  // 5. Nulls masivos (> 60% de campos) — solo en respuestas grandes
+  // ── REGLA 4: Markdown sin parsear como raíz ──────────────────────────────────
+  if (/^["']?```/.test(str.trim())) {
+    console.log('[GarbageDetector] BASURA: markdown sin parsear como raíz');
+    return true;
+  }
+
+  // ── REGLA 5: Nulls masivos (>70% de campos) — SOLO en respuestas grandes ────
   const totalFields = (str.match(/:/g) || []).length;
-  if (totalFields > 10) {
-    const nullCount = (str.match(/null/g) || []).length;
-    if (nullCount / totalFields > 0.6) {
-      console.log(`[GarbageDetector] BASURA: nulls masivos (${nullCount}/${totalFields} campos)`);
+  if (totalFields > 15) {
+    const nullCount = (str.match(/\bnull\b/g) || []).length;
+    if (nullCount / totalFields > 0.7) {
+      console.log(`[GarbageDetector] BASURA: nulls masivos (${nullCount}/${totalFields} = ${Math.round(nullCount/totalFields*100)}%)`);
       return true;
     }
   }
 
-  // ── Validaciones específicas por campo esperado ──────────────────────────────
+  // ── Validaciones por tipo de campo esperado ───────────────────────────────────
 
   if (expectedField === 'activities') {
     const items = Array.isArray(response?.activities) ? response.activities
                 : Array.isArray(response) ? response
                 : null;
 
+    // BASURA REAL: no existe el array
     if (!items) {
-      console.log('[GarbageDetector] BASURA: no se encontró array de actividades');
+      console.log('[GarbageDetector] BASURA: no se encontró array de actividades en la respuesta');
       return true;
     }
 
+    // BASURA REAL: array vacío
     if (items.length === 0) {
-      console.log('[GarbageDetector] BASURA: array de actividades vacío');
+      console.log('[GarbageDetector] BASURA: array de actividades vacío (length === 0)');
       return true;
     }
 
-    // Contar actividades con campos mínimos (question + type)
-    const MIN_VALID = 4;
-    const validItems = items.filter(a => a?.question && typeof a.question === 'string' && a.question.trim().length > 0 && a?.type);
-    console.log(`[GarbageDetector] actividades totales: ${items.length}, válidas (question+type): ${validItems.length}`);
+    // Verificar que existan objetos con al menos question O type (umbral muy bajo)
+    // Para matemáticas, "2 + 3 = ?" es una pregunta válida aunque sea corta
+    const itemsWithQuestion = items.filter(a => a && typeof a === 'object' && a.question !== undefined && a.question !== null);
+    const itemsWithType = items.filter(a => a && typeof a === 'object' && a.type);
+    const itemsCompletelyEmpty = items.filter(a => !a || typeof a !== 'object' || (!a.question && !a.type));
 
-    if (validItems.length < MIN_VALID) {
-      console.log(`[GarbageDetector] BASURA: solo ${validItems.length} actividades válidas, mínimo requerido: ${MIN_VALID}`);
+    console.log(`[GarbageDetector] items total: ${items.length} | con question: ${itemsWithQuestion.length} | con type: ${itemsWithType.length} | completamente vacíos: ${itemsCompletelyEmpty.length}`);
+
+    // Solo es basura si MÁS DEL 70% de los items están completamente vacíos
+    if (items.length > 0 && itemsCompletelyEmpty.length / items.length > 0.7) {
+      const reasons = itemsCompletelyEmpty.slice(0, 3).map((a, i) =>
+        `item[${i}]: question="${a?.question ?? 'MISSING'}", type="${a?.type ?? 'MISSING'}"`
+      );
+      console.log(`[GarbageDetector] BASURA: ${itemsCompletelyEmpty.length}/${items.length} items completamente vacíos`);
+      reasons.forEach(r => console.log(`  → ${r}`));
       return true;
     }
 
-    // Detectar duplicados masivos (todas las preguntas iguales)
-    const questions = validItems.map(a => a.question.trim().toLowerCase());
-    const uniqueQ = new Set(questions);
-    if (uniqueQ.size === 1 && validItems.length > 2) {
-      console.log('[GarbageDetector] BASURA: todas las preguntas son idénticas');
+    // Necesitamos al menos 1 actividad con question (aunque sea muy corta)
+    if (itemsWithQuestion.length === 0) {
+      console.log('[GarbageDetector] BASURA: ninguna actividad tiene campo question');
       return true;
     }
 
-    console.log(`[GarbageDetector] OK: ${validItems.length} actividades válidas${isMath ? ' [modo math]' : ''}`);
+    // Detectar duplicados masivos (TODAS las preguntas exactamente iguales)
+    const nonEmptyQuestions = itemsWithQuestion
+      .map(a => String(a.question).trim().toLowerCase())
+      .filter(q => q.length > 0);
+    if (nonEmptyQuestions.length > 2) {
+      const uniqueQ = new Set(nonEmptyQuestions);
+      if (uniqueQ.size === 1) {
+        console.log(`[GarbageDetector] BASURA: todas las ${nonEmptyQuestions.length} preguntas son idénticas: "${nonEmptyQuestions[0].slice(0,60)}"`);
+        return true;
+      }
+    }
+
+    console.log(`[GarbageDetector] ✅ OK: ${items.length} actividades aceptadas (${itemsWithQuestion.length} con question, ${itemsWithType.length} con type) — materia: "${subjectName}"`);
     return false;
   }
 
   if (expectedField === 'lesson') {
-    if (!response?.title || !response?.explanation) {
-      console.log('[GarbageDetector] BASURA: lesson sin title o explanation');
+    // Solo rechazar si faltan AMBOS campos críticos
+    if (!response?.title && !response?.explanation) {
+      console.log('[GarbageDetector] BASURA: lesson sin title NI explanation');
       return true;
     }
-    // Math permite títulos y explicaciones muy cortos
-    const minTitleLen = isMath ? 1 : 3;
-    const minExplLen = isMath ? 5 : 10;
-    if (response.title.length < minTitleLen) {
-      console.log(`[GarbageDetector] BASURA: title demasiado corto (${response.title.length} chars)`);
+    // Aceptar títulos y explicaciones de cualquier longitud (incluso "x²" es válido)
+    const title = response.title ? String(response.title).trim() : '';
+    const expl = response.explanation ? String(response.explanation).trim() : '';
+    if (!title && !expl) {
+      console.log('[GarbageDetector] BASURA: lesson con title y explanation vacíos');
       return true;
     }
-    if (response.explanation.length < minExplLen) {
-      console.log(`[GarbageDetector] BASURA: explanation demasiado corta (${response.explanation.length} chars)`);
-      return true;
-    }
-    console.log('[GarbageDetector] OK: lesson válida');
+    console.log(`[GarbageDetector] ✅ OK: lesson válida — title="${title.slice(0,40)}" (${title.length} chars), expl=${expl.length} chars`);
     return false;
   }
 
