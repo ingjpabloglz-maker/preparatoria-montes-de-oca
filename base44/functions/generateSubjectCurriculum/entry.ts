@@ -108,6 +108,84 @@ function sanitizeActivity(activity) {
   return safe;
 }
 
+// ─── CAPA FINAL: normalizeForPersistence ─────────────────────────────────────
+function normalizeForPersistence(activity) {
+  const a = { ...activity };
+  const isArrayType = ARRAY_ANSWER_TYPES.includes(a.type);
+
+  // --- question ---
+  if (!a.question || typeof a.question !== 'string') a.question = 'Pregunta no disponible';
+
+  // --- correct_answer ---
+  if (isArrayType) {
+    a.correct_answer = '';
+  } else {
+    if (a.correct_answer === null || a.correct_answer === undefined) a.correct_answer = '';
+    else if (Array.isArray(a.correct_answer)) a.correct_answer = a.correct_answer.length > 0 ? String(a.correct_answer[0]) : '';
+    else if (typeof a.correct_answer === 'object') a.correct_answer = JSON.stringify(a.correct_answer);
+    else a.correct_answer = String(a.correct_answer);
+  }
+
+  // --- correct_answers ---
+  if (isArrayType) {
+    if (a.correct_answers === null || a.correct_answers === undefined) a.correct_answers = [];
+    else if (typeof a.correct_answers === 'string') a.correct_answers = [a.correct_answers].filter(Boolean);
+    else if (typeof a.correct_answers === 'number') a.correct_answers = [String(a.correct_answers)];
+    else if (!Array.isArray(a.correct_answers) && typeof a.correct_answers === 'object') a.correct_answers = Object.values(a.correct_answers).map(String).filter(Boolean);
+    else if (Array.isArray(a.correct_answers)) a.correct_answers = a.correct_answers.map(String).filter(Boolean);
+    else a.correct_answers = [];
+  } else {
+    a.correct_answers = [];
+  }
+
+  // --- explanation_levels ---
+  const expl = a.explanation || a.question || 'Explicación no disponible';
+  if (!a.explanation_levels || Array.isArray(a.explanation_levels)) {
+    a.explanation_levels = { basic: expl, detailed: expl, example: 'Sin ejemplo' };
+  } else if (typeof a.explanation_levels === 'string') {
+    a.explanation_levels = { basic: a.explanation_levels, detailed: a.explanation_levels, example: 'Sin ejemplo' };
+  } else if (typeof a.explanation_levels === 'object') {
+    a.explanation_levels = {
+      basic: typeof a.explanation_levels.basic === 'string' ? a.explanation_levels.basic : expl,
+      detailed: typeof a.explanation_levels.detailed === 'string' ? a.explanation_levels.detailed : expl,
+      example: typeof a.explanation_levels.example === 'string' ? a.explanation_levels.example : 'Sin ejemplo',
+    };
+  } else {
+    a.explanation_levels = { basic: expl, detailed: expl, example: 'Sin ejemplo' };
+  }
+
+  // --- options ---
+  if (!Array.isArray(a.options)) a.options = [];
+  else a.options = a.options.map(String).filter(Boolean);
+
+  // --- hints ---
+  if (!Array.isArray(a.hints)) a.hints = [];
+  else a.hints = a.hints.map(String).filter(Boolean);
+
+  // --- steps ---
+  if (!Array.isArray(a.steps)) a.steps = [];
+
+  // --- drag_items / drop_targets ---
+  if (!Array.isArray(a.drag_items)) a.drag_items = [];
+  else a.drag_items = a.drag_items.map(String).filter(Boolean);
+  if (!Array.isArray(a.drop_targets)) a.drop_targets = [];
+  else a.drop_targets = a.drop_targets.map(String).filter(Boolean);
+
+  // --- points ---
+  if (typeof a.points !== 'number' || isNaN(a.points) || a.points < 0) a.points = 10;
+
+  return a;
+}
+
+function assertValidForPersistence(activity) {
+  if (typeof activity.correct_answer !== 'string') throw new Error(`correct_answer debe ser string, got: ${typeof activity.correct_answer}`);
+  if (!Array.isArray(activity.correct_answers)) throw new Error(`correct_answers debe ser array, got: ${typeof activity.correct_answers}`);
+  if (typeof activity.explanation_levels !== 'object' || Array.isArray(activity.explanation_levels) || activity.explanation_levels === null) throw new Error(`explanation_levels debe ser object`);
+  if (typeof activity.explanation_levels.basic !== 'string') throw new Error(`explanation_levels.basic debe ser string`);
+  if (typeof activity.explanation_levels.detailed !== 'string') throw new Error(`explanation_levels.detailed debe ser string`);
+  if (typeof activity.explanation_levels.example !== 'string') throw new Error(`explanation_levels.example debe ser string`);
+}
+
 // ─── VALIDACIÓN ESTRICTA ──────────────────────────────────────────────────────
 function validateActivity(act) {
   if (!act.question?.toString().trim()) return 'question vacío';
@@ -316,30 +394,43 @@ CALIDAD: explanation_levels {basic,detailed,example}, incorrect_feedback {defaul
     }
   }
 
-  // Guardar actividades con campo dual estricto
+  // Guardar actividades — siempre pasar por normalizeForPersistence antes de create
   let activitiesCreated = 0;
   for (let i = 0; i < valid.length; i++) {
     const act = valid[i];
     const isArrayType = ARRAY_ANSWER_TYPES.includes(act.type);
-    const actData = {
+    const raw = {
       lesson_id: lesson.id,
       type: act.type,
-      question: act.question.trim(),
+      question: act.question,
       options: act.options || [],
       correct_answer: isArrayType ? '' : (act.correct_answer || ''),
       correct_answers: isArrayType ? (act.correct_answers || []) : [],
       accepted_answers: act.accepted_answers || [],
       explanation: act.explanation || '',
-      explanation_levels: normalizeExplanationLevels(act.explanation_levels, act.question),
+      explanation_levels: act.explanation_levels,
       incorrect_feedback: act.incorrect_feedback || null,
       hints: act.hints || [],
       difficulty: act.difficulty || 'medium',
       points: act.points || 10,
       order: i + 1,
       grading_type: 'auto',
+      steps: act.type === 'step_by_step' ? (act.steps || []) : [],
+      drag_items: act.type === 'drag_drop' ? (act.drag_items || []) : [],
+      drop_targets: act.type === 'drag_drop' ? (act.drop_targets || []) : [],
     };
-    if (act.type === 'step_by_step') actData.steps = act.steps;
-    if (act.type === 'drag_drop') { actData.drag_items = act.drag_items; actData.drop_targets = act.drop_targets; }
+
+    const actData = normalizeForPersistence(raw);
+    assertValidForPersistence(actData);
+
+    console.log('FINAL_ACTIVITY_PAYLOAD', {
+      type: actData.type,
+      correct_answer_type: typeof actData.correct_answer,
+      correct_answers_is_array: Array.isArray(actData.correct_answers),
+      explanation_levels_type: typeof actData.explanation_levels,
+      explanation_levels: actData.explanation_levels,
+    });
+
     await base44.asServiceRole.entities.CourseActivity.create(actData);
     activitiesCreated++;
   }
