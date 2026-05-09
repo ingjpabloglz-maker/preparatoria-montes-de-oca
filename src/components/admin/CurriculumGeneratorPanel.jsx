@@ -329,31 +329,49 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
     setGenRecord(null);
     setJobRecord(null);
 
-    const res = await base44.functions.invoke('generateSubjectCurriculum', {
-      subject_id: subject.id,
-      overwrite,
-      safe_mode: safeMode,
-      generation_mode: generationMode,
-    });
+    try {
+      const res = await base44.functions.invoke('generateSubjectCurriculum', {
+        subject_id: subject.id,
+        overwrite,
+        safe_mode: safeMode,
+        generation_mode: generationMode,
+      });
 
-    const data = res.data;
-    if (data?.success && data?.generation_id) {
-      setGenId(data.generation_id);
-      if (data.job_id) setJobId(data.job_id);
-      toast.info(`Generación iniciada — ${data.total_lessons} lecciones planificadas`);
-    } else if (data?.locked) {
-      setStatus('idle');
-      toast.error(`🔒 ${data.error}`);
-    } else if (data?.has_content) {
-      setHasExisting(true);
-      setStatus('idle');
-      toast.warning('Ya existe contenido. Activa "Sobreescribir" en el preview.');
-    } else if (data?.no_syllabus) {
-      setStatus('idle');
-      toast.error('Define el temario antes de generar.');
-    } else {
-      setStatus('failed');
-      toast.error(`Error: ${data?.error || 'Desconocido'}`);
+      const data = res.data;
+      if (data?.success && data?.generation_id) {
+        setGenId(data.generation_id);
+        if (data.job_id) setJobId(data.job_id);
+        toast.info(`Generación iniciada — ${data.total_lessons} lecciones planificadas`);
+      } else if (data?.locked) {
+        setStatus('idle');
+        toast.error(`🔒 ${data.error}`);
+      } else if (data?.has_content) {
+        setHasExisting(true);
+        setStatus('idle');
+        toast.warning('Ya existe contenido. Activa "Sobreescribir" en el preview.');
+      } else if (data?.no_syllabus) {
+        setStatus('idle');
+        toast.error('Define el temario antes de generar.');
+      } else {
+        setStatus('failed');
+        toast.error(`Error: ${data?.error || 'Desconocido'}`);
+      }
+    } catch (e) {
+      const data = e?.response?.data;
+      if (data?.locked) {
+        setStatus('idle');
+        toast.error(`🔒 ${data.error}`);
+      } else if (data?.has_content) {
+        setHasExisting(true);
+        setStatus('idle');
+        toast.warning('Ya existe contenido. Activa "Sobreescribir" en el preview.');
+      } else if (data?.no_syllabus) {
+        setStatus('idle');
+        toast.error('Define el temario antes de generar.');
+      } else {
+        setStatus('idle');
+        toast.error(`Error: ${data?.error || e.message}`);
+      }
     }
   };
 
