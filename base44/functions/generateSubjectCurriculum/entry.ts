@@ -502,11 +502,17 @@ function normalizeForPersistence(activity) {
 }
 
 function validateActivity(act) {
-  if (!act.question?.toString().trim()) return 'question vacío';
+  // Solo rechazar si question está completamente ausente o es un objeto no-string
+  if (act.question === undefined || act.question === null) return 'question ausente';
+  if (typeof act.question !== 'string' && typeof act.question !== 'number') return 'question tipo inválido';
+  // Aceptar preguntas numéricas cortas: "2+3", "x²", "5/8" son válidas
+  if (String(act.question).trim().length === 0) return 'question vacío';
+
   if (!VALID_TYPES.includes(act.type)) return `tipo inválido: ${act.type}`;
+
   if (act.type === 'multiple_choice') {
     if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
-    if (!act.correct_answer?.trim()) return 'correct_answer vacío';
+    if (!act.correct_answer && act.correct_answer !== 0) return 'correct_answer vacío';
   }
   if (act.type === 'multiple_select') {
     if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
@@ -521,7 +527,9 @@ function validateActivity(act) {
     if (!['verdadero','falso','true','false'].includes(ca)) return `correct_answer inválido: ${ca}`;
   }
   if (act.type === 'fill_blank' || act.type === 'solve') {
-    if (!act.correct_answer && (!Array.isArray(act.accepted_answers) || act.accepted_answers.length === 0)) return 'correct_answer requerido';
+    const hasAnswer = (act.correct_answer !== undefined && act.correct_answer !== null && String(act.correct_answer).trim().length > 0)
+      || (Array.isArray(act.accepted_answers) && act.accepted_answers.length > 0);
+    if (!hasAnswer) return 'correct_answer requerido';
   }
   if (act.type === 'drag_drop') {
     if (!Array.isArray(act.drag_items) || !act.drag_items.length) return 'drag_items vacío';
@@ -530,8 +538,9 @@ function validateActivity(act) {
   if (act.type === 'step_by_step') {
     if (!Array.isArray(act.steps) || act.steps.length < 2) return 'steps requiere mínimo 2';
   }
-  // Explanation no vacía
-  if (!act.explanation || act.explanation.trim().length < 3) return 'explanation vacía';
+  // Explanation: aceptar cualquier string no vacío (incluso "Ver solución" o "4")
+  // NO rechazar por longitud — matemáticas puede tener explicaciones muy cortas
+  if (act.explanation !== undefined && act.explanation !== null && typeof act.explanation !== 'string') return 'explanation tipo inválido';
   return null;
 }
 
