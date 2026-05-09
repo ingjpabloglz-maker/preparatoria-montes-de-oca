@@ -1,0 +1,122 @@
+{
+  "name": "CurriculumGenerationJob",
+  "type": "object",
+  "properties": {
+    "subject_id": {
+      "type": "string",
+      "description": "ID de la materia"
+    },
+    "subject_name": {
+      "type": "string",
+      "description": "Nombre de la materia"
+    },
+    "batch_id": {
+      "type": "string",
+      "description": "UUID \u00fanico del batch"
+    },
+    "generation_version": {
+      "type": "number",
+      "default": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "paused",
+        "completed",
+        "failed"
+      ],
+      "default": "pending"
+    },
+    "total_lessons": {
+      "type": "number",
+      "default": 0
+    },
+    "completed_lessons": {
+      "type": "number",
+      "default": 0
+    },
+    "failed_lessons": {
+      "type": "number",
+      "default": 0
+    },
+    "skipped_lessons": {
+      "type": "number",
+      "default": 0
+    },
+    "current_unit": {
+      "type": "string"
+    },
+    "current_module": {
+      "type": "string"
+    },
+    "current_lesson": {
+      "type": "string"
+    },
+    "progress_percent": {
+      "type": "number",
+      "default": 0
+    },
+    "logs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_activity_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "retry_count": {
+      "type": "number",
+      "default": 0
+    },
+    "overwrite": {
+      "type": "boolean",
+      "default": false
+    },
+    "started_by": {
+      "type": "string"
+    },
+    "error_message": {
+      "type": "string"
+    },
+    "units_created": {
+      "type": "number",
+      "default": 0
+    },
+    "modules_created": {
+      "type": "number",
+      "default": 0
+    },
+    "activities_created": {
+      "type": "number",
+      "default": 0
+    },
+    "avg_lesson_seconds": {
+      "type": "number",
+      "default": 0
+    },
+    "total_duration_seconds": {
+      "type": "number",
+      "default": 0
+    },
+    "rate_limit_hits": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "subject_id",
+    "batch_id"
+  ]
+}
