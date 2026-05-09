@@ -393,20 +393,9 @@ IMPORTANTE: devuelve SOLO el JSON, sin bloques de código markdown.`,
     });
   }, [lesson?.id]);
 
-  const generateVisuals = async (visuals) => {
-    if (!visuals?.length) return;
-    setLoadingVisuals(true);
-    // Secuencial — sin Promise.all
-    const generated = [];
-    for (const v of visuals.slice(0, 2)) {
-      try {
-        const res = await base44.integrations.Core.GenerateImage({ prompt: v.prompt });
-        if (res?.url) generated.push({ ...v, url: res.url });
-      } catch {
-        // silent — imagen no crítica
-      }
-    }
-    setLessonVisuals(generated);
+  // Generación de imágenes desactivada — reducción de consumo de créditos
+  const generateVisuals = async (_visuals) => {
+    setLessonVisuals([]);
     setLoadingVisuals(false);
   };
 

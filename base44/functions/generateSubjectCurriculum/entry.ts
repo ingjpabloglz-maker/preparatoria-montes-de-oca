@@ -22,6 +22,19 @@ const BACKOFF_DELAYS = [0, 5000, 15000, 45000];
 const WATCHDOG_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos
 const CIRCUIT_BREAKER_THRESHOLD = 5; // fallos consecutivos
 
+// Modos de generación
+const GENERATION_MODES = {
+  lightweight: { normal_min: 4, normal_max: 4, mini_min: 5, mini_max: 5, only_basic_explanation: true, max_advanced_types: 1 },
+  standard:    { normal_min: 4, normal_max: 6, mini_min: 5, mini_max: 7, only_basic_explanation: true, max_advanced_types: 1 },
+  rich:        { normal_min: 7, normal_max: 10, mini_min: 10, mini_max: 14, only_basic_explanation: false, max_advanced_types: 3 },
+};
+
+// Tipos avanzados — se elige 1 aleatorio por lección
+const ADVANCED_TYPES = ['drag_drop', 'step_by_step', 'multiple_select'];
+
+// Tokens estimados por modo (para preview)
+const TOKENS_PER_LESSON = { lightweight: 700, standard: 1100, rich: 1800 };
+
 // ─── Timestamp ────────────────────────────────────────────────────────────────
 function ts() {
   return new Date().toLocaleTimeString('es-MX', { hour12: false });
@@ -171,69 +184,44 @@ function isGarbageLLMResponse(response, expectedField = 'activities') {
 // ═══════════════════════════════════════════════════════════════════════════════
 // #5 CACHE DE PROMPTS
 // ═══════════════════════════════════════════════════════════════════════════════
-const SYSTEM_PROMPT_BASE = `Eres experto en diseño instruccional para preparatoria mexicana. Generas contenido educativo de alta calidad, riguroso y pedagógicamente correcto.`;
+// ── Prompt cache compacto ──────────────────────────────────────────────────────
+const SYS = `Experto en diseño instruccional para preparatoria SEP México. Genera contenido educativo riguroso.`;
 
-const PEDAGOGICAL_RULES = `REGLAS PEDAGÓGICAS:
-- Contenido alineado al programa de preparatoria mexicana SEP
-- Lenguaje claro, preciso, apropiado para adolescentes
-- Ejemplos contextualizados a la realidad mexicana
-- Dificultad progresiva dentro de la lección`;
+const RULES_SHORT = `REGLAS: contenido SEP México, lenguaje claro para adolescentes, ejemplos contextualizados.`;
 
-const JSON_RULES_ACTIVITIES = `REGLAS JSON CRÍTICAS:
-- multiple_choice: options=[4 opciones], correct_answer=texto exacto de una opción
-- true_false: options=["Verdadero","Falso"], correct_answer="Verdadero" o "Falso"
-- multiple_select: correct_answers=ARRAY de strings. NO usar correct_answer
-- order_steps: correct_answers=ARRAY en orden correcto. NO usar correct_answer
-- drag_drop: drag_items=array, drop_targets=array, correct_answer=JSON string del mapeo
+const JSON_RULES = `JSON OBLIGATORIO:
+- multiple_choice: options=[4], correct_answer=texto exacto de opción
+- true_false: options=["Verdadero","Falso"], correct_answer="Verdadero"|"Falso"
+- multiple_select: correct_answers=ARRAY, NO correct_answer
+- order_steps: correct_answers=ARRAY orden correcto, NO correct_answer
+- drag_drop: drag_items=[], drop_targets=[], correct_answer=JSON mapeo
 - step_by_step: steps=[{instruction,answer,hint}], correct_answer="step_by_step"
-- fill_blank / solve: correct_answer=string, accepted_answers=array de variantes válidas
-- NUNCA mezclar correct_answer y correct_answers en la misma actividad
-- explanation_levels: {basic: string, detailed: string, example: string} — SIEMPRE presentes
-- hints: array de máx 2 pistas progresivas
-- points: easy=8, medium=10, hard=14
-- Para matemáticas usar LaTeX inline: $expresión$`;
+- fill_blank/solve: correct_answer=string, accepted_answers=[]
+- explanation_levels: {basic:string} SIEMPRE. Omitir detailed/example.
+- hints: máx 2 pistas. points: easy=8,medium=10,hard=14
+- Matemáticas: LaTeX inline $expr$`;
 
 function buildLessonContentPrompt(topic, subjectName, isMiniEval, difficulty, keywords) {
-  const diffHint = { easy: 'introductoria', medium: 'intermedia', hard: 'avanzada' }[difficulty] || 'intermedia';
-  const kwHint = keywords?.length ? `\nPalabras clave: ${keywords.join(', ')}` : '';
-  return `${SYSTEM_PROMPT_BASE}
-
-TEMA: "${topic}"
-MATERIA: "${subjectName}"
-TIPO: ${isMiniEval ? 'MINI EVALUACIÓN (evaluación formativa del módulo)' : 'LECCIÓN NORMAL'}
-DIFICULTAD: ${diffHint}${kwHint}
-
-${PEDAGOGICAL_RULES}
-
-Genera un objeto JSON con:
-- title: título claro y específico (máx 8 palabras)
-- explanation: explicación teórica completa (mín 80 palabras, máx 150). Para matemáticas usa LaTeX: $x^2$, $\\frac{a}{b}$.
-
-Devuelve SOLO JSON válido: {"title":"...","explanation":"..."}`;
+  const diff = { easy: 'básica', medium: 'intermedia', hard: 'avanzada' }[difficulty] || 'intermedia';
+  const kw = keywords?.length ? ` [${keywords.slice(0,4).join(', ')}]` : '';
+  return `${SYS}
+TEMA:"${topic}" MATERIA:"${subjectName}" DIFICULTAD:${diff}${kw}
+${RULES_SHORT}
+Genera JSON: {"title":"título ≤8 palabras","explanation":"texto 60-120 palabras. LaTeX para fórmulas: $x^2$"}
+SOLO JSON.`;
 }
 
-function buildActivitiesPrompt(lessonTitle, subjectName, lessonExpl, isMiniEval, count, easyCount, mediumCount, hardCount) {
-  const typeInstructions = isMiniEval
-    ? 'DISTRIBUCIÓN REQUERIDA: mínimo 2 multiple_choice, 2 true_false, 1 fill_blank, 1 multiple_select, 1 drag_drop, 1 step_by_step, 1 order_steps, 1 solve.'
-    : 'DISTRIBUCIÓN REQUERIDA: mínimo 2 multiple_choice, 1 true_false, 1 fill_blank, 1 solve, 1 order_steps.';
-
-  return `${SYSTEM_PROMPT_BASE}
-
-LECCIÓN: "${lessonTitle}"
-MATERIA: "${subjectName}"
-CONTENIDO DE LA LECCIÓN: "${lessonExpl}"
-TIPO: ${isMiniEval ? 'MINI EVALUACIÓN' : 'LECCIÓN NORMAL'}
-
-${PEDAGOGICAL_RULES}
-
-Genera exactamente ${count} actividades interactivas.
-${typeInstructions}
-DIFICULTAD: ${easyCount} easy, ${mediumCount} medium, ${hardCount} hard.
-TIPOS DISPONIBLES: multiple_choice, true_false, fill_blank, solve, order_steps, multiple_select, drag_drop, step_by_step.
-
-${JSON_RULES_ACTIVITIES}
-
-Devuelve SOLO JSON válido: {"activities":[...]}`;
+function buildActivitiesPrompt(lessonTitle, subjectName, lessonExpl, isMiniEval, count, easyCount, mediumCount, hardCount, advancedType) {
+  const baseTypes = 'multiple_choice,true_false,fill_blank';
+  const advLine = advancedType ? `. 1 actividad tipo ${advancedType}` : '';
+  return `${SYS}
+LECCIÓN:"${lessonTitle}" MATERIA:"${subjectName}"
+CONTEXTO:"${lessonExpl.slice(0,200)}"
+${RULES_SHORT}
+Genera ${count} actividades. Incluye: ${baseTypes}${advLine}.
+Dificultad: ${easyCount} easy, ${mediumCount} medium, ${hardCount} hard.
+${JSON_RULES}
+SOLO JSON: {"activities":[...]}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -321,14 +309,11 @@ async function syncLegacyProgress(base44, genId, patch) {
 
 // ─── Normalización y sanitización ────────────────────────────────────────────
 function normalizeExplanationLevels(raw, question) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { basic: `La respuesta correcta es la indicada.`, detailed: `Explicación del procedimiento.`, example: `Aplica el mismo procedimiento.` };
-  }
-  return {
-    basic: typeof raw.basic === 'string' && raw.basic.trim() ? raw.basic : `Respuesta correcta.`,
-    detailed: typeof raw.detailed === 'string' && raw.detailed.trim() ? raw.detailed : `Explicación paso a paso.`,
-    example: typeof raw.example === 'string' && raw.example.trim() ? raw.example : `Ejemplo similar.`,
-  };
+  const basic = (raw && typeof raw === 'object' && !Array.isArray(raw) && typeof raw.basic === 'string' && raw.basic.trim())
+    ? raw.basic
+    : (typeof raw === 'string' && raw.trim() ? raw : `La respuesta correcta es la indicada.`);
+  // Solo generar basic; detailed/example se generan on-demand
+  return { basic, detailed: '', example: '' };
 }
 
 function sanitizeActivity(activity) {
@@ -384,14 +369,14 @@ function normalizeForPersistence(activity) {
   } else { a.correct_answers = []; }
   const expl = a.explanation || a.question || 'Explicación no disponible';
   if (!a.explanation_levels || Array.isArray(a.explanation_levels)) {
-    a.explanation_levels = { basic: expl, detailed: expl, example: 'Sin ejemplo' };
+    a.explanation_levels = { basic: expl, detailed: '', example: '' };
   } else if (typeof a.explanation_levels === 'string') {
-    a.explanation_levels = { basic: a.explanation_levels, detailed: a.explanation_levels, example: 'Sin ejemplo' };
+    a.explanation_levels = { basic: a.explanation_levels, detailed: '', example: '' };
   } else {
     a.explanation_levels = {
-      basic: typeof a.explanation_levels.basic === 'string' ? a.explanation_levels.basic : expl,
-      detailed: typeof a.explanation_levels.detailed === 'string' ? a.explanation_levels.detailed : expl,
-      example: typeof a.explanation_levels.example === 'string' ? a.explanation_levels.example : 'Sin ejemplo',
+      basic: typeof a.explanation_levels.basic === 'string' && a.explanation_levels.basic.trim() ? a.explanation_levels.basic : expl,
+      detailed: '',
+      example: '',
     };
   }
   if (!Array.isArray(a.options)) a.options = []; else a.options = a.options.map(String).filter(Boolean);
@@ -554,8 +539,9 @@ function buildStructureFromSyllabus(syllabus) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // GENERAR 1 LECCIÓN — con transacciones, validación post-gen, math normalizer
 // ═══════════════════════════════════════════════════════════════════════════════
-async function generateOneLesson(base44, params, batchId, logFn, metrics) {
+async function generateOneLesson(base44, params, batchId, logFn, metrics, modeConfig) {
   const { module_id, subject_id, subject_name, topic, is_mini_eval, lesson_order, difficulty, keywords } = params;
+  const cfg = modeConfig || GENERATION_MODES.standard;
   const t0 = Date.now();
   await logFn(`[${ts()}] 📝 Generando lección: "${topic}" ${is_mini_eval ? '(mini-eval)' : ''}`);
 
@@ -626,12 +612,14 @@ async function generateOneLesson(base44, params, batchId, logFn, metrics) {
     await logFn(`[${ts()}] 🏗️ Lección creada: "${lessonTitle}"`);
 
     // LLM #2: Actividades con garbage detection + retry
-    const min = is_mini_eval ? 10 : 7;
-    const max = is_mini_eval ? 14 : 10;
+    const min = is_mini_eval ? cfg.mini_min : cfg.normal_min;
+    const max = is_mini_eval ? cfg.mini_max : cfg.normal_max;
     const count = Math.floor(Math.random() * (max - min + 1)) + min;
     const easyCount = Math.round(count * 0.4);
     const hardCount = Math.round(count * 0.2);
     const mediumCount = count - easyCount - hardCount;
+    // 1 tipo avanzado aleatorio por lección (o ninguno en lightweight si es normal)
+    const advancedType = ADVANCED_TYPES[Math.floor(Math.random() * ADVANCED_TYPES.length)];
 
     const valid = [];
     let activitiesRaw = null;
@@ -639,7 +627,7 @@ async function generateOneLesson(base44, params, batchId, logFn, metrics) {
 
     while (garbageRetries < 2) {
       try {
-        const prompt2 = buildActivitiesPrompt(lessonTitle, subject_name, lessonExpl, is_mini_eval, count, easyCount, mediumCount, hardCount);
+        const prompt2 = buildActivitiesPrompt(lessonTitle, subject_name, lessonExpl, is_mini_eval, count, easyCount, mediumCount, hardCount, advancedType);
         const rawActs = await safeInvokeLLM(
           base44, prompt2,
           { response_json_schema: { type:'object', properties:{ activities:{type:'array', items:{type:'object'}} } } },
@@ -802,10 +790,11 @@ Deno.serve(async (req) => {
 
     // ── PREVIEW MODE — retorna estimaciones sin generar ──────────────────────
     if (preview_only) {
-      const avgSecsPerLesson = 35; // estimación conservadora
-      const avgTokensPerLesson = 1800;
+      const mode = body.generation_mode || 'standard';
+      const tokensPerLesson = TOKENS_PER_LESSON[mode] || TOKENS_PER_LESSON.standard;
+      const avgSecsPerLesson = mode === 'lightweight' ? 20 : mode === 'standard' ? 28 : 40;
       const estimatedMinutes = Math.ceil((totalLessons * avgSecsPerLesson) / 60);
-      const estimatedTokens = totalLessons * avgTokensPerLesson;
+      const estimatedTokens = totalLessons * tokensPerLesson;
 
       return Response.json({
         preview: true,
@@ -815,6 +804,7 @@ Deno.serve(async (req) => {
         total_lessons: totalLessons,
         estimated_minutes: estimatedMinutes,
         estimated_tokens: estimatedTokens,
+        generation_mode: mode,
         structure_summary: structure.map(u => ({
           title: u.title,
           modules: u.modules.map(m => ({
@@ -888,6 +878,9 @@ Deno.serve(async (req) => {
       activities_created: 0,
     });
 
+    const generationMode = body.generation_mode || 'standard';
+    const modeConfig = GENERATION_MODES[generationMode] || GENERATION_MODES.standard;
+
     const responsePayload = {
       success: true,
       generation_id: genId,
@@ -896,6 +889,7 @@ Deno.serve(async (req) => {
       record_id: genRecord.id,
       total_lessons: totalLessons,
       safe_mode,
+      generation_mode: generationMode,
     };
 
     // ── Background: generación secuencial ────────────────────────────────────
@@ -1046,7 +1040,7 @@ Deno.serve(async (req) => {
                   lesson_order: lessonBlueprint.order,
                   difficulty: lessonBlueprint.difficulty || 'medium',
                   keywords: lessonBlueprint.keywords || [],
-                }, batchId, log, metrics);
+                }, batchId, log, metrics, modeConfig);
 
                 if (result.skipped) {
                   skippedLessons++;

@@ -13,8 +13,32 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+const MODE_OPTIONS = [
+  {
+    value: 'lightweight',
+    label: '⚡ Ligero',
+    desc: '4 act/lección · solo explicación básica · 1 tipo avanzado · mínimo tokens',
+    color: 'border-green-400 bg-green-50',
+    badge: 'bg-green-100 text-green-700',
+  },
+  {
+    value: 'standard',
+    label: '📘 Estándar',
+    desc: '4–6 act/lección · explicación básica · 1 tipo avanzado · balance calidad/costo',
+    color: 'border-blue-400 bg-blue-50',
+    badge: 'bg-blue-100 text-blue-700',
+  },
+  {
+    value: 'rich',
+    label: '🎓 Completo',
+    desc: '7–10 act/lección · todos los tipos · mayor calidad y cobertura',
+    color: 'border-violet-400 bg-violet-50',
+    badge: 'bg-violet-100 text-violet-700',
+  },
+];
+
 // ─── Preview Modal ─────────────────────────────────────────────────────────────
-function PreviewModal({ preview, onConfirm, onCancel, safeMode, setSafeMode, overwrite, setOverwrite }) {
+function PreviewModal({ preview, onConfirm, onCancel, safeMode, setSafeMode, overwrite, setOverwrite, generationMode, setGenerationMode }) {
   if (!preview) return null;
 
   return (
@@ -50,15 +74,45 @@ function PreviewModal({ preview, onConfirm, onCancel, safeMode, setSafeMode, ove
           </div>
 
           {/* Tokens */}
-          <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 flex items-center justify-between">
-            <span>Tokens estimados</span>
+          <div className={cn(
+            "rounded-lg p-3 text-sm flex items-center justify-between",
+            generationMode === 'lightweight' ? 'bg-green-50 text-green-800' :
+            generationMode === 'rich' ? 'bg-violet-50 text-violet-800' : 'bg-gray-50 text-gray-700'
+          )}>
+            <span>Tokens estimados ({generationMode})</span>
             <span className="font-mono font-semibold">~{Math.round(preview.estimated_tokens / 1000)}k tokens</span>
+          </div>
+
+          {/* Modo de generación */}
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Modo de generación</p>
+            <div className="space-y-2">
+              {MODE_OPTIONS.map(m => (
+                <label key={m.value} className={cn(
+                  "flex items-start gap-3 cursor-pointer rounded-lg p-3 border-2 transition-all",
+                  generationMode === m.value ? m.color + ' border-opacity-100' : 'border-gray-200 bg-white hover:bg-gray-50'
+                )}>
+                  <input
+                    type="radio"
+                    name="generation_mode"
+                    value={m.value}
+                    checked={generationMode === m.value}
+                    onChange={() => setGenerationMode(m.value)}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <span className="font-semibold text-sm text-gray-800">{m.label}</span>
+                    <p className="text-xs text-gray-500 mt-0.5">{m.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
           </div>
 
           {/* Estructura */}
           <div>
             <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Estructura del temario</p>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
+            <div className="space-y-2 max-h-36 overflow-y-auto">
               {preview.structure_summary?.map((u, i) => (
                 <div key={i} className="border rounded-lg p-2.5">
                   <p className="text-xs font-semibold text-gray-700">{u.title}</p>
@@ -166,6 +220,7 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
   const [showLogs, setShowLogs] = useState(false);
   const [overwrite, setOverwrite] = useState(false);
   const [safeMode, setSafeMode] = useState(false);
+  const [generationMode, setGenerationMode] = useState('standard');
   const [preview, setPreview] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -252,6 +307,7 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
       const res = await base44.functions.invoke('generateSubjectCurriculum', {
         subject_id: subject.id,
         preview_only: true,
+        generation_mode: generationMode,
       });
       if (res.data?.preview) {
         setPreview(res.data);
@@ -277,6 +333,7 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
       subject_id: subject.id,
       overwrite,
       safe_mode: safeMode,
+      generation_mode: generationMode,
     });
 
     const data = res.data;
@@ -387,6 +444,8 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
           setSafeMode={setSafeMode}
           overwrite={hasExisting ? overwrite : undefined}
           setOverwrite={setOverwrite}
+          generationMode={generationMode}
+          setGenerationMode={setGenerationMode}
         />
       )}
 
@@ -411,7 +470,7 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
             <span className="flex items-center gap-1.5"><Layers className="w-3.5 h-3.5 text-blue-500" /> Unidades del temario</span>
             <span className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-violet-500" /> Módulos</span>
             <span className="flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5 text-amber-500" /> Lecciones + mini-eval</span>
-            <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-orange-500" /> 7–14 actividades/lección</span>
+            <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-orange-500" /> 4–10 act/lección según modo</span>
           </div>
 
           {/* Barra de progreso */}
