@@ -2,6 +2,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const VALID_TYPES = ['multiple_choice','true_false','fill_blank','solve','order_steps','multiple_select','drag_drop','step_by_step'];
 const ARRAY_ANSWER_TYPES = ['multiple_select', 'order_steps'];
+// Tipos seguros para fallback (sin drag_drop, step_by_step, multiple_select)
+const FALLBACK_TYPES = ['multiple_choice', 'true_false', 'fill_blank'];
 
 // ─── NORMALIZACIÓN: explanation_levels siempre válido ─────────────────────────
 function normalizeExplanationLevels(raw, question) {
@@ -19,30 +21,19 @@ function normalizeExplanationLevels(raw, question) {
   };
 }
 
-// ─── SANITIZACIÓN GLOBAL ROBUSTA: NUNCA rechazar, siempre corregir ─────────────
+// ─── SANITIZACIÓN GLOBAL ROBUSTA ─────────────────────────────────────────────
 function sanitizeActivity(activity) {
   const safe = { ...activity };
 
-  // --- TYPE ---
-  if (!safe.type || !VALID_TYPES.includes(safe.type)) {
-    safe.type = 'multiple_choice';
-  }
+  if (!safe.type || !VALID_TYPES.includes(safe.type)) safe.type = 'multiple_choice';
+  if (!safe.question || typeof safe.question !== 'string') safe.question = 'Selecciona la respuesta correcta';
 
-  // --- QUESTION ---
-  if (!safe.question || typeof safe.question !== 'string') {
-    safe.question = 'Selecciona la respuesta correcta';
-  }
-
-  // --- OPTIONS ---
   if (['multiple_choice', 'multiple_select', 'order_steps'].includes(safe.type)) {
-    if (!Array.isArray(safe.options) || safe.options.length < 2) {
-      safe.options = ['Opción A', 'Opción B', 'Opción C', 'Opción D'];
-    }
+    if (!Array.isArray(safe.options) || safe.options.length < 2) safe.options = ['Opción A', 'Opción B', 'Opción C', 'Opción D'];
   } else {
     safe.options = Array.isArray(safe.options) ? safe.options : [];
   }
 
-  // --- CORRECT ANSWERS (dual field) ---
   if (ARRAY_ANSWER_TYPES.includes(safe.type)) {
     safe.correct_answer = '';
     if (!Array.isArray(safe.correct_answers) || safe.correct_answers.length === 0) {
@@ -57,19 +48,12 @@ function sanitizeActivity(activity) {
     }
   }
 
-  // --- ACCEPTED ANSWERS ---
   safe.accepted_answers = Array.isArray(safe.accepted_answers) ? safe.accepted_answers.map(a => String(a)) : [];
-
-  // --- HINTS ---
   safe.hints = Array.isArray(safe.hints) ? safe.hints.filter(h => h) : [];
 
-  // --- EXPLANATION & LEVELS ---
-  if (!safe.explanation || typeof safe.explanation !== 'string') {
-    safe.explanation = safe.question;
-  }
+  if (!safe.explanation || typeof safe.explanation !== 'string') safe.explanation = safe.question;
   safe.explanation_levels = normalizeExplanationLevels(safe.explanation_levels, safe.question);
 
-  // --- STEPS (step_by_step) ---
   if (safe.type === 'step_by_step') {
     if (!Array.isArray(safe.steps) || safe.steps.length < 2) {
       safe.steps = [{ instruction: 'Paso 1', answer: 'respuesta 1', hint: 'pista 1' }, { instruction: 'Paso 2', answer: 'respuesta 2', hint: 'pista 2' }];
@@ -78,45 +62,30 @@ function sanitizeActivity(activity) {
     safe.steps = [];
   }
 
-  // --- DRAG/DROP ---
   if (safe.type === 'drag_drop') {
-    if (!Array.isArray(safe.drag_items) || safe.drag_items.length < 2) {
-      safe.drag_items = ['A', 'B', 'C'];
-    }
-    if (!Array.isArray(safe.drop_targets) || safe.drop_targets.length < 2) {
-      safe.drop_targets = ['1', '2', '3'];
-    }
+    if (!Array.isArray(safe.drag_items) || safe.drag_items.length < 2) safe.drag_items = ['A', 'B', 'C'];
+    if (!Array.isArray(safe.drop_targets) || safe.drop_targets.length < 2) safe.drop_targets = ['1', '2', '3'];
   } else {
     safe.drag_items = [];
     safe.drop_targets = [];
   }
 
-  // --- DIFFICULTY ---
-  if (!['easy', 'medium', 'hard'].includes(safe.difficulty)) {
-    safe.difficulty = 'medium';
-  }
-
-  // --- POINTS ---
+  if (!['easy', 'medium', 'hard'].includes(safe.difficulty)) safe.difficulty = 'medium';
   if (typeof safe.points !== 'number' || safe.points < 0) {
-    const points = { easy: 8, medium: 10, hard: 14 };
-    safe.points = points[safe.difficulty] || 10;
+    safe.points = { easy: 8, medium: 10, hard: 14 }[safe.difficulty] || 10;
   }
-
-  // --- FEEDBACK ---
   safe.incorrect_feedback = typeof safe.incorrect_feedback === 'object' ? safe.incorrect_feedback : null;
 
   return safe;
 }
 
-// ─── CAPA FINAL: normalizeForPersistence ─────────────────────────────────────
+// ─── NORMALIZACIÓN PARA PERSISTENCIA ─────────────────────────────────────────
 function normalizeForPersistence(activity) {
   const a = { ...activity };
   const isArrayType = ARRAY_ANSWER_TYPES.includes(a.type);
 
-  // --- question ---
   if (!a.question || typeof a.question !== 'string') a.question = 'Pregunta no disponible';
 
-  // --- correct_answer ---
   if (isArrayType) {
     a.correct_answer = '';
   } else {
@@ -126,7 +95,6 @@ function normalizeForPersistence(activity) {
     else a.correct_answer = String(a.correct_answer);
   }
 
-  // --- correct_answers ---
   if (isArrayType) {
     if (a.correct_answers === null || a.correct_answers === undefined) a.correct_answers = [];
     else if (typeof a.correct_answers === 'string') a.correct_answers = [a.correct_answers].filter(Boolean);
@@ -138,7 +106,6 @@ function normalizeForPersistence(activity) {
     a.correct_answers = [];
   }
 
-  // --- explanation_levels ---
   const expl = a.explanation || a.question || 'Explicación no disponible';
   if (!a.explanation_levels || Array.isArray(a.explanation_levels)) {
     a.explanation_levels = { basic: expl, detailed: expl, example: 'Sin ejemplo' };
@@ -154,24 +121,18 @@ function normalizeForPersistence(activity) {
     a.explanation_levels = { basic: expl, detailed: expl, example: 'Sin ejemplo' };
   }
 
-  // --- options ---
   if (!Array.isArray(a.options)) a.options = [];
   else a.options = a.options.map(String).filter(Boolean);
 
-  // --- hints ---
   if (!Array.isArray(a.hints)) a.hints = [];
   else a.hints = a.hints.map(String).filter(Boolean);
 
-  // --- steps ---
   if (!Array.isArray(a.steps)) a.steps = [];
-
-  // --- drag_items / drop_targets ---
   if (!Array.isArray(a.drag_items)) a.drag_items = [];
   else a.drag_items = a.drag_items.map(String).filter(Boolean);
   if (!Array.isArray(a.drop_targets)) a.drop_targets = [];
   else a.drop_targets = a.drop_targets.map(String).filter(Boolean);
 
-  // --- points ---
   if (typeof a.points !== 'number' || isNaN(a.points) || a.points < 0) a.points = 10;
 
   return a;
@@ -186,20 +147,13 @@ function assertValidForPersistence(activity) {
   if (typeof activity.explanation_levels.example !== 'string') throw new Error(`explanation_levels.example debe ser string`);
 }
 
-// ─── VALIDACIÓN ESTRICTA ──────────────────────────────────────────────────────
 function validateActivity(act) {
   if (!act.question?.toString().trim()) return 'question vacío';
   if (!VALID_TYPES.includes(act.type)) return `tipo inválido: ${act.type}`;
 
   const isArrayType = ARRAY_ANSWER_TYPES.includes(act.type);
-
-  // Rechazar si ambos campos están llenos
-  if (isArrayType && act.correct_answer && act.correct_answer.trim() !== '') {
-    return `Invalid activity: wrong answer field for type ${act.type} — correct_answer debe estar vacío`;
-  }
-  if (!isArrayType && Array.isArray(act.correct_answers) && act.correct_answers.length > 0) {
-    return `Invalid activity: wrong answer field for type ${act.type} — correct_answers debe estar vacío`;
-  }
+  if (isArrayType && act.correct_answer && act.correct_answer.trim() !== '') return `correct_answer debe estar vacío para tipo ${act.type}`;
+  if (!isArrayType && Array.isArray(act.correct_answers) && act.correct_answers.length > 0) return `correct_answers debe estar vacío para tipo ${act.type}`;
 
   if (act.type === 'multiple_choice') {
     if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
@@ -207,19 +161,18 @@ function validateActivity(act) {
   }
   if (act.type === 'multiple_select') {
     if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
-    if (!Array.isArray(act.correct_answers) || act.correct_answers.length === 0) return 'Invalid activity: wrong answer field for type multiple_select — correct_answers vacío';
+    if (!Array.isArray(act.correct_answers) || act.correct_answers.length === 0) return 'correct_answers vacío';
   }
   if (act.type === 'order_steps') {
     if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
-    if (!Array.isArray(act.correct_answers) || act.correct_answers.length === 0) return 'Invalid activity: wrong answer field for type order_steps — correct_answers vacío';
+    if (!Array.isArray(act.correct_answers) || act.correct_answers.length === 0) return 'correct_answers vacío';
   }
   if (act.type === 'true_false') {
     const ca = act.correct_answer?.toString().toLowerCase();
     if (!['verdadero','falso','true','false'].includes(ca)) return `correct_answer inválido: ${ca}`;
   }
   if (act.type === 'fill_blank' || act.type === 'solve') {
-    if (!act.correct_answer && (!Array.isArray(act.accepted_answers) || act.accepted_answers.length === 0))
-      return 'correct_answer requerido';
+    if (!act.correct_answer && (!Array.isArray(act.accepted_answers) || act.accepted_answers.length === 0)) return 'correct_answer requerido';
   }
   if (act.type === 'drag_drop') {
     if (!Array.isArray(act.drag_items) || !act.drag_items.length) return 'drag_items vacío';
@@ -231,29 +184,26 @@ function validateActivity(act) {
   return null;
 }
 
-// ─── Helper: actualizar progreso en la entidad ────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 async function updateProgress(base44, genId, patch) {
   try {
     const records = await base44.asServiceRole.entities.CurriculumGeneration.filter({ generation_id: genId });
-    if (records[0]) {
-      await base44.asServiceRole.entities.CurriculumGeneration.update(records[0].id, patch);
-    }
+    if (records[0]) await base44.asServiceRole.entities.CurriculumGeneration.update(records[0].id, patch);
   } catch (e) {
     console.warn('updateProgress error:', e.message);
   }
 }
 
 async function appendLog(base44, genId, currentLogs, message) {
-  const logs = [...(currentLogs || []), `[${new Date().toISOString()}] ${message}`].slice(-50);
+  const logs = [...(currentLogs || []), `[${new Date().toISOString()}] ${message}`].slice(-80);
   await updateProgress(base44, genId, { logs });
   console.log(message);
   return logs;
 }
 
-// ─── Timeout wrapper ─────────────────────────────────────────────────────────
 function withTimeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`TIMEOUT: "${label}" superó ${ms}ms`)), ms);
+    const timer = setTimeout(() => reject(new Error(`[LLM_TIMEOUT] "${label}" superó ${ms}ms`)), ms);
     promise.then(
       (val) => { clearTimeout(timer); resolve(val); },
       (err) => { clearTimeout(timer); reject(err); }
@@ -261,17 +211,138 @@ function withTimeout(promise, ms, label) {
   });
 }
 
-// ─── Generar lección + actividades (lógica inline) ───────────────────────────
-async function generateLessonBlock(base44, { module_id, subject_id, subject_name, topic, is_mini_eval, lesson_order, difficulty = 'medium', keywords = [] }) {
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ─── Retry inteligente con backoff ────────────────────────────────────────────
+async function withRetry(fn, maxAttempts, label, logFn) {
+  const delays = [0, 3000, 6000];
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (attempt > 1) {
+      const delayMs = delays[attempt - 1] || 6000;
+      await logFn(`[LLM_RETRY] Attempt ${attempt}/${maxAttempts} for "${label}" (waiting ${delayMs / 1000}s...)`);
+      await sleep(delayMs);
+    }
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const isTimeout = err.message?.includes('LLM_TIMEOUT') || err.message?.includes('TIMEOUT');
+      await logFn(`[LLM_RETRY] ${isTimeout ? '[LLM_TIMEOUT]' : 'Error'} on attempt ${attempt}/${maxAttempts} for "${label}": ${err.message}`);
+    }
+  }
+  throw lastErr;
+}
+
+// ─── Crear actividades fallback mínimas (sin LLM) ────────────────────────────
+function buildFallbackActivities(lessonTitle, subjectName, count = 5) {
+  const templates = [
+    {
+      type: 'multiple_choice',
+      question: `¿Cuál de las siguientes opciones describe mejor el tema "${lessonTitle}"?`,
+      options: [`Concepto central de ${lessonTitle}`, `No pertenece a ${subjectName}`, `Definición incorrecta`, `Ninguna de las anteriores`],
+      correct_answer: `Concepto central de ${lessonTitle}`,
+      correct_answers: [],
+      explanation: `Esta actividad refuerza los conceptos básicos del tema: ${lessonTitle}.`,
+      hints: ['Revisa el contenido explicativo de la lección'],
+      difficulty: 'easy', points: 8,
+    },
+    {
+      type: 'true_false',
+      question: `El tema "${lessonTitle}" forma parte del programa de ${subjectName}.`,
+      options: ['Verdadero', 'Falso'],
+      correct_answer: 'Verdadero',
+      correct_answers: [],
+      explanation: `Correcto. Esta lección pertenece al temario de ${subjectName}.`,
+      hints: ['Piensa en el contexto de la materia'],
+      difficulty: 'easy', points: 8,
+    },
+    {
+      type: 'fill_blank',
+      question: `El tema principal de esta lección es ___.`,
+      options: [],
+      correct_answer: lessonTitle,
+      correct_answers: [],
+      accepted_answers: [lessonTitle],
+      explanation: `El tema es "${lessonTitle}".`,
+      hints: ['Lee el título de la lección'],
+      difficulty: 'easy', points: 8,
+    },
+    {
+      type: 'multiple_choice',
+      question: `¿A qué materia pertenece el tema "${lessonTitle}"?`,
+      options: [subjectName, 'Matemáticas', 'Historia', 'Química'],
+      correct_answer: subjectName,
+      correct_answers: [],
+      explanation: `"${lessonTitle}" es un tema de ${subjectName}.`,
+      hints: ['Recuerda en qué materia estás estudiando'],
+      difficulty: 'easy', points: 8,
+    },
+    {
+      type: 'true_false',
+      question: `Es importante estudiar "${lessonTitle}" para comprender ${subjectName}.`,
+      options: ['Verdadero', 'Falso'],
+      correct_answer: 'Verdadero',
+      correct_answers: [],
+      explanation: `Sí, este tema es esencial para el dominio de ${subjectName}.`,
+      hints: ['Considera la importancia del tema en la materia'],
+      difficulty: 'easy', points: 8,
+    },
+  ];
+
+  const result = [];
+  for (let i = 0; result.length < count; i++) {
+    result.push({ ...templates[i % templates.length] });
+  }
+  return result;
+}
+
+// ─── Guardar actividades en DB ────────────────────────────────────────────────
+async function persistActivities(base44, lessonId, activities) {
+  let count = 0;
+  for (let i = 0; i < activities.length; i++) {
+    const act = activities[i];
+    const isArrayType = ARRAY_ANSWER_TYPES.includes(act.type);
+    const raw = {
+      lesson_id: lessonId,
+      type: act.type,
+      question: act.question,
+      options: act.options || [],
+      correct_answer: isArrayType ? '' : (act.correct_answer || ''),
+      correct_answers: isArrayType ? (act.correct_answers || []) : [],
+      accepted_answers: act.accepted_answers || [],
+      explanation: act.explanation || '',
+      explanation_levels: act.explanation_levels,
+      incorrect_feedback: act.incorrect_feedback || null,
+      hints: act.hints || [],
+      difficulty: act.difficulty || 'medium',
+      points: act.points || 10,
+      order: i + 1,
+      grading_type: 'auto',
+      steps: act.type === 'step_by_step' ? (act.steps || []) : [],
+      drag_items: act.type === 'drag_drop' ? (act.drag_items || []) : [],
+      drop_targets: act.type === 'drag_drop' ? (act.drop_targets || []) : [],
+    };
+    const actData = normalizeForPersistence(raw);
+    assertValidForPersistence(actData);
+    await base44.asServiceRole.entities.CourseActivity.create(actData);
+    count++;
+  }
+  return count;
+}
+
+// ─── Generar lección completa con retry inteligente ───────────────────────────
+async function generateLessonBlock(base44, { module_id, subject_id, subject_name, topic, is_mini_eval, lesson_order, difficulty = 'medium', keywords = [] }, logFn) {
   const keywordsHint = keywords.length ? `\nPalabras clave a incluir: ${keywords.join(', ')}` : '';
   const difficultyHint = { easy: 'introductoria y accesible', medium: 'intermedia con ejemplos aplicados', hard: 'avanzada con razonamiento profundo' }[difficulty] || 'intermedia';
 
-  // ── LLM #1: Contenido teórico ──
-  const t0_lesson = Date.now();
-  console.log(`[DEBUG] LLM lesson request started — topic: "${topic}"`);
-  const lessonResult = await withTimeout(
-    base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt: `Eres un experto en diseño instruccional para preparatoria mexicana. Crea el contenido teórico completo para una lección.
+  // ── LLM #1: Contenido teórico — con retry 3 intentos ──
+  const lessonResult = await withRetry(
+    () => withTimeout(
+      base44.asServiceRole.integrations.Core.InvokeLLM({
+        prompt: `Eres un experto en diseño instruccional para preparatoria mexicana. Crea el contenido teórico completo para una lección.
 
 TEMA: "${topic}"
 MATERIA: "${subject_name}"
@@ -283,20 +354,22 @@ Genera:
 - explanation: explicación teórica clara (máximo 150 palabras). Para matemáticas usa LaTeX: $x^2$, $\\frac{a}{b}$, $\\mathbb{N}$.
 
 Devuelve SOLO JSON: { "title": "...", "explanation": "..." }`,
-      response_json_schema: {
-        type: "object",
-        properties: { title: { type: "string" }, explanation: { type: "string" } },
-        required: ["title", "explanation"]
-      }
-    }),
-    90000,
-    `LLM lesson content — ${topic}`
+        response_json_schema: {
+          type: "object",
+          properties: { title: { type: "string" }, explanation: { type: "string" } },
+          required: ["title", "explanation"]
+        }
+      }),
+      90000,
+      `LLM lesson content — ${topic}`
+    ),
+    3,
+    `lesson content — ${topic}`,
+    logFn
   );
 
-  console.log(`[DEBUG] LLM lesson response received in ${Date.now() - t0_lesson}ms — topic: "${topic}"`);
   if (!lessonResult?.title || !lessonResult?.explanation) throw new Error('LLM no generó contenido válido para la lección');
 
-  const t0_db_lesson = Date.now();
   const lesson = await base44.asServiceRole.entities.CourseLesson.create({
     module_id,
     subject_id,
@@ -305,9 +378,9 @@ Devuelve SOLO JSON: { "title": "...", "explanation": "..." }`,
     order: lesson_order,
     is_mini_eval,
   });
-  console.log(`[DEBUG] DB lesson created in ${Date.now() - t0_db_lesson}ms`);
+  console.log(`[DEBUG] DB lesson created: "${lesson.title}"`);
 
-  // Actividades
+  // ── LLM #2: Actividades con retry ──
   const min = is_mini_eval ? 10 : 7;
   const max = is_mini_eval ? 15 : 11;
   const count = Math.floor(Math.random() * (max - min + 1)) + min;
@@ -331,142 +404,106 @@ REGLAS:
 - multiple_choice: 4 opciones, correct_answer = texto exacto de opción correcta.
 - true_false: options=["Verdadero","Falso"], correct_answer="Verdadero" o "Falso".
 - fill_blank: pregunta con ___, correct_answer = texto.
-- multiple_select: correct_answers = ARRAY de textos correctos, ej: ["op1","op3"]. NO usar correct_answer.
-  - order_steps: options=pasos MEZCLADOS, correct_answers=ARRAY en ORDEN CORRECTO. NO usar correct_answer.
+- multiple_select: correct_answers = ARRAY de textos correctos. NO usar correct_answer.
+- order_steps: options=pasos MEZCLADOS, correct_answers=ARRAY en ORDEN CORRECTO. NO usar correct_answer.
 - drag_drop: drag_items=items mezclados, drop_targets=etiquetas, correct_answer=JSON object target→item.
 - step_by_step: steps=[{instruction,answer,hint}], correct_answer="step_by_step".
 CALIDAD: explanation_levels {basic,detailed,example}, incorrect_feedback {default:...}, hints (max 1), points: easy=8, medium=10, hard=14.
-  Matemáticas: usa LaTeX dentro de $...$.
-  REGLA CRÍTICA: NUNCA incluir ambos campos correct_answer y correct_answers en la misma actividad.
-  Devuelve SOLO JSON con campo "activities": array de ${count} objetos.`;
+Matemáticas: usa LaTeX dentro de $...$.
+REGLA CRÍTICA: NUNCA incluir ambos campos correct_answer y correct_answers en la misma actividad.
+Devuelve SOLO JSON con campo "activities": array de ${count} objetos.`;
 
-  const t0_activities = Date.now();
-  console.log(`[DEBUG] LLM activities request started — lesson: "${lesson.title}"`);
-  const activitiesResult = await withTimeout(
-    base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt: activitiesPrompt,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          activities: { type: "array", items: { type: "object" } }
-        }
-      }
-    }),
-    90000,
-    `LLM activities — ${lesson.title}`
-  );
-  console.log(`[DEBUG] LLM activities response received in ${Date.now() - t0_activities}ms`);
-
-  let rawActivities = Array.isArray(activitiesResult) ? activitiesResult : (activitiesResult?.activities || []);
   const valid = [];
-  for (const rawAct of rawActivities) {
-    let act = sanitizeActivity(rawAct);
-    const err = validateActivity(act);
-    if (!err) {
-      valid.push(act);
+
+  // Intento principal con retry
+  let activitiesRaw = null;
+  try {
+    activitiesRaw = await withRetry(
+      () => withTimeout(
+        base44.asServiceRole.integrations.Core.InvokeLLM({
+          prompt: activitiesPrompt,
+          response_json_schema: { type: "object", properties: { activities: { type: "array", items: { type: "object" } } } }
+        }),
+        90000,
+        `LLM activities — ${lesson.title}`
+      ),
+      3,
+      `activities — ${lesson.title}`,
+      logFn
+    );
+  } catch (e) {
+    await logFn(`[FALLBACK_MODE] LLM activities fallaron para "${lesson.title}" tras 3 intentos: ${e.message}`);
+  }
+
+  if (activitiesRaw) {
+    const rawList = Array.isArray(activitiesRaw) ? activitiesRaw : (activitiesRaw?.activities || []);
+    for (const rawAct of rawList) {
+      const act = sanitizeActivity(rawAct);
+      if (!validateActivity(act)) valid.push(act);
     }
   }
 
-  // Reintento si faltan
+  // Reintento adicional si faltan
+  if (valid.length < min && activitiesRaw) {
+    const needed = min - valid.length;
+    await logFn(`[LLM_RETRY] Need ${needed} more activities for "${lesson.title}", attempting supplement...`);
+    try {
+      const supplement = await withRetry(
+        () => withTimeout(
+          base44.asServiceRole.integrations.Core.InvokeLLM({
+            prompt: `${activitiesPrompt}\n\nNecesito SOLO ${needed} actividades adicionales válidas. Devuelve JSON con "activities": [...]`,
+            response_json_schema: { type: "object", properties: { activities: { type: "array", items: { type: "object" } } } }
+          }),
+          90000,
+          `LLM supplement activities — ${lesson.title}`
+        ),
+        2,
+        `supplement activities — ${lesson.title}`,
+        logFn
+      );
+      const suppList = Array.isArray(supplement) ? supplement : (supplement?.activities || []);
+      for (const rawAct of suppList) {
+        if (valid.length >= min) break;
+        const act = sanitizeActivity(rawAct);
+        if (!validateActivity(act)) valid.push(act);
+      }
+    } catch (e) {
+      await logFn(`[LLM_RETRY] Supplement also failed for "${lesson.title}": ${e.message}`);
+    }
+  }
+
+  // Completar con fallback si aún faltan
   if (valid.length < min) {
     const needed = min - valid.length;
-    const t0_retry = Date.now();
-    console.log(`[DEBUG] LLM retry started — need ${needed} more activities`);
-    const retry = await withTimeout(
-      base44.asServiceRole.integrations.Core.InvokeLLM({
-        prompt: `${activitiesPrompt}\n\nNecesito SOLO ${needed} actividades adicionales válidas. Devuelve JSON con "activities": [...]`,
-        response_json_schema: { type: "object", properties: { activities: { type: "array", items: { type: "object" } } } }
-      }),
-      90000,
-      `LLM retry activities — ${lesson.title}`
-    );
-    console.log(`[DEBUG] LLM retry response received in ${Date.now() - t0_retry}ms`);
-    const retryRaw = Array.isArray(retry) ? retry : (retry?.activities || []);
-    for (const rawAct of retryRaw) {
-      if (valid.length >= min) break;
-      let act = sanitizeActivity(rawAct);
-      const err = validateActivity(act);
-      if (!err) valid.push(act);
-    }
+    const fallbacks = buildFallbackActivities(lesson.title, subject_name, needed);
+    for (const fb of fallbacks) valid.push(fb);
+    await logFn(`[FALLBACK_CREATED] Added ${needed} fallback activities for "${lesson.title}" (total: ${valid.length})`);
   }
 
-  // FALLBACK: si aún faltan, completar con actividades seguras predefinidas
-  if (valid.length < min) {
-    const fallbackNeeded = min - valid.length;
-    console.log(`Fallback activities generated: ${fallbackNeeded} (lección preservada sin eliminar)`);
-    const fallbackTemplates = [
-      {
-        type: 'multiple_choice',
-        question: `¿Cuál de las siguientes opciones está relacionada con "${lesson.title}"?`,
-        options: ['Opción A', 'Opción B', 'Opción C', 'Opción D'],
-        correct_answer: 'Opción A', correct_answers: [],
-        explanation: `Esta actividad refuerza el tema: ${lesson.title}.`,
-        hints: ['Revisa el contenido de la lección'],
-        difficulty: 'easy', points: 8,
-      },
-      {
-        type: 'true_false',
-        question: `El tema "${lesson.title}" es parte de la materia ${subject_name}.`,
-        options: ['Verdadero', 'Falso'],
-        correct_answer: 'Verdadero', correct_answers: [],
-        explanation: 'Esta lección pertenece al temario de la materia.',
-        hints: ['Piensa en el contexto de la lección'],
-        difficulty: 'easy', points: 8,
-      },
-      {
-        type: 'fill_blank',
-        question: `El tema principal de esta lección es ___.`,
-        options: [],
-        correct_answer: lesson.title, correct_answers: [],
-        accepted_answers: [lesson.title],
-        explanation: `El tema es "${lesson.title}".`,
-        hints: ['Lee el título de la lección'],
-        difficulty: 'easy', points: 8,
-      },
-    ];
-    for (let f = 0; valid.length < min; f++) {
-      valid.push({ ...fallbackTemplates[f % fallbackTemplates.length] });
-    }
-  }
-
-  // Guardar actividades — siempre pasar por normalizeForPersistence antes de create
-  let activitiesCreated = 0;
-  for (let i = 0; i < valid.length; i++) {
-    const act = valid[i];
-    const isArrayType = ARRAY_ANSWER_TYPES.includes(act.type);
-    const raw = {
-      lesson_id: lesson.id,
-      type: act.type,
-      question: act.question,
-      options: act.options || [],
-      correct_answer: isArrayType ? '' : (act.correct_answer || ''),
-      correct_answers: isArrayType ? (act.correct_answers || []) : [],
-      accepted_answers: act.accepted_answers || [],
-      explanation: act.explanation || '',
-      explanation_levels: act.explanation_levels,
-      incorrect_feedback: act.incorrect_feedback || null,
-      hints: act.hints || [],
-      difficulty: act.difficulty || 'medium',
-      points: act.points || 10,
-      order: i + 1,
-      grading_type: 'auto',
-      steps: act.type === 'step_by_step' ? (act.steps || []) : [],
-      drag_items: act.type === 'drag_drop' ? (act.drag_items || []) : [],
-      drop_targets: act.type === 'drag_drop' ? (act.drop_targets || []) : [],
-    };
-
-    const t0_sanitize = Date.now();
-    const actData = normalizeForPersistence(raw);
-    assertValidForPersistence(actData);
-    console.log(`[DEBUG] sanitizeActivity+normalizeForPersistence completed in ${Date.now() - t0_sanitize}ms (type: ${actData.type})`);
-
-    const t0_persist = Date.now();
-    await base44.asServiceRole.entities.CourseActivity.create(actData);
-    console.log(`[DEBUG] persistence completed in ${Date.now() - t0_persist}ms`);
-    activitiesCreated++;
-  }
+  const activitiesCreated = await persistActivities(base44, lesson.id, valid);
+  await logFn(`[LESSON_COMPLETED] "${lesson.title}" — ${activitiesCreated} activities persisted`);
 
   return { lesson, activities_count: activitiesCreated };
+}
+
+// ─── Crear lección fallback completa (sin LLM) cuando todo falla ─────────────
+async function createFallbackLesson(base44, { module_id, subject_id, subject_name, topic, is_mini_eval, lesson_order }, logFn) {
+  await logFn(`[FALLBACK_MODE] Creating minimal fallback lesson for "${topic}"`);
+
+  const lesson = await base44.asServiceRole.entities.CourseLesson.create({
+    module_id,
+    subject_id,
+    title: topic,
+    explanation: `Esta lección cubre el tema "${topic}" dentro de ${subject_name}. El contenido detallado será enriquecido próximamente.`,
+    order: lesson_order,
+    is_mini_eval,
+  });
+
+  const fallbackActivities = buildFallbackActivities(topic, subject_name, 5);
+  const activitiesCreated = await persistActivities(base44, lesson.id, fallbackActivities);
+
+  await logFn(`[FALLBACK_CREATED] Fallback lesson "${topic}" created with ${activitiesCreated} basic activities`);
+  return { lesson, activities_count: activitiesCreated, is_fallback: true };
 }
 
 // ─── HANDLER PRINCIPAL ────────────────────────────────────────────────────────
@@ -481,12 +518,10 @@ Deno.serve(async (req) => {
     const { subject_id, overwrite = false } = body;
     if (!subject_id) return Response.json({ error: 'subject_id requerido' }, { status: 400 });
 
-    // Obtener materia
     const subjects = await base44.asServiceRole.entities.Subject.filter({ id: subject_id });
     const subject = subjects[0];
     if (!subject) return Response.json({ error: 'Materia no encontrada' }, { status: 404 });
 
-    // Verificar que existe temario activo
     const syllabuses = await base44.asServiceRole.entities.SubjectSyllabus.filter({ subject_id, is_active: true });
     const syllabus = syllabuses[0];
     if (!syllabus || !syllabus.units?.length) {
@@ -496,7 +531,6 @@ Deno.serve(async (req) => {
       }, { status: 422 });
     }
 
-    // Verificar contenido existente si no overwrite
     if (!overwrite) {
       const existingUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
       if (existingUnits.length > 0) {
@@ -507,7 +541,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Crear registro de generación
     const genId = crypto.randomUUID();
     const genRecord = await base44.asServiceRole.entities.CurriculumGeneration.create({
       generation_id: genId,
@@ -528,40 +561,29 @@ Deno.serve(async (req) => {
       activities_created: 0,
     });
 
-    // Responder inmediatamente con el generation_id para que el frontend pueda hacer polling
     const responsePayload = { success: true, generation_id: genId, record_id: genRecord.id };
 
-    // Ejecutar generación en background (fire and forget)
+    // ── Background: fire and forget ───────────────────────────────────────────
     (async () => {
       let logs = [];
       const log = async (msg) => { logs = await appendLog(base44, genId, logs, msg); };
+      const startTime = Date.now();
 
       try {
         await log(`🚀 Iniciando generación de currículo para "${subject.name}" (Nivel ${subject.level})`);
-
-        // ── FASE 0: Usar temario como blueprint ──────────────────────────────
         await log(`📋 Usando temario v${syllabus.version} como base`);
         await updateProgress(base44, genId, { current_module: 'Leyendo temario...', progress_percent: 2 });
 
         const blueprint = { units: syllabus.units };
 
-        // Calcular total de pasos
         let totalLessons = 0;
         for (const unit of blueprint.units) {
-          for (const mod of (unit.modules || [])) {
-            totalLessons += (mod.lessons || []).length;
-          }
+          for (const mod of (unit.modules || [])) totalLessons += (mod.lessons || []).length;
         }
-        const totalSteps = totalLessons;
 
-        await updateProgress(base44, genId, {
-          blueprint,
-          total_steps: totalSteps,
-          progress_percent: 5,
-        });
+        await updateProgress(base44, genId, { blueprint, total_steps: totalLessons, progress_percent: 5 });
         await log(`✅ Blueprint listo: ${blueprint.units.length} unidades, ${totalLessons} lecciones planificadas`);
 
-        // Si overwrite, limpiar contenido existente
         if (overwrite) {
           await log('🗑️ Limpiando contenido existente...');
           const existingUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
@@ -581,18 +603,20 @@ Deno.serve(async (req) => {
           await log('✅ Contenido anterior eliminado');
         }
 
-        // ── FASES 1-4: Crear estructura y generar contenido ──────────────────
+        // ── Contadores ────────────────────────────────────────────────────────
         let completedSteps = 0;
         let totalUnitsCreated = 0;
         let totalModulesCreated = 0;
         let totalLessonsCreated = 0;
         let totalActivitiesCreated = 0;
+        let normalLessons = 0;
+        let fallbackLessons = 0;
+        let failedLessons = 0;
+        const lessonTimes = [];
 
         for (const unitBlueprint of blueprint.units) {
           await log(`📦 Creando Unidad ${unitBlueprint.order}: "${unitBlueprint.title}"`);
-          await updateProgress(base44, genId, { current_module: `Unidad: ${unitBlueprint.title}` });
 
-          // Crear unidad
           const unit = await base44.asServiceRole.entities.CourseUnit.create({
             subject_id,
             title: unitBlueprint.title,
@@ -602,12 +626,7 @@ Deno.serve(async (req) => {
 
           for (const modBlueprint of (unitBlueprint.modules || [])) {
             await log(`  📁 Módulo ${modBlueprint.order}: "${modBlueprint.title}"`);
-            await updateProgress(base44, genId, {
-              current_module: modBlueprint.title,
-              current_lesson: '',
-            });
 
-            // Crear módulo
             const module = await base44.asServiceRole.entities.CourseModule.create({
               unit_id: unit.id,
               subject_id,
@@ -616,23 +635,25 @@ Deno.serve(async (req) => {
             });
             totalModulesCreated++;
 
-            let moduleOk = true;
             for (const lessonBlueprint of (modBlueprint.lessons || [])) {
               await updateProgress(base44, genId, {
+                current_module: modBlueprint.title,
                 current_lesson: lessonBlueprint.topic,
                 completed_steps: completedSteps,
-                progress_percent: Math.round(5 + (completedSteps / totalSteps) * 90),
+                progress_percent: Math.round(5 + (completedSteps / totalLessons) * 90),
                 lessons_created: totalLessonsCreated,
                 activities_created: totalActivitiesCreated,
                 modules_created: totalModulesCreated,
                 units_created: totalUnitsCreated,
               });
 
-              try {
-                await log(`    📝 Lección ${lessonBlueprint.order}: "${lessonBlueprint.topic}" ${lessonBlueprint.is_mini_eval ? '(mini-eval)' : ''}`);
-                const t0_lesson_block = Date.now();
+              await log(`    📝 Lección ${lessonBlueprint.order}: "${lessonBlueprint.topic}" ${lessonBlueprint.is_mini_eval ? '(mini-eval)' : ''}`);
+              const t0_lesson = Date.now();
+              let result = null;
+              let isFallback = false;
 
-                const { lesson, activities_count } = await withTimeout(
+              try {
+                result = await withTimeout(
                   generateLessonBlock(base44, {
                     module_id: module.id,
                     subject_id,
@@ -642,39 +663,74 @@ Deno.serve(async (req) => {
                     lesson_order: lessonBlueprint.order,
                     difficulty: lessonBlueprint.difficulty || 'medium',
                     keywords: lessonBlueprint.keywords || [],
-                  }),
-                  200000,
+                  }, log),
+                  300000,
                   `generateLessonBlock — ${lessonBlueprint.topic}`
                 );
-                console.log(`[DEBUG] generateLessonBlock completed in ${Date.now() - t0_lesson_block}ms — "${lessonBlueprint.topic}"`);
-
-                totalLessonsCreated++;
-                totalActivitiesCreated += activities_count;
-                completedSteps++;
-                await log(`    ✅ "${lesson.title}" — ${activities_count} actividades`);
-
+                if (result.is_fallback) {
+                  isFallback = true;
+                  fallbackLessons++;
+                } else {
+                  normalLessons++;
+                }
               } catch (lessonErr) {
-                await log(`    ❌ Error en lección "${lessonBlueprint.topic}": ${lessonErr.message}`);
-                moduleOk = false;
+                const isTimeout = lessonErr.message?.includes('LLM_TIMEOUT') || lessonErr.message?.includes('TIMEOUT');
+                await log(`    ${isTimeout ? '[LLM_TIMEOUT]' : '❌'} Error en lección "${lessonBlueprint.topic}": ${lessonErr.message}`);
+
+                // Último recurso: fallback lesson sin LLM
+                try {
+                  result = await createFallbackLesson(base44, {
+                    module_id: module.id,
+                    subject_id,
+                    subject_name: subject.name,
+                    topic: lessonBlueprint.topic,
+                    is_mini_eval: lessonBlueprint.is_mini_eval || false,
+                    lesson_order: lessonBlueprint.order,
+                  }, log);
+                  isFallback = true;
+                  fallbackLessons++;
+                } catch (fallbackErr) {
+                  await log(`    ❌ Fallback también falló para "${lessonBlueprint.topic}": ${fallbackErr.message}`);
+                  failedLessons++;
+                }
+              }
+
+              const lessonDuration = Date.now() - t0_lesson;
+              lessonTimes.push(lessonDuration);
+
+              if (result) {
+                totalLessonsCreated++;
+                totalActivitiesCreated += result.activities_count;
+                completedSteps++;
+
+                const progressPercent = Math.round(5 + (completedSteps / totalLessons) * 90);
+                await updateProgress(base44, genId, {
+                  completed_steps: completedSteps,
+                  progress_percent: progressPercent,
+                  lessons_created: totalLessonsCreated,
+                  activities_created: totalActivitiesCreated,
+                });
+
+                await log(`[CURRICULUM_PROGRESS] ${completedSteps}/${totalLessons} lecciones — ${progressPercent}% (${isFallback ? 'fallback' : 'normal'}, ${(lessonDuration / 1000).toFixed(1)}s)`);
+              } else {
                 completedSteps++;
               }
             }
 
-            // Fase 4: Validación por módulo — si falla y hay 0 lecciones, reportar
-            if (!moduleOk) {
-              await log(`  ⚠️ Módulo "${modBlueprint.title}" completado con errores parciales`);
-            } else {
-              await log(`  ✅ Módulo "${modBlueprint.title}" completado`);
-            }
+            const modLessons = (modBlueprint.lessons || []).length;
+            await log(`  ✅ Módulo "${modBlueprint.title}" completado (${modLessons} lecciones)`);
           }
         }
 
-        // Completado
+        // ── Métricas finales ──────────────────────────────────────────────────
+        const totalDuration = Date.now() - startTime;
+        const avgTime = lessonTimes.length > 0 ? Math.round(lessonTimes.reduce((a, b) => a + b, 0) / lessonTimes.length / 1000) : 0;
+
         await updateProgress(base44, genId, {
           status: 'completed',
           progress_percent: 100,
           completed_steps: completedSteps,
-          total_steps: totalSteps,
+          total_steps: totalLessons,
           current_module: '',
           current_lesson: '',
           units_created: totalUnitsCreated,
@@ -682,14 +738,19 @@ Deno.serve(async (req) => {
           lessons_created: totalLessonsCreated,
           activities_created: totalActivitiesCreated,
         });
-        await log(`🎉 Currículo completo: ${totalUnitsCreated} unidades, ${totalModulesCreated} módulos, ${totalLessonsCreated} lecciones, ${totalActivitiesCreated} actividades`);
+
+        await log(`🎉 ============ GENERACIÓN COMPLETADA ============`);
+        await log(`📊 Total lessons: ${totalLessonsCreated}`);
+        await log(`✅ Generated normally: ${normalLessons}`);
+        await log(`⚠️ Generated with fallback: ${fallbackLessons}`);
+        await log(`❌ Failed permanently: ${failedLessons}`);
+        await log(`⏱️ Total duration: ${(totalDuration / 1000 / 60).toFixed(1)} min`);
+        await log(`📈 Average generation time: ${avgTime}s/lesson`);
+        await log(`📦 ${totalUnitsCreated} unidades | 📁 ${totalModulesCreated} módulos | 📝 ${totalLessonsCreated} lecciones | 🎯 ${totalActivitiesCreated} actividades`);
 
       } catch (bgErr) {
         console.error('Background generation error:', bgErr.message);
-        await updateProgress(base44, genId, {
-          status: 'failed',
-          error_message: bgErr.message,
-        });
+        await updateProgress(base44, genId, { status: 'failed', error_message: bgErr.message });
         await appendLog(base44, genId, logs, `💥 Error fatal: ${bgErr.message}`);
       }
     })();
