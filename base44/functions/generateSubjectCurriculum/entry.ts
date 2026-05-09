@@ -355,9 +355,13 @@ function normalizeExplanationLevels(raw, question) {
 }
 
 function sanitizeActivity(activity) {
+  if (!activity) return null;
+  // Rechazar si question está vacía, es whitespace, null, o type falta — NO crear placeholders
+  const q = activity.question;
+  if (q === null || q === undefined || String(q).trim().length === 0) return null;
+  if (!activity.type || !VALID_TYPES.includes(activity.type)) return null;
+
   const safe = { ...activity };
-  if (!safe.type || !VALID_TYPES.includes(safe.type)) safe.type = 'multiple_choice';
-  if (!safe.question || typeof safe.question !== 'string') safe.question = 'Selecciona la respuesta correcta';
   if (['multiple_choice','multiple_select','order_steps'].includes(safe.type)) {
     if (!Array.isArray(safe.options) || safe.options.length < 2) safe.options = ['Opción A','Opción B','Opción C','Opción D'];
   } else { safe.options = Array.isArray(safe.options) ? safe.options : []; }
@@ -891,9 +895,13 @@ async function generateOneLesson(base44, params, batchId, logFn, metrics, modeCo
 
     if (activitiesRaw) {
       const rawList = Array.isArray(activitiesRaw) ? activitiesRaw : (activitiesRaw?.activities || []);
-      for (const rawAct of rawList) {
-        const act = normalizeActivityMath(sanitizeActivity(rawAct));
-        if (!validateActivity(act)) valid.push(act);
+      const sanitized = rawList.map(sanitizeActivity).filter(Boolean);
+      await logFn(`[${ts()}] 🧹 Sanitización: ${rawList.length} items → ${sanitized.length} válidos (${rawList.length - sanitized.length} descartados por vacíos)`);
+      for (const rawAct of sanitized) {
+        const act = normalizeActivityMath(rawAct);
+        const err = validateActivity(act);
+        if (!err) valid.push(act);
+        else await logFn(`[${ts()}] ⚠️ Actividad descartada por validación: ${err}`);
       }
     }
 
