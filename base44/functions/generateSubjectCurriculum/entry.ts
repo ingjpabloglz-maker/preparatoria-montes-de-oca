@@ -170,125 +170,51 @@ function isLenientSubject(subjectName = '') {
   return true; // Aplicar reglas relajadas a TODAS las materias para evitar falsos positivos
 }
 
-function isGarbageLLMResponse(response, expectedField = 'activities', subjectName = '') {
-  // ── REGLA 1: Null absoluto ───────────────────────────────────────────────────
-  if (response === null || response === undefined) {
-    console.log('[GarbageDetector] BASURA: response es null/undefined');
-    return true;
-  }
+// Retorna string con motivo si es basura, null si es válido
+function getGarbageReason(response, expectedField = 'activities') {
+  if (response === null || response === undefined) return 'response es null/undefined';
 
   let str;
-  try {
-    str = typeof response === 'string' ? response : JSON.stringify(response);
-  } catch (e) {
-    console.log('[GarbageDetector] BASURA: JSON.stringify falló —', e.message);
-    return true;
-  }
+  try { str = typeof response === 'string' ? response : JSON.stringify(response); } catch (e) { return `JSON.stringify falló: ${e.message}`; }
 
-  // ── REGLA 2: Respuesta vacía o truncada ─────────────────────────────────────
-  if (!str || str.length < 5) {
-    console.log(`[GarbageDetector] BASURA: respuesta vacía o truncada (${str?.length} chars)`);
-    return true;
-  }
+  if (!str || str.length < 5) return `respuesta vacía (${str?.length} chars)`;
+  if (/<html[\s>]|<body[\s>]|<!DOCTYPE/i.test(str)) return 'respuesta es página HTML';
+  if (/^["']?```/.test(str.trim())) return 'markdown sin parsear como raíz';
 
-  // ── REGLA 3: HTML masivo (error page del servidor) ───────────────────────────
-  if (/<html[\s>]|<body[\s>]|<!DOCTYPE/i.test(str)) {
-    console.log('[GarbageDetector] BASURA: respuesta es página HTML');
-    return true;
-  }
-
-  // ── REGLA 4: Markdown sin parsear como raíz ──────────────────────────────────
-  if (/^["']?```/.test(str.trim())) {
-    console.log('[GarbageDetector] BASURA: markdown sin parsear como raíz');
-    return true;
-  }
-
-  // ── REGLA 5: Nulls masivos (>70% de campos) — SOLO en respuestas grandes ────
   const totalFields = (str.match(/:/g) || []).length;
   if (totalFields > 15) {
     const nullCount = (str.match(/\bnull\b/g) || []).length;
-    if (nullCount / totalFields > 0.7) {
-      console.log(`[GarbageDetector] BASURA: nulls masivos (${nullCount}/${totalFields} = ${Math.round(nullCount/totalFields*100)}%)`);
-      return true;
-    }
+    if (nullCount / totalFields > 0.7) return `nulls masivos (${nullCount}/${totalFields} = ${Math.round(nullCount/totalFields*100)}%)`;
   }
 
-  // ── Validaciones por tipo de campo esperado ───────────────────────────────────
-
   if (expectedField === 'activities') {
-    const items = Array.isArray(response?.activities) ? response.activities
-                : Array.isArray(response) ? response
-                : null;
-
-    // BASURA REAL: no existe el array
-    if (!items) {
-      console.log('[GarbageDetector] BASURA: no se encontró array de actividades en la respuesta');
-      return true;
-    }
-
-    // BASURA REAL: array vacío
-    if (items.length === 0) {
-      console.log('[GarbageDetector] BASURA: array de actividades vacío (length === 0)');
-      return true;
-    }
-
-    // Verificar que existan objetos con al menos question O type (umbral muy bajo)
-    // Para matemáticas, "2 + 3 = ?" es una pregunta válida aunque sea corta
-    const itemsWithQuestion = items.filter(a => a && typeof a === 'object' && a.question !== undefined && a.question !== null);
-    const itemsWithType = items.filter(a => a && typeof a === 'object' && a.type);
-    const itemsCompletelyEmpty = items.filter(a => !a || typeof a !== 'object' || (!a.question && !a.type));
-
-    console.log(`[GarbageDetector] items total: ${items.length} | con question: ${itemsWithQuestion.length} | con type: ${itemsWithType.length} | completamente vacíos: ${itemsCompletelyEmpty.length}`);
-
-    // Solo es basura si MÁS DEL 70% de los items están completamente vacíos
-    if (items.length > 0 && itemsCompletelyEmpty.length / items.length > 0.7) {
-      const reasons = itemsCompletelyEmpty.slice(0, 3).map((a, i) =>
-        `item[${i}]: question="${a?.question ?? 'MISSING'}", type="${a?.type ?? 'MISSING'}"`
-      );
-      console.log(`[GarbageDetector] BASURA: ${itemsCompletelyEmpty.length}/${items.length} items completamente vacíos`);
-      reasons.forEach(r => console.log(`  → ${r}`));
-      return true;
-    }
-
-    // Necesitamos al menos 1 actividad con question (aunque sea muy corta)
-    if (itemsWithQuestion.length === 0) {
-      console.log('[GarbageDetector] BASURA: ninguna actividad tiene campo question');
-      return true;
-    }
-
-    // Detectar duplicados masivos (TODAS las preguntas exactamente iguales)
-    const nonEmptyQuestions = itemsWithQuestion
-      .map(a => String(a.question).trim().toLowerCase())
-      .filter(q => q.length > 0);
-    if (nonEmptyQuestions.length > 2) {
-      const uniqueQ = new Set(nonEmptyQuestions);
-      if (uniqueQ.size === 1) {
-        console.log(`[GarbageDetector] BASURA: todas las ${nonEmptyQuestions.length} preguntas son idénticas: "${nonEmptyQuestions[0].slice(0,60)}"`);
-        return true;
-      }
-    }
-
-    console.log(`[GarbageDetector] ✅ OK: ${items.length} actividades aceptadas (${itemsWithQuestion.length} con question, ${itemsWithType.length} con type) — materia: "${subjectName}"`);
-    return false;
+    const items = Array.isArray(response?.activities) ? response.activities : (Array.isArray(response) ? response : null);
+    if (!items) return `no se encontró array activities — keys: ${response ? Object.keys(response).join(',') : 'null'}`;
+    if (items.length === 0) return 'array activities vacío';
+    const emptyCount = items.filter(a => !a || typeof a !== 'object' || (!a.question && !a.type)).length;
+    if (emptyCount / items.length > 0.7) return `${emptyCount}/${items.length} items completamente vacíos`;
+    const withQuestion = items.filter(a => a && a.question !== undefined && a.question !== null);
+    if (withQuestion.length === 0) return 'ningún item tiene campo question';
+    const qs = withQuestion.map(a => String(a.question).trim().toLowerCase()).filter(q => q.length > 0);
+    if (qs.length > 2 && new Set(qs).size === 1) return `todas las preguntas son idénticas: "${qs[0].slice(0,40)}"`;
+    return null;
   }
 
   if (expectedField === 'lesson') {
-    // Solo rechazar si faltan AMBOS campos críticos
-    if (!response?.title && !response?.explanation) {
-      console.log('[GarbageDetector] BASURA: lesson sin title NI explanation');
-      return true;
-    }
-    // Aceptar títulos y explicaciones de cualquier longitud (incluso "x²" es válido)
-    const title = response.title ? String(response.title).trim() : '';
-    const expl = response.explanation ? String(response.explanation).trim() : '';
-    if (!title && !expl) {
-      console.log('[GarbageDetector] BASURA: lesson con title y explanation vacíos');
-      return true;
-    }
-    console.log(`[GarbageDetector] ✅ OK: lesson válida — title="${title.slice(0,40)}" (${title.length} chars), expl=${expl.length} chars`);
-    return false;
+    if (!response?.title && !response?.explanation) return 'lesson sin title NI explanation';
+    const t = response.title ? String(response.title).trim() : '';
+    const e = response.explanation ? String(response.explanation).trim() : '';
+    if (!t && !e) return 'title y explanation vacíos';
+    return null;
   }
 
+  return null;
+}
+
+function isGarbageLLMResponse(response, expectedField = 'activities', subjectName = '') {
+  const reason = getGarbageReason(response, expectedField);
+  if (reason) { console.log(`[GarbageDetector] BASURA (${expectedField}): ${reason}`); return true; }
+  console.log(`[GarbageDetector] ✅ OK (${expectedField}) — materia: "${subjectName}"`);
   return false;
 }
 
@@ -935,32 +861,32 @@ async function generateOneLesson(base44, params, batchId, logFn, metrics, modeCo
 
     const valid = [];
     let activitiesRaw = null;
-    let garbageRetries = 0;
 
-    while (garbageRetries < 2) {
-      try {
-        const prompt2 = buildActivitiesPrompt(lessonTitle, subject_name, lessonExpl, is_mini_eval, count, easyCount, mediumCount, hardCount, advancedType);
-        const rawActs = await safeInvokeLLM(
-          base44, prompt2,
-          { response_json_schema: { type:'object', properties:{ activities:{type:'array', items:{type:'object'}} } } },
-          `activities:${lessonTitle}`, logFn, metrics
-        );
+    try {
+      const prompt2 = buildActivitiesPrompt(lessonTitle, subject_name, lessonExpl, is_mini_eval, count, easyCount, mediumCount, hardCount, advancedType);
+      const rawActs = await safeInvokeLLM(
+        base44, prompt2,
+        { response_json_schema: { type:'object', properties:{ activities:{type:'array', items:{type:'object'}} } } },
+        `activities:${lessonTitle}`, logFn, metrics
+      );
 
-        if (isGarbageLLMResponse(rawActs, 'activities', subject_name)) {
-          garbageRetries++;
-          await logFn(`[${ts()}] ⚠️ Basura LLM detectada (intento ${garbageRetries}/2) para "${lessonTitle}"`);
-          if (garbageRetries < 2) {
-            await sleep(5000);
-            continue;
-          }
-        } else {
+      // Diagnóstico detallado antes de evaluar
+      const items = Array.isArray(rawActs?.activities) ? rawActs.activities : (Array.isArray(rawActs) ? rawActs : null);
+      await logFn(`[${ts()}] 🔍 LLM respondió: ${items ? items.length + ' items' : 'NO ARRAY'} | type=${typeof rawActs} | keys=${rawActs ? Object.keys(rawActs).join(',') : 'null'}`);
+
+      const garbageReason = getGarbageReason(rawActs, 'activities');
+      if (garbageReason) {
+        await logFn(`[${ts()}] ⚠️ Respuesta descartada: ${garbageReason} — usando lo que hay`);
+        // Aun así intentar usar lo que venga si tiene items
+        if (items && items.length > 0) {
+          await logFn(`[${ts()}] 🔄 Recuperando ${items.length} items a pesar del warning`);
           activitiesRaw = rawActs;
-          break;
         }
-      } catch (err) {
-        await logFn(`[${ts()}] ⚠️ LLM actividades falló: ${err.message}`);
-        break;
+      } else {
+        activitiesRaw = rawActs;
       }
+    } catch (err) {
+      await logFn(`[${ts()}] ⚠️ LLM actividades falló: ${err.message}`);
     }
 
     if (activitiesRaw) {
