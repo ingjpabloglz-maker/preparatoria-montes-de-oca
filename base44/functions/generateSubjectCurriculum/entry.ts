@@ -250,13 +250,28 @@ async function appendLog(base44, genId, currentLogs, message) {
   return logs;
 }
 
+// ─── Timeout wrapper ─────────────────────────────────────────────────────────
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`TIMEOUT: "${label}" superó ${ms}ms`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
 // ─── Generar lección + actividades (lógica inline) ───────────────────────────
 async function generateLessonBlock(base44, { module_id, subject_id, subject_name, topic, is_mini_eval, lesson_order, difficulty = 'medium', keywords = [] }) {
   const keywordsHint = keywords.length ? `\nPalabras clave a incluir: ${keywords.join(', ')}` : '';
   const difficultyHint = { easy: 'introductoria y accesible', medium: 'intermedia con ejemplos aplicados', hard: 'avanzada con razonamiento profundo' }[difficulty] || 'intermedia';
 
-  const lessonResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
-    prompt: `Eres un experto en diseño instruccional para preparatoria mexicana. Crea el contenido teórico completo para una lección.
+  // ── LLM #1: Contenido teórico ──
+  const t0_lesson = Date.now();
+  console.log(`[DEBUG] LLM lesson request started — topic: "${topic}"`);
+  const lessonResult = await withTimeout(
+    base44.asServiceRole.integrations.Core.InvokeLLM({
+      prompt: `Eres un experto en diseño instruccional para preparatoria mexicana. Crea el contenido teórico completo para una lección.
 
 TEMA: "${topic}"
 MATERIA: "${subject_name}"
@@ -268,15 +283,20 @@ Genera:
 - explanation: explicación teórica clara (máximo 150 palabras). Para matemáticas usa LaTeX: $x^2$, $\\frac{a}{b}$, $\\mathbb{N}$.
 
 Devuelve SOLO JSON: { "title": "...", "explanation": "..." }`,
-    response_json_schema: {
-      type: "object",
-      properties: { title: { type: "string" }, explanation: { type: "string" } },
-      required: ["title", "explanation"]
-    }
-  });
+      response_json_schema: {
+        type: "object",
+        properties: { title: { type: "string" }, explanation: { type: "string" } },
+        required: ["title", "explanation"]
+      }
+    }),
+    90000,
+    `LLM lesson content — ${topic}`
+  );
 
+  console.log(`[DEBUG] LLM lesson response received in ${Date.now() - t0_lesson}ms — topic: "${topic}"`);
   if (!lessonResult?.title || !lessonResult?.explanation) throw new Error('LLM no generó contenido válido para la lección');
 
+  const t0_db_lesson = Date.now();
   const lesson = await base44.asServiceRole.entities.CourseLesson.create({
     module_id,
     subject_id,
@@ -285,6 +305,7 @@ Devuelve SOLO JSON: { "title": "...", "explanation": "..." }`,
     order: lesson_order,
     is_mini_eval,
   });
+  console.log(`[DEBUG] DB lesson created in ${Date.now() - t0_db_lesson}ms`);
 
   // Actividades
   const min = is_mini_eval ? 10 : 7;
@@ -319,15 +340,22 @@ CALIDAD: explanation_levels {basic,detailed,example}, incorrect_feedback {defaul
   REGLA CRÍTICA: NUNCA incluir ambos campos correct_answer y correct_answers en la misma actividad.
   Devuelve SOLO JSON con campo "activities": array de ${count} objetos.`;
 
-  const activitiesResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
-    prompt: activitiesPrompt,
-    response_json_schema: {
-      type: "object",
-      properties: {
-        activities: { type: "array", items: { type: "object" } }
+  const t0_activities = Date.now();
+  console.log(`[DEBUG] LLM activities request started — lesson: "${lesson.title}"`);
+  const activitiesResult = await withTimeout(
+    base44.asServiceRole.integrations.Core.InvokeLLM({
+      prompt: activitiesPrompt,
+      response_json_schema: {
+        type: "object",
+        properties: {
+          activities: { type: "array", items: { type: "object" } }
+        }
       }
-    }
-  });
+    }),
+    90000,
+    `LLM activities — ${lesson.title}`
+  );
+  console.log(`[DEBUG] LLM activities response received in ${Date.now() - t0_activities}ms`);
 
   let rawActivities = Array.isArray(activitiesResult) ? activitiesResult : (activitiesResult?.activities || []);
   const valid = [];
@@ -342,10 +370,17 @@ CALIDAD: explanation_levels {basic,detailed,example}, incorrect_feedback {defaul
   // Reintento si faltan
   if (valid.length < min) {
     const needed = min - valid.length;
-    const retry = await base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt: `${activitiesPrompt}\n\nNecesito SOLO ${needed} actividades adicionales válidas. Devuelve JSON con "activities": [...]`,
-      response_json_schema: { type: "object", properties: { activities: { type: "array", items: { type: "object" } } } }
-    });
+    const t0_retry = Date.now();
+    console.log(`[DEBUG] LLM retry started — need ${needed} more activities`);
+    const retry = await withTimeout(
+      base44.asServiceRole.integrations.Core.InvokeLLM({
+        prompt: `${activitiesPrompt}\n\nNecesito SOLO ${needed} actividades adicionales válidas. Devuelve JSON con "activities": [...]`,
+        response_json_schema: { type: "object", properties: { activities: { type: "array", items: { type: "object" } } } }
+      }),
+      90000,
+      `LLM retry activities — ${lesson.title}`
+    );
+    console.log(`[DEBUG] LLM retry response received in ${Date.now() - t0_retry}ms`);
     const retryRaw = Array.isArray(retry) ? retry : (retry?.activities || []);
     for (const rawAct of retryRaw) {
       if (valid.length >= min) break;
@@ -420,18 +455,14 @@ CALIDAD: explanation_levels {basic,detailed,example}, incorrect_feedback {defaul
       drop_targets: act.type === 'drag_drop' ? (act.drop_targets || []) : [],
     };
 
+    const t0_sanitize = Date.now();
     const actData = normalizeForPersistence(raw);
     assertValidForPersistence(actData);
+    console.log(`[DEBUG] sanitizeActivity+normalizeForPersistence completed in ${Date.now() - t0_sanitize}ms (type: ${actData.type})`);
 
-    console.log('FINAL_ACTIVITY_PAYLOAD', {
-      type: actData.type,
-      correct_answer_type: typeof actData.correct_answer,
-      correct_answers_is_array: Array.isArray(actData.correct_answers),
-      explanation_levels_type: typeof actData.explanation_levels,
-      explanation_levels: actData.explanation_levels,
-    });
-
+    const t0_persist = Date.now();
     await base44.asServiceRole.entities.CourseActivity.create(actData);
+    console.log(`[DEBUG] persistence completed in ${Date.now() - t0_persist}ms`);
     activitiesCreated++;
   }
 
@@ -599,17 +630,23 @@ Deno.serve(async (req) => {
 
               try {
                 await log(`    📝 Lección ${lessonBlueprint.order}: "${lessonBlueprint.topic}" ${lessonBlueprint.is_mini_eval ? '(mini-eval)' : ''}`);
+                const t0_lesson_block = Date.now();
 
-                const { lesson, activities_count } = await generateLessonBlock(base44, {
-                  module_id: module.id,
-                  subject_id,
-                  subject_name: subject.name,
-                  topic: lessonBlueprint.topic,
-                  is_mini_eval: lessonBlueprint.is_mini_eval || false,
-                  lesson_order: lessonBlueprint.order,
-                  difficulty: lessonBlueprint.difficulty || 'medium',
-                  keywords: lessonBlueprint.keywords || [],
-                });
+                const { lesson, activities_count } = await withTimeout(
+                  generateLessonBlock(base44, {
+                    module_id: module.id,
+                    subject_id,
+                    subject_name: subject.name,
+                    topic: lessonBlueprint.topic,
+                    is_mini_eval: lessonBlueprint.is_mini_eval || false,
+                    lesson_order: lessonBlueprint.order,
+                    difficulty: lessonBlueprint.difficulty || 'medium',
+                    keywords: lessonBlueprint.keywords || [],
+                  }),
+                  200000,
+                  `generateLessonBlock — ${lessonBlueprint.topic}`
+                );
+                console.log(`[DEBUG] generateLessonBlock completed in ${Date.now() - t0_lesson_block}ms — "${lessonBlueprint.topic}"`);
 
                 totalLessonsCreated++;
                 totalActivitiesCreated += activities_count;
