@@ -53,7 +53,10 @@ function withTimeout(promise, ms, label) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // #1 WATCHDOG — recoverStuckJobs
+// Recupera jobs 'processing' inactivos >5min y 'paused' abandonados >30min
 // ═══════════════════════════════════════════════════════════════════════════════
+const PAUSED_STALE_MS = 30 * 60 * 1000; // 30 minutos sin actividad = paused abandonado
+
 async function recoverStuckJobs(base44, subjectId) {
   try {
     const allJobs = await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ subject_id: subjectId });
@@ -61,19 +64,23 @@ async function recoverStuckJobs(base44, subjectId) {
     let recovered = 0;
 
     for (const job of allJobs) {
-      if (job.status !== 'processing') continue;
+      if (job.status !== 'processing' && job.status !== 'paused') continue;
       const lastActivity = job.last_activity_at ? new Date(job.last_activity_at).getTime() : 0;
       const inactiveMs = now - lastActivity;
+      const threshold = job.status === 'paused' ? PAUSED_STALE_MS : WATCHDOG_TIMEOUT_MS;
 
-      if (inactiveMs > WATCHDOG_TIMEOUT_MS) {
-        const logs = [...(job.logs || []), `[${ts()}] ⚠️ Watchdog timeout: job inactive for ${Math.round(inactiveMs/60000)} minutes — marking as failed`];
+      if (inactiveMs > threshold) {
+        const reason = job.status === 'paused'
+          ? `Watchdog: paused job abandoned for ${Math.round(inactiveMs/60000)} minutes`
+          : `Watchdog timeout: job inactive for ${Math.round(inactiveMs/60000)} minutes`;
+        const logs = [...(job.logs || []), `[${ts()}] ⚠️ ${reason} — marking as failed`];
         await base44.asServiceRole.entities.CurriculumGenerationJob.update(job.id, {
           status: 'failed',
-          error_message: 'Watchdog timeout: job inactive for 5+ minutes',
+          error_message: reason,
           finished_at: new Date().toISOString(),
           logs: logs.slice(-100),
         });
-        console.log(`[Watchdog] Job ${job.id} marcado como failed (inactivo ${Math.round(inactiveMs/60000)}min)`);
+        console.log(`[Watchdog] Job ${job.id} (${job.status}) marcado como failed (inactivo ${Math.round(inactiveMs/60000)}min)`);
         recovered++;
       }
     }
@@ -1026,8 +1033,26 @@ Deno.serve(async (req) => {
     if (user.role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = await req.json();
-    const { subject_id, overwrite = false, safe_mode = false, preview_only = false } = body;
+    const { subject_id, overwrite = false, safe_mode = false, preview_only = false, force_unlock = false } = body;
     if (!subject_id) return Response.json({ error: 'subject_id requerido' }, { status: 400 });
+
+    // ── FORCE UNLOCK — cancelar todos los jobs activos/pausados de esta materia ──
+    if (force_unlock) {
+      const allJobs = await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ subject_id });
+      let unlocked = 0;
+      for (const job of allJobs) {
+        if (job.status === 'processing' || job.status === 'paused' || job.status === 'pending') {
+          await base44.asServiceRole.entities.CurriculumGenerationJob.update(job.id, {
+            status: 'failed',
+            error_message: `Desbloqueado manualmente por admin: ${user.email}`,
+            finished_at: new Date().toISOString(),
+          });
+          unlocked++;
+        }
+      }
+      console.log(`[ForceUnlock] ${unlocked} jobs desbloqueados para subject=${subject_id} por ${user.email}`);
+      return Response.json({ success: true, unlocked, message: `${unlocked} job(s) desbloqueados.` });
+    }
 
     const subjects = await base44.asServiceRole.entities.Subject.filter({ id: subject_id });
     const subject = subjects[0];

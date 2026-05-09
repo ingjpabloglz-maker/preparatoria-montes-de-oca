@@ -244,6 +244,8 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
   const [showPreview, setShowPreview] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingAction, setLoadingAction] = useState(null);
+  const [lockedJobId, setLockedJobId] = useState(null);
+  const [lockedJobStatus, setLockedJobStatus] = useState(null);
   const pollRef = useRef(null);
   const logsEndRef = useRef(null);
 
@@ -259,6 +261,8 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
     setPreview(null);
     setShowPreview(false);
 
+    setLockedJobId(null);
+    setLockedJobStatus(null);
     base44.entities.CourseUnit.filter({ subject_id: subject.id })
       .then(units => setHasExisting(units.length > 0))
       .catch(() => {});
@@ -363,6 +367,8 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
         toast.info(`Generación iniciada — ${data.total_lessons} lecciones planificadas`);
       } else if (data?.locked) {
         setStatus('idle');
+        setLockedJobId(data.active_job_id || null);
+        setLockedJobStatus(data.active_job_status || null);
         toast.error(`🔒 ${data.error}`);
       } else if (data?.has_content) {
         setHasExisting(true);
@@ -379,6 +385,8 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
       const data = e?.response?.data;
       if (data?.locked) {
         setStatus('idle');
+        setLockedJobId(data.active_job_id || null);
+        setLockedJobStatus(data.active_job_status || null);
         toast.error(`🔒 ${data.error}`);
       } else if (data?.has_content) {
         setHasExisting(true);
@@ -438,6 +446,27 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
         toast.error(res.data?.error || 'Error al reanudar');
       }
     } finally { setLoadingAction(null); }
+  };
+
+  const handleForceUnlock = async () => {
+    setLoadingAction('unlock');
+    try {
+      const res = await base44.functions.invoke('generateSubjectCurriculum', {
+        subject_id: subject.id,
+        force_unlock: true,
+      });
+      if (res.data?.success) {
+        setLockedJobId(null);
+        setLockedJobStatus(null);
+        toast.success(`✅ ${res.data.message || 'Job desbloqueado.'}`);
+      } else {
+        toast.error(res.data?.error || 'No se pudo desbloquear');
+      }
+    } catch (e) {
+      toast.error(`Error: ${e.message}`);
+    } finally {
+      setLoadingAction(null);
+    }
   };
 
   const handleExportLogs = () => {
@@ -644,6 +673,30 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
           )}
 
           {/* ── Botones de acción ─────────────────────────────────────────────── */}
+
+          {/* Bloqueo detectado — botón de desbloqueo */}
+          {lockedJobId && (status === 'idle' || status === 'failed') && (
+            <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-amber-800">
+                  <p className="font-semibold">Job bloqueado ({lockedJobStatus})</p>
+                  <p className="text-xs mt-0.5 text-amber-600">ID: {lockedJobId}</p>
+                  <p className="text-xs text-amber-700 mt-1">Existe un job pausado/activo que impide iniciar. Puedes desbloquearlo manualmente.</p>
+                </div>
+              </div>
+              <Button
+                onClick={handleForceUnlock}
+                disabled={loadingAction === 'unlock'}
+                variant="outline"
+                size="sm"
+                className="w-full border-amber-400 text-amber-700 hover:bg-amber-100 gap-2"
+              >
+                {loadingAction === 'unlock' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Shield className="w-3.5 h-3.5" />}
+                {loadingAction === 'unlock' ? 'Desbloqueando...' : 'Forzar desbloqueo'}
+              </Button>
+            </div>
+          )}
 
           {/* Idle o failed: mostrar preview */}
           {(status === 'idle' || status === 'failed') && (
