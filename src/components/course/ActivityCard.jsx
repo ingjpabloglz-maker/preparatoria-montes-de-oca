@@ -156,7 +156,7 @@ export default function ActivityCard({
     setIsCorrect(correct);
     setSubmitted(true);
     playSound(correct ? 'correct_answer' : 'incorrect_answer');
-    onAnswer(activity.id, correct, correct ? (activity.points || 10) : 0, answer, 0, 1);
+    onAnswer(activity.id, correct, correct ? 10 : 0, answer, 0, 1);
   };
 
   const handleNext = () => {
