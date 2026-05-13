@@ -28,35 +28,8 @@ function gradeAnswer(activity, user_answer) {
   const correctMain = activity.correct_answer;
   const acceptedList = activity.accepted_answers || [];
 
-  // ─── multiple_select: scoring con penalización por respuestas incorrectas ──────
-  if (activity.type === 'multiple_select') {
-    // Validación estricta: user_answer debe ser array no vacío
-    if (!Array.isArray(user_answer) || user_answer.length === 0) {
-      return { correct: false, points_obtained: 0, requires_review: false };
-    }
-    // correct_answer SIEMPRE es array nativo (formato único)
-    const correctArr = Array.isArray(correctMain) ? correctMain : [];
-    if (correctArr.length === 0) {
-      return { correct: false, points_obtained: 0, requires_review: false };
-    }
-
-    // Normalizar y deduplicar con Set
-    const correctSet = new Set(correctArr.map(x => normalizeAnswer(String(x))));
-    const userSet = new Set(user_answer.map(x => normalizeAnswer(String(x))));
-
-    const correctHits = [...userSet].filter(x => correctSet.has(x)).length;
-    const wrongHits = [...userSet].filter(x => !correctSet.has(x)).length;
-
-    const rawScore = (correctHits - wrongHits) / correctSet.size;
-    const finalScore = Math.max(0, rawScore); // clamp: nunca negativo
-    const isCorrect = finalScore === 1;
-    const points_obtained = Math.round(points * finalScore);
-
-    return { correct: isCorrect, points_obtained, requires_review: false };
-  }
-
-  // ─── fill_blank / solve: comparar tokens sin importar orden ─────────────────
-  if (activity.type === 'fill_blank' || activity.type === 'solve') {
+  // ─── fill_blank: comparar tokens sin importar orden ─────────────────
+  if (activity.type === 'fill_blank') {
     const splitTokens = (str) => normalizeAnswer(str).split(/[\s,]+/).filter(Boolean).sort();
     const userTokens = JSON.stringify(splitTokens(String(user_answer)));
     const allValid = [correctMain, ...acceptedList];
@@ -237,11 +210,9 @@ Deno.serve(async (req) => {
     // Clasificar tipo de error
     let error_type = null;
     if (correct === false) {
-      if (activity.type === 'multiple_choice' || activity.type === 'multiple_select') error_type = 'wrong_option';
+      if (activity.type === 'multiple_choice') error_type = 'wrong_option';
       else if (activity.type === 'true_false') error_type = 'wrong_tf';
-      else if (activity.type === 'fill_blank' || activity.type === 'solve') error_type = 'wrong_text';
-      else if (activity.type === 'order_steps' || activity.type === 'drag_drop') error_type = 'wrong_order';
-      else if (activity.type === 'step_by_step') error_type = 'wrong_step';
+      else if (activity.type === 'fill_blank') error_type = 'wrong_text';
       else error_type = 'unknown';
     }
 

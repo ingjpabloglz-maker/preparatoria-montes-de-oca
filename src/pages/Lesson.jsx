@@ -215,8 +215,8 @@ export default function Lesson() {
 
   // Calcular resultados finales
   const correctCount = answers.filter(a => a.correct).length;
-  const totalPoints = activities.reduce((s, a) => s + (a.points || 10), 0);
-  const earnedPoints = answers.reduce((s, a) => s + a.points, 0);
+  const totalPoints = activities.length * 10;
+  const earnedPoints = answers.filter(a => a.correct).length * 10;
   const finalScore = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
   const passed = finalScore >= 60;
 
@@ -267,7 +267,6 @@ export default function Lesson() {
             onAnswer={handleActivityAnswer}
             onNext={handleNextActivity}
             consecutiveCorrect={consecutiveCorrect}
-            userEmail={user?.email}
           />
         )}
 
