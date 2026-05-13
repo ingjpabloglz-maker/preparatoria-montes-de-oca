@@ -1,164 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css';
-import { base44 } from '@/api/base44Client';
-
-// Convierte \(...\) y \[...\] a $...$ y $$...$$
-function normalizeMathDelimiters(text) {
-  if (!text) return '';
-  let str = String(text);
-  str = str.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner) => `$$${inner}$$`);
-  str = str.replace(/\\\(([\s\S]*?)\\\)/g, (_, inner) => `$${inner}$`);
-  return str;
-}
+import React from 'react';
 import { Button } from "@/components/ui/button";
-import { BookOpen, ClipboardList, CheckCircle2, Star, Zap, Info, Loader2 } from "lucide-react";
-import MathText from '../math/MathText';
+import { BookOpen, ClipboardList, CheckCircle2, Star, Zap, Info } from "lucide-react";
 
-// Ayudas visuales por tema de la lección
+// Ayudas visuales estáticas por tema
 const VISUAL_HINTS = {
-  // Conjuntos numéricos
-  'conjuntos': {
-    type: 'diagram',
-    content: '⊂ ℕ ⊂ ℤ ⊂ ℚ ⊂ ℝ',
-    detail: 'Naturales ⊂ Enteros ⊂ Racionales ⊂ Reales'
-  },
-  'recta numérica': {
-    type: 'number_line',
-    numbers: [-3, -2, -1, 0, 1, 2, 3]
-  },
-  'valor absoluto': {
-    type: 'formula',
-    formulas: ['|5| = 5', '|-5| = 5', '|0| = 0']
-  },
-  // Operaciones
-  'suma y resta de enteros': {
-    type: 'rule',
-    rules: ['(+) + (+) = +', '(−) + (−) = −', '(+) + (−) = signo del mayor']
-  },
-  'multiplicación y división': {
-    type: 'rule',
-    rules: ['(+) × (+) = +', '(−) × (−) = +', '(+) × (−) = −']
-  },
-  'fracciones: suma': {
-    type: 'formula',
-    formulas: ['a/b + c/d = (ad + bc) / bd', 'Busca el MCM de los denominadores']
-  },
-  'fracciones: multiplicación': {
-    type: 'formula',
-    formulas: ['a/b × c/d = ac / bd', 'a/b ÷ c/d = a/b × d/c']
-  },
-  // Potencias
-  'potencias': {
-    type: 'formula',
-    formulas: ['aⁿ = a × a × ... (n veces)', 'a⁰ = 1', 'a¹ = a']
-  },
-  'leyes de los exponentes': {
-    type: 'formula',
-    formulas: ['aᵐ × aⁿ = aᵐ⁺ⁿ', 'aᵐ ÷ aⁿ = aᵐ⁻ⁿ', '(aᵐ)ⁿ = aᵐⁿ']
-  },
-  'raíces': {
-    type: 'formula',
-    formulas: ['√a = a^(1/2)', '³√a = a^(1/3)', '√a × √b = √(ab)']
-  },
-  // Álgebra
-  'variable': {
-    type: 'example',
-    examples: ['3x → coef: 3, literal: x', '-5y² → coef: -5, literal: y²', '7 → término independiente']
-  },
-  'términos semejantes': {
-    type: 'example',
-    examples: ['3x + 5x = 8x  ✓ (semejantes)', '3x + 5x² ≠ 8x³  ✗', 'Solo se combinan si la parte literal es igual']
-  },
-  'simplificar expresiones': {
-    type: 'formula',
-    formulas: ['Distributiva: a(b+c) = ab + ac', '3x + 2y - x = 2x + 2y']
-  },
-  'polinomio': {
-    type: 'example',
-    examples: ['Monomio: 5x³', 'Binomio: x² + 3', 'Trinomio: 2x² - x + 1']
-  },
-  'suma y resta de polinomios': {
-    type: 'formula',
-    formulas: ['Agrupa términos semejantes', '(3x² + 2x) + (x² - 5x) = 4x² - 3x']
-  },
-  'multiplicación de polinomios': {
-    type: 'formula',
-    formulas: ['FOIL: (a+b)(c+d) = ac + ad + bc + bd', '(x+2)(x+3) = x² + 5x + 6']
-  },
-  'productos notables': {
-    type: 'formula',
-    formulas: ['(a+b)² = a² + 2ab + b²', '(a-b)² = a² - 2ab + b²', '(a+b)(a-b) = a² - b²']
-  },
-  'factor común': {
-    type: 'formula',
-    formulas: ['6x² + 9x = 3x(2x + 3)', 'Busca el MCD de todos los términos']
-  },
-  'factorización de trinomios': {
-    type: 'formula',
-    formulas: ['x² + bx + c = (x + p)(x + q)', 'donde p × q = c  y  p + q = b']
-  },
-  // Ecuaciones
-  'ecuación lineal': {
-    type: 'steps',
-    steps: ['ax + b = c', '→ ax = c - b', '→ x = (c-b)/a']
-  },
-  'resolviendo ecuaciones': {
-    type: 'steps',
-    steps: ['1. Elimina paréntesis', '2. Agrupa x de un lado', '3. Agrupa constantes del otro', '4. Despeja x']
-  },
-  'ecuación cuadrática': {
-    type: 'formula',
-    formulas: ['ax² + bx + c = 0', 'Δ = b² - 4ac', 'Δ>0: dos soluciones, Δ=0: una, Δ<0: ninguna']
-  },
-  'factorización': {
-    type: 'steps',
-    steps: ['x² + 5x + 6 = 0', '→ (x + 2)(x + 3) = 0', '→ x = -2  o  x = -3']
-  },
-  'fórmula general': {
-    type: 'formula',
-    formulas: ['x = (−b ± √(b²−4ac)) / 2a']
-  },
-  'sistemas de ecuaciones': {
-    type: 'example',
-    examples: ['x + y = 5  →  (ec. 1)', '2x - y = 4  →  (ec. 2)', 'Solución: (x, y) satisface ambas']
-  },
-  'sustitución': {
-    type: 'steps',
-    steps: ['1. Despeja x de ec.1', '2. Sustituye en ec.2', '3. Resuelve para y', '4. Halla x']
-  },
-  'eliminación': {
-    type: 'steps',
-    steps: ['1. Ajusta coeficientes', '2. Suma o resta las ecuaciones', '3. Resuelve la variable', '4. Sustituye para hallar la otra']
-  },
-  // Funciones
-  'función': {
-    type: 'diagram',
-    content: 'f: X → Y',
-    detail: 'A cada x le corresponde exactamente un f(x)'
-  },
-  'dominio y rango': {
-    type: 'example',
-    examples: ['Dominio = conjunto de entradas (x)', 'Rango = conjunto de salidas f(x)', 'f(x)=√x → dominio: x ≥ 0']
-  },
-  'evaluación de funciones': {
-    type: 'formula',
-    formulas: ['f(a) → sustituye x = a', 'f(x) = x² + 1 → f(3) = 9 + 1 = 10']
-  },
-  'función lineal': {
-    type: 'formula',
-    formulas: ['f(x) = mx + b', 'm = pendiente (inclinación)', 'b = intercepto en y']
-  },
-  'pendiente': {
-    type: 'formula',
-    formulas: ['m = (y₂ - y₁) / (x₂ - x₁)', 'm > 0: crece, m < 0: decrece', 'm = 0: horizontal']
-  },
-  'parábola': {
-    type: 'formula',
-    formulas: ['f(x) = ax² + bx + c', 'a > 0: abre ↑ (mínimo)', 'a < 0: abre ↓ (máximo)', 'Vértice: x = -b/2a']
-  },
+  'conjuntos': { type: 'diagram', content: '⊂ ℕ ⊂ ℤ ⊂ ℚ ⊂ ℝ', detail: 'Naturales ⊂ Enteros ⊂ Racionales ⊂ Reales' },
+  'recta numérica': { type: 'number_line', numbers: [-3, -2, -1, 0, 1, 2, 3] },
+  'valor absoluto': { type: 'formula', formulas: ['|5| = 5', '|-5| = 5', '|0| = 0'] },
+  'suma y resta de enteros': { type: 'rule', rules: ['(+) + (+) = +', '(−) + (−) = −', '(+) + (−) = signo del mayor'] },
+  'multiplicación y división': { type: 'rule', rules: ['(+) × (+) = +', '(−) × (−) = +', '(+) × (−) = −'] },
+  'potencias': { type: 'formula', formulas: ['aⁿ = a × a × ... (n veces)', 'a⁰ = 1', 'a¹ = a'] },
+  'leyes de los exponentes': { type: 'formula', formulas: ['aᵐ × aⁿ = aᵐ⁺ⁿ', 'aᵐ ÷ aⁿ = aᵐ⁻ⁿ', '(aᵐ)ⁿ = aᵐⁿ'] },
+  'productos notables': { type: 'formula', formulas: ['(a+b)² = a² + 2ab + b²', '(a-b)² = a² - 2ab + b²', '(a+b)(a-b) = a² - b²'] },
+  'ecuación lineal': { type: 'steps', steps: ['ax + b = c', '→ ax = c - b', '→ x = (c-b)/a'] },
+  'fórmula general': { type: 'formula', formulas: ['x = (−b ± √(b²−4ac)) / 2a'] },
+  'función lineal': { type: 'formula', formulas: ['f(x) = mx + b', 'm = pendiente', 'b = intercepto en y'] },
 };
 
 function getVisualHint(title) {
@@ -176,24 +32,20 @@ function VisualHint({ hint }) {
   if (hint.type === 'number_line') {
     return (
       <div className="bg-slate-800/60 rounded-xl p-4 mb-5 border border-white/10 w-full max-w-lg">
-        <div className="flex items-center gap-1 mb-2">
-          <span className="text-xs text-white/50 font-semibold uppercase tracking-wide">Recta numérica</span>
-        </div>
-        <div className="relative overflow-x-auto">
-          <div className="flex items-center justify-center gap-0 min-w-max mx-auto">
-            <div className="w-6 h-0.5 bg-white/40" />
-            {hint.numbers.map((n, i) => (
-              <React.Fragment key={n}>
-                <div className="flex flex-col items-center">
-                  <div className="w-0.5 h-3 bg-white/60 mb-1" />
-                  <span className={`text-xs font-bold ${n === 0 ? 'text-yellow-400' : n < 0 ? 'text-red-400' : 'text-green-400'}`}>{n}</span>
-                </div>
-                {i < hint.numbers.length - 1 && <div className="w-7 h-0.5 bg-white/40" />}
-              </React.Fragment>
-            ))}
-            <div className="w-6 h-0.5 bg-white/40" />
-            <span className="text-white/60 ml-1 text-sm">→</span>
-          </div>
+        <span className="text-xs text-white/50 font-semibold uppercase tracking-wide block mb-2">Recta numérica</span>
+        <div className="flex items-center justify-center gap-0 overflow-x-auto">
+          <div className="w-6 h-0.5 bg-white/40" />
+          {hint.numbers.map((n, i) => (
+            <React.Fragment key={n}>
+              <div className="flex flex-col items-center">
+                <div className="w-0.5 h-3 bg-white/60 mb-1" />
+                <span className={`text-xs font-bold ${n === 0 ? 'text-yellow-400' : n < 0 ? 'text-red-400' : 'text-green-400'}`}>{n}</span>
+              </div>
+              {i < hint.numbers.length - 1 && <div className="w-7 h-0.5 bg-white/40" />}
+            </React.Fragment>
+          ))}
+          <div className="w-6 h-0.5 bg-white/40" />
+          <span className="text-white/60 ml-1 text-sm">→</span>
         </div>
       </div>
     );
@@ -208,9 +60,7 @@ function VisualHint({ hint }) {
         </div>
         <div className="space-y-1.5">
           {hint.formulas.map((f, i) => (
-            <div key={i} className="bg-white/5 rounded-lg px-3 py-2 font-mono text-sm text-white/90 border border-white/10">
-              {f}
-            </div>
+            <div key={i} className="bg-white/5 rounded-lg px-3 py-2 font-mono text-sm text-white/90 border border-white/10">{f}</div>
           ))}
         </div>
       </div>
@@ -230,27 +80,7 @@ function VisualHint({ hint }) {
               r.includes('= +') ? 'bg-green-500/15 border-green-500/30 text-green-300' :
               r.includes('= −') || r.includes('= -') ? 'bg-red-500/15 border-red-500/30 text-red-300' :
               'bg-amber-500/15 border-amber-500/30 text-amber-300'
-            }`}>
-              {r}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (hint.type === 'example') {
-    return (
-      <div className="bg-slate-800/60 rounded-xl p-4 mb-5 border border-white/10 w-full max-w-lg">
-        <div className="flex items-center gap-1.5 mb-2">
-          <BookOpen className="w-3.5 h-3.5 text-violet-400" />
-          <span className="text-xs text-white/50 font-semibold uppercase tracking-wide">Ejemplos</span>
-        </div>
-        <div className="space-y-1.5">
-          {hint.examples.map((e, i) => (
-            <div key={i} className="bg-white/5 rounded-lg px-3 py-2 text-sm text-white/85 border border-white/10 font-mono">
-              {e}
-            </div>
+            }`}>{r}</div>
           ))}
         </div>
       </div>
@@ -290,121 +120,13 @@ function VisualHint({ hint }) {
 
 export default function LessonIntro({ lesson, activitiesCount, isMiniEval, alreadyCompleted, previousScore, onStart }) {
   const visualHint = getVisualHint(lesson?.title);
-  const [enrichedExplanation, setEnrichedExplanation] = useState(null);
-  const [loadingExplanation, setLoadingExplanation] = useState(false);
-
-  const [lessonVisuals, setLessonVisuals] = useState([]); // [{prompt, url, position}]
-  const [loadingVisuals, setLoadingVisuals] = useState(false);
-
-  useEffect(() => {
-    if (!lesson?.explanation || isMiniEval) return;
-
-    // Si ya existe una explicación cacheada en la entidad, usarla directamente
-    if (lesson.ai_explanation) {
-      try {
-        const parsed = JSON.parse(lesson.ai_explanation);
-        setEnrichedExplanation(parsed.explanation || lesson.ai_explanation);
-        if (parsed.visuals?.length) {
-          // Generar imágenes si no están cacheadas
-          generateVisuals(parsed.visuals);
-        }
-      } catch {
-        setEnrichedExplanation(lesson.ai_explanation);
-      }
-      return;
-    }
-
-    // Si no existe, generarla con IA y guardarla en la entidad para todos los usuarios
-    setLoadingExplanation(true);
-    base44.integrations.Core.InvokeLLM({
-      prompt: `Eres un profesor experto en educación media superior.
-
-Genera una explicación clara, estructurada y didáctica del tema: "${lesson.title}".
-
-Contexto base (amplía y mejora esto): "${lesson.explanation}"
-
-REQUISITOS:
-- Usa formato Markdown con subtítulos (##)
-- Párrafos cortos (máximo 3-4 líneas)
-- Incluye al menos un ejemplo claro
-- Explica paso a paso cuando sea necesario
-- Usa listas cuando ayuden a la claridad
-
-FORMATO OBLIGATORIO:
-## Concepto
-Explicación clara del tema
-
-## Ejemplo
-Ejemplo explicado paso a paso
-
-## Regla clave
-Resumen simple y directo
-
-MATEMÁTICAS (MUY IMPORTANTE):
-- USA SIEMPRE LaTeX para expresiones matemáticas
-- Fracciones: $\\frac{2}{3}$
-- Potencias: $x^2$
-- Raíces: $\\sqrt{2}$
-- Ecuaciones en línea: $ax + b = c$
-- NUNCA escribas: 2/3, sqrt(2), x^2 como texto plano
-- Si el tema es matemático, TODA expresión numérica debe estar en LaTeX
-
-LONGITUD: Completo pero conciso. No excedas 300 palabras.
-
-APOYOS VISUALES:
-Además del texto, si el tema se beneficia de una imagen educativa, incluye hasta 2 visuales.
-Devuelve tu respuesta en formato JSON con esta estructura exacta:
-{
-  "explanation": "texto completo en Markdown",
-  "visuals": [
-    {
-      "prompt": "descripción detallada en inglés para generar la imagen educativa. Debe ser clara, educativa, sin texto dentro de la imagen. Ejemplo: 'Clean educational diagram showing the real number line with natural, integer, rational and real number sets illustrated as nested circles on white background'",
-      "position": "after_explanation"
-    }
-  ]
-}
-Si no hay visuals necesarios, devuelve "visuals": [].
-IMPORTANTE: devuelve SOLO el JSON, sin bloques de código markdown.`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          explanation: { type: "string" },
-          visuals: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                prompt: { type: "string" },
-                position: { type: "string" }
-              }
-            }
-          }
-        }
-      }
-    }).then(result => {
-      const explanation = result?.explanation || lesson.explanation;
-      const visuals = result?.visuals || [];
-      setEnrichedExplanation(explanation);
-      if (visuals.length) generateVisuals(visuals);
-      // Guardar en la entidad para que otros usuarios no tengan que regenerarla
-      base44.entities.CourseLesson.update(lesson.id, { ai_explanation: JSON.stringify({ explanation, visuals }) });
-    }).finally(() => {
-      setLoadingExplanation(false);
-    });
-  }, [lesson?.id]);
-
-  // Generación de imágenes desactivada — reducción de consumo de créditos
-  const generateVisuals = async (_visuals) => {
-    setLessonVisuals([]);
-    setLoadingVisuals(false);
-  };
 
   return (
     <div className="flex flex-col items-center text-center py-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
       {/* Icon */}
       <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-6 shadow-lg ${
-        isMiniEval 
-          ? 'bg-gradient-to-br from-amber-400 to-orange-500' 
+        isMiniEval
+          ? 'bg-gradient-to-br from-amber-400 to-orange-500'
           : 'bg-gradient-to-br from-blue-500 to-violet-600'
       }`}>
         {isMiniEval
@@ -413,17 +135,14 @@ IMPORTANTE: devuelve SOLO el JSON, sin bloques de código markdown.`,
         }
       </div>
 
-      {/* Badge */}
       {isMiniEval && (
         <div className="bg-amber-500/20 text-amber-300 text-xs font-semibold px-3 py-1.5 rounded-full mb-3 border border-amber-500/30">
           ⭐ Mini Evaluación del Módulo
         </div>
       )}
 
-      {/* Title */}
       <h1 className="text-2xl sm:text-3xl font-bold text-white mb-3">{lesson.title}</h1>
 
-      {/* Already completed badge */}
       {alreadyCompleted && previousScore !== undefined && (
         <div className="flex items-center gap-2 bg-green-500/20 text-green-300 text-sm px-4 py-2 rounded-full mb-4 border border-green-500/30">
           <CheckCircle2 className="w-4 h-4" />
@@ -431,65 +150,33 @@ IMPORTANTE: devuelve SOLO el JSON, sin bloques de código markdown.`,
         </div>
       )}
 
-      {/* Explanation */}
+      {/* Explicación pregenerada */}
       {lesson.explanation && (
         <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 mb-4 text-left border border-white/10 max-w-lg w-full">
           <div className="flex items-center gap-2 mb-3">
             <Zap className="w-4 h-4 text-yellow-400" />
             <span className="text-xs font-semibold text-white/60 uppercase tracking-wide">Explicación</span>
           </div>
-          {loadingExplanation ? (
-            <div className="flex items-center gap-2 text-white/50 text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Preparando explicación...</span>
-            </div>
-          ) : (
-            <div className="text-white/85 text-sm leading-relaxed prose prose-sm prose-invert max-w-none [&_h2]:text-white [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0.5 [&_.katex]:text-white">
-              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                {normalizeMathDelimiters(enrichedExplanation || lesson.explanation)}
-              </ReactMarkdown>
-            </div>
-          )}
-          {/* Imágenes educativas generadas por IA */}
-          {loadingVisuals && (
-            <div className="flex items-center gap-2 text-white/40 text-xs mt-3">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              <span>Generando apoyos visuales...</span>
-            </div>
-          )}
-          {lessonVisuals.map((v, i) => (
-            <img
-              key={i}
-              src={v.url}
-              alt="Apoyo visual educativo"
-              loading="lazy"
-              className="w-full rounded-xl mt-3 border border-white/10 object-contain max-h-64"
-            />
-          ))}
+          <p className="text-white/85 text-sm leading-relaxed whitespace-pre-line">{lesson.explanation}</p>
         </div>
       )}
 
-      {/* Visual Hint */}
+      {/* Visual Hint estático */}
       {visualHint && !isMiniEval && <VisualHint hint={visualHint} />}
 
-      {/* Info Row */}
+      {/* Info */}
       <div className="flex items-center gap-4 text-sm text-white/50 mb-8">
         <div className="flex items-center gap-1.5">
           <Star className="w-4 h-4 text-amber-400" />
           <span>{activitiesCount} actividades</span>
         </div>
         {isMiniEval ? (
-          <div className="flex items-center gap-1.5">
-            <span>Pasa con ≥60%</span>
-          </div>
+          <span>Pasa con ≥60%</span>
         ) : (
-          <div className="flex items-center gap-1.5">
-            <span>~{Math.ceil(activitiesCount * 0.5)} min</span>
-          </div>
+          <span>~{Math.ceil(activitiesCount * 0.5)} min</span>
         )}
       </div>
 
-      {/* CTA */}
       <Button
         onClick={onStart}
         size="lg"
