@@ -43,15 +43,9 @@ async function invokeLLMWithTimeout(base44, prompt, ms = 45000) {
   ]);
 }
 
-// Máximo 2 intentos, sin espera entre ellos
+// 1 intento con timeout duro — si falla, el catch en generateLesson usa fallback
 async function invokeLLM(base44, prompt) {
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      return await invokeLLMWithTimeout(base44, prompt, 45000);
-    } catch (err) {
-      if (attempt === 2) throw err;
-    }
-  }
+  return invokeLLMWithTimeout(base44, prompt, 45000);
 }
 
 // ─── Prompt estructurado ──────────────────────────────────────────────────────
@@ -313,15 +307,10 @@ async function generateLesson(base44, { module_id, subject_id, subject_name, top
 
   for (let i = 0; i < activities.length; i++) {
     const a = activities[i];
-    // Unicidad por lesson_id + order: no crear si ya existe
-    const existingActs = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: lesson.id });
-    const dupAct = existingActs.find(ea => ea.order === i + 1);
-    if (!dupAct) {
-      await base44.asServiceRole.entities.CourseActivity.create({
-        lesson_id: lesson.id, type: a.type, question: a.question,
-        options: a.options, correct_answer: a.correct_answer, explanation: a.explanation, order: i + 1,
-      });
-    }
+    await base44.asServiceRole.entities.CourseActivity.create({
+      lesson_id: lesson.id, type: a.type, question: a.question,
+      options: a.options, correct_answer: a.correct_answer, explanation: a.explanation, order: i + 1,
+    });
   }
 
   await base44.asServiceRole.entities.CourseLesson.update(lesson.id, { generation_completed: true });
