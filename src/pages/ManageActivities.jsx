@@ -151,9 +151,9 @@ export default function ManageActivities() {
                 <div className="text-sm text-blue-800 space-y-1">
                   <p className="font-semibold">Reglas de generación activas:</p>
                   <ul className="list-disc ml-4 space-y-0.5 text-blue-700">
-                    <li>Lecciones normales: 7–11 actividades | Mini-eval: 10–15 actividades</li>
-                    <li>Distribución: 40% fácil, 40% medio, 20% difícil</li>
-                    <li>Tipos obligatorios: multiple_select, drag_drop, step_by_step, multiple_choice, true_false, fill_blank</li>
+                    <li>Mínimo 4 actividades por lección (4–5 generadas por LLM)</li>
+                    <li>Tipos: multiple_choice, true_false, fill_blank</li>
+                    <li>Fallback local automático si el LLM no genera suficientes</li>
                   </ul>
                 </div>
               </div>
@@ -301,7 +301,7 @@ export default function ManageActivities() {
                       const actCount = activitiesCounts[lesson.id] ?? null;
                       const result = results[lesson.id];
                       const isGenerating = generatingId === lesson.id;
-                      const needsMore = actCount !== null && (lesson.is_mini_eval ? actCount < 10 : actCount < 7);
+                      const needsMore = actCount !== null && actCount < 4;
 
                       return (
                         <div key={lesson.id} className={`flex items-center gap-3 p-3 rounded-xl border ${needsMore ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-white'}`}>
