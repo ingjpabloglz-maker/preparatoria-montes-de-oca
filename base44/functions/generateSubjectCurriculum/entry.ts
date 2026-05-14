@@ -1,10 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// generateSubjectCurriculum — v6
-// • 1 llamada LLM por lección
+// generateSubjectCurriculum — v7
+// • 1 llamada LLM por lección (timeout 45s, fallback inmediato)
 // • Solo: multiple_choice, true_false, fill_blank
 // • Unicidad lógica por (parent_id + order)
-// • Cleanup total en overwrite=true
+// • Cleanup SELECTIVO en overwrite=true (solo borra la selección actual)
 // • Protección contra concurrencia
 // • Validación post-generación con auto-limpieza de duplicados
 
