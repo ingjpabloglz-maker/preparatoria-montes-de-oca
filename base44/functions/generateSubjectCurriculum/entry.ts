@@ -200,38 +200,64 @@ function buildStructure(syllabus) {
   }));
 }
 
-// ─── Cleanup total: Activity → Lesson → Module → Unit ────────────────────────
-async function cleanupSubject(base44, subject_id, log) {
-  await log('[' + ts() + '] 🗑️ Iniciando limpieza completa...');
+// ─── Cleanup selectivo: solo borra lo que está en filteredStructure ───────────
+// Orden: Activities → Lessons → Modules vacíos → Units vacías
+async function cleanupSelectedContent(base44, subject_id, filteredStructure, log) {
+  await log('[' + ts() + '] 🗑️ Limpieza selectiva...');
+  let actCount = 0, lessonCount = 0, modCount = 0, unitCount = 0;
 
-  const allLessons = await base44.asServiceRole.entities.CourseLesson.filter({ subject_id });
-  let actCount = 0;
-  for (const lesson of allLessons) {
-    const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: lesson.id });
-    for (const a of acts) {
-      await base44.asServiceRole.entities.CourseActivity.delete(a.id);
-      await sleep(50);
-      actCount++;
+  // Obtener todas las unidades existentes para la materia
+  const allUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
+
+  for (const unitBp of filteredStructure) {
+    // Encontrar la unidad existente por order
+    const existingUnit = allUnits.find(u => u.order === unitBp.order);
+    if (!existingUnit) continue;
+
+    // Obtener módulos de esta unidad
+    const allMods = await base44.asServiceRole.entities.CourseModule.filter({ unit_id: existingUnit.id });
+
+    for (const modBp of unitBp.modules) {
+      // Encontrar el módulo existente por order
+      const existingMod = allMods.find(m => m.order === modBp.order);
+      if (!existingMod) continue;
+
+      // Obtener lecciones de este módulo
+      const allLessons = await base44.asServiceRole.entities.CourseLesson.filter({ module_id: existingMod.id });
+
+      for (const lessonBp of modBp.lessons) {
+        // Encontrar la lección existente por order
+        const existingLesson = allLessons.find(l => l.order === lessonBp.order);
+        if (!existingLesson) continue;
+
+        // Borrar actividades de esta lección
+        const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: existingLesson.id });
+        for (const a of acts) {
+          await base44.asServiceRole.entities.CourseActivity.delete(a.id);
+          actCount++;
+        }
+        // Borrar la lección
+        await base44.asServiceRole.entities.CourseLesson.delete(existingLesson.id);
+        lessonCount++;
+      }
+
+      // Borrar módulo solo si quedó completamente vacío
+      const remainingLessons = await base44.asServiceRole.entities.CourseLesson.filter({ module_id: existingMod.id });
+      if (remainingLessons.length === 0) {
+        await base44.asServiceRole.entities.CourseModule.delete(existingMod.id);
+        modCount++;
+      }
+    }
+
+    // Borrar unidad solo si quedó completamente vacía
+    const remainingMods = await base44.asServiceRole.entities.CourseModule.filter({ unit_id: existingUnit.id });
+    if (remainingMods.length === 0) {
+      await base44.asServiceRole.entities.CourseUnit.delete(existingUnit.id);
+      unitCount++;
     }
   }
-  for (const lesson of allLessons) {
-    await base44.asServiceRole.entities.CourseLesson.delete(lesson.id);
-    await sleep(50);
-  }
 
-  const allModules = await base44.asServiceRole.entities.CourseModule.filter({ subject_id });
-  for (const mod of allModules) {
-    await base44.asServiceRole.entities.CourseModule.delete(mod.id);
-    await sleep(50);
-  }
-
-  const allUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
-  for (const unit of allUnits) {
-    await base44.asServiceRole.entities.CourseUnit.delete(unit.id);
-    await sleep(50);
-  }
-
-  await log('[' + ts() + '] ✅ Limpieza: ' + actCount + ' actividades, ' + allLessons.length + ' lecciones, ' + allModules.length + ' módulos, ' + allUnits.length + ' unidades eliminadas');
+  await log('[' + ts() + '] ✅ Limpieza selectiva: ' + actCount + ' act, ' + lessonCount + ' lec, ' + modCount + ' mod, ' + unitCount + ' uni eliminados');
 }
 
 // ─── Upsert por unicidad lógica (parent_id + order) ──────────────────────────
@@ -512,9 +538,9 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.CurriculumGenerationJob.update(job.id, { status: 'processing', last_activity_at: new Date().toISOString() });
         await log('[' + ts() + '] 🚀 "' + subject.name + '" — ' + totalLessons + ' lecciones');
 
-        // Cleanup total SIEMPRE en overwrite=true
+        // Cleanup selectivo: solo borra lo que está en la selección actual
         if (overwrite) {
-          await cleanupSubject(base44, subject_id, log);
+          await cleanupSelectedContent(base44, subject_id, filteredStructure, log);
         }
 
         for (const unitBp of filteredStructure) {
