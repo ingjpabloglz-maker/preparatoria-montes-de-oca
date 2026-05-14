@@ -16,35 +16,38 @@ const MAX_TOTAL_LESSONS = 26;
 function ts() { return new Date().toLocaleTimeString('es-MX', { hour12: false }); }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ─── LLM con retry simple ─────────────────────────────────────────────────────
-async function invokeLLM(base44, prompt) {
-  for (let attempt = 0; attempt <= 2; attempt++) {
-    if (attempt > 0) await sleep(attempt * 10000);
-    try {
-      const result = await Promise.race([
-        base44.asServiceRole.integrations.Core.InvokeLLM({
-          prompt,
-          response_json_schema: {
+// ─── LLM con timeout duro ─────────────────────────────────────────────────────
+async function invokeLLMWithTimeout(base44, prompt, ms = 45000) {
+  return Promise.race([
+    base44.asServiceRole.integrations.Core.InvokeLLM({
+      prompt,
+      response_json_schema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          explanation: {
             type: 'object',
             properties: {
-              title: { type: 'string' },
-              explanation: {
-                type: 'object',
-                properties: {
-                  intro: { type: 'string' },
-                  key_points: { type: 'array', items: { type: 'object' } },
-                  examples: { type: 'array', items: { type: 'object' } },
-                  summary: { type: 'string' }
-                }
-              },
-              activities: { type: 'array', items: { type: 'object' } }
-            },
-            required: ['title', 'explanation', 'activities']
-          }
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('LLM timeout')), 90000))
-      ]);
-      return result;
+              intro: { type: 'string' },
+              key_points: { type: 'array', items: { type: 'object' } },
+              examples: { type: 'array', items: { type: 'object' } },
+              summary: { type: 'string' }
+            }
+          },
+          activities: { type: 'array', items: { type: 'object' } }
+        },
+        required: ['title', 'explanation', 'activities']
+      }
+    }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('LLM_TIMEOUT')), ms))
+  ]);
+}
+
+// Máximo 2 intentos, sin espera entre ellos
+async function invokeLLM(base44, prompt) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await invokeLLMWithTimeout(base44, prompt, 45000);
     } catch (err) {
       if (attempt === 2) throw err;
     }
@@ -293,7 +296,9 @@ async function generateLesson(base44, { module_id, subject_id, subject_name, top
       }));
     }
   } catch (err) {
-    await log('[' + ts() + '] ⚠️ LLM falló: ' + err.message);
+    const isTimeout = err.message === 'LLM_TIMEOUT';
+    await log('[' + ts() + '] ⚠️ ' + (isTimeout ? 'TIMEOUT — usando fallback' : 'LLM falló: ' + err.message));
+    // Fallback inmediato, no reintentar más
   }
 
   if (activities.length < 4) {
