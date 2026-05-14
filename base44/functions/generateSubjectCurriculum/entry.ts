@@ -202,8 +202,8 @@ function buildStructure(syllabus) {
 
 // ─── Cleanup selectivo: solo borra lo que está en filteredStructure ───────────
 // Orden: Activities → Lessons → Modules vacíos → Units vacías
-async function cleanupSelectedContent(base44, subject_id, filteredStructure, log) {
-  await log('[' + ts() + '] 🗑️ Limpieza selectiva...');
+async function cleanupSelectedContent(base44, subject_id, filteredStructure, log, selectionSummary) {
+  await log('[' + ts() + '] 🗑️ Limpiando contenido seleccionado: ' + (selectionSummary || filteredStructure.map(u => u.title).join(', ')));
   let actCount = 0, lessonCount = 0, modCount = 0, unitCount = 0;
 
   // Obtener todas las unidades existentes para la materia
@@ -507,6 +507,11 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── Protección: overwrite sin selección explícita es peligroso ──
+    if (overwrite && (!lesson_selection || !Array.isArray(lesson_selection) || lesson_selection.length === 0)) {
+      throw new Error('lesson_selection is required. Refusing full-subject overwrite.');
+    }
+
     if (!overwrite) {
       const existing = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
       if (existing.length > 0) return Response.json({ error: 'Ya tiene contenido. Usa overwrite=true.', has_content: true }, { status: 409 });
@@ -540,7 +545,9 @@ Deno.serve(async (req) => {
 
         // Cleanup selectivo: solo borra lo que está en la selección actual
         if (overwrite) {
-          await cleanupSelectedContent(base44, subject_id, filteredStructure, log);
+          console.log('SELECTION_RECEIVED', lesson_selection);
+          const selectionSummary = filteredStructure.map(u => u.title).join(', ');
+          await cleanupSelectedContent(base44, subject_id, filteredStructure, log, selectionSummary);
         }
 
         for (const unitBp of filteredStructure) {
