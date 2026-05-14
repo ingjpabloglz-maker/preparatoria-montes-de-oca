@@ -9,9 +9,6 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 // • Validación post-generación con auto-limpieza de duplicados
 
 const VALID_TYPES = ['multiple_choice', 'true_false', 'fill_blank'];
-const MAX_UNITS = 4;
-const MAX_MODULES = 10;
-const MAX_TOTAL_LESSONS = 26;
 
 function ts() { return new Date().toLocaleTimeString('es-MX', { hour12: false }); }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -130,73 +127,20 @@ function localFallback(title, subjectName, count) {
   return items.slice(0, count);
 }
 
-// ─── Agrupación pedagógica ────────────────────────────────────────────────────
-const TOPIC_GROUPS = [
-  { pattern: /natural|entero|racional|irracional|real|clasificaci/i, title: 'Números reales y su clasificación' },
-  { pattern: /suma|resta|multiplicaci|divisi|operaci|aritmética/i, title: 'Operaciones fundamentales' },
-  { pattern: /media|mediana|moda|tendencia central|promedio/i, title: 'Medidas de tendencia central' },
-  { pattern: /fraccion|fracción|decimal|porcentaje|proporci/i, title: 'Fracciones, decimales y porcentajes' },
-  { pattern: /potencia|exponente|raíz|radical|logaritmo/i, title: 'Potencias, radicales y logaritmos' },
-  { pattern: /ecuaci|inecuaci|sistema/i, title: 'Ecuaciones e inecuaciones' },
-  { pattern: /función|funcion|dominio|rango/i, title: 'Funciones y sus representaciones' },
-  { pattern: /polinomio|monomio|binomio|álgebra/i, title: 'Expresiones algebraicas y polinomios' },
-  { pattern: /trigonom|seno|coseno|tangente/i, title: 'Trigonometría básica' },
-  { pattern: /geom|área|perímet|volumen|figura/i, title: 'Geometría y medición' },
-  { pattern: /probabilidad|estadística|frecuencia/i, title: 'Probabilidad y estadística' },
-];
-const MICRO = [/^definici/i, /^concepto de/i, /^introducción a/i, /^qué es/i, /^generalidades/i];
-
-function groupLessons(rawLessons, moduleName) {
-  const minis = rawLessons.filter(l => l.is_mini_eval);
-  const normals = rawLessons.filter(l => !l.is_mini_eval);
-  const grouped = [];
-  const used = new Set();
-
-  for (const g of TOPIC_GROUPS) {
-    const matches = normals.filter((l, i) => !used.has(i) && g.pattern.test(l.topic));
-    if (matches.length >= 2) {
-      matches.map(m => normals.indexOf(m)).forEach(i => used.add(i));
-      grouped.push({ topic: g.title, order: grouped.length + 1, is_mini_eval: false });
-    }
-  }
-
-  const remaining = normals.filter((_, i) => !used.has(i));
-  let i = 0;
-  while (i < remaining.length) {
-    if (grouped.length >= 3) break;
-    const cur = remaining[i];
-    const next = remaining[i + 1];
-    if (MICRO.some(rx => rx.test(cur.topic)) && next) {
-      grouped.push({ topic: next.topic, order: grouped.length + 1, is_mini_eval: false });
-      i += 2;
-    } else {
-      grouped.push({ topic: cur.topic, order: grouped.length + 1, is_mini_eval: false });
-      i++;
-    }
-  }
-
-  const final = grouped.slice(0, 3).map((l, idx) => ({ ...l, order: idx + 1 }));
-  if (minis.length > 0) {
-    final.push({ topic: 'Mini evaluación: ' + moduleName, order: final.length + 1, is_mini_eval: true });
-  }
-  return final;
-}
-
+// ─── Estructura 1:1 del sílabo (sin recortes) ────────────────────────────────
 function buildStructure(syllabus) {
-  const units = (syllabus.units || []).slice(0, MAX_UNITS);
-  let moduleCount = 0, lessonCount = 0;
-  const moduleSlot = Math.min(units.reduce((s, u) => s + (u.modules || []).length, 0), MAX_MODULES);
-
-  return units.map((unit, ui) => ({
+  return (syllabus.units || []).map((unit, ui) => ({
     title: unit.title,
     order: ui + 1,
-    modules: (unit.modules || []).filter(() => moduleCount < moduleSlot).map((mod, mi) => {
-      if (moduleCount >= moduleSlot) return null;
-      moduleCount++;
-      const lessons = groupLessons(mod.lessons || [], mod.title).slice(0, Math.max(MAX_TOTAL_LESSONS - lessonCount, 1));
-      lessonCount += lessons.length;
-      return { title: mod.title, order: mi + 1, lessons };
-    }).filter(Boolean),
+    modules: (unit.modules || []).map((mod, mi) => ({
+      title: mod.title,
+      order: mi + 1,
+      lessons: (mod.lessons || []).map((l, li) => ({
+        topic: l.topic,
+        order: li + 1,
+        is_mini_eval: l.is_mini_eval || false,
+      })),
+    })),
   }));
 }
 
