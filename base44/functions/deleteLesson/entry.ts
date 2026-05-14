@@ -16,11 +16,11 @@ Deno.serve(async (req) => {
     // Borrar todas las actividades de la lección
     const acts = await sa.entities.CourseActivity.filter({ lesson_id });
     for (const a of acts) {
-      await sa.entities.CourseActivity.delete(a.id);
+      try { await sa.entities.CourseActivity.delete(a.id); } catch (_) {}
     }
 
-    // Borrar la lección
-    await sa.entities.CourseLesson.delete(lesson_id);
+    // Borrar la lección (ignorar si ya no existe)
+    try { await sa.entities.CourseLesson.delete(lesson_id); } catch (_) {}
 
     return Response.json({ success: true, deleted_activities: acts.length });
   } catch (e) {
