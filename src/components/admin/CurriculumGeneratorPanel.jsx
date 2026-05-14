@@ -285,9 +285,8 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
     setStatus('generating');
     setJobRecord(null);
     try {
-      const payload = { subject_id: subject.id, overwrite };
-      // Si no es generación completa, pasar selección al backend
-      if (!isFullGeneration) payload.lesson_selection = selection;
+      // SIEMPRE enviar lesson_selection para que el cleanup selectivo sepa exactamente qué borrar
+      const payload = { subject_id: subject.id, overwrite, lesson_selection: selection };
 
       const res = await base44.functions.invoke('generateSubjectCurriculum', payload);
       const data = res.data;
