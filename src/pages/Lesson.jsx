@@ -255,6 +255,7 @@ export default function Lesson() {
             alreadyCompleted={existingProgress?.completed}
             previousScore={existingProgress?.score}
             onStart={handleStart}
+            subjectName={lessonSubject?.name}
           />
         )}
 

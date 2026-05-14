@@ -2,10 +2,162 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { BookOpen, ClipboardList, CheckCircle2, Star, Zap, Info, Lightbulb, FlaskConical } from "lucide-react";
 
-// ─── Renderizado de explanation estructurada ──────────────────────────────────
+// ─── Detección de materia ─────────────────────────────────────────────────────
+function detectSubjectType(subjectName = '') {
+  const s = subjectName.toLowerCase();
+  if (/matem|álgebra|algebra|cálculo|calculo|geometr|trigon|estadíst/.test(s)) return 'math';
+  if (/física|fisica|química|quimica|biolog|ciencia/.test(s)) return 'science';
+  if (/historia|filosofía|filosofia|literatura|ética|etica|sociolog|geografía/.test(s)) return 'humanities';
+  if (/informát|informatic|programac|computac|tecnolog|software|hardware/.test(s)) return 'tech';
+  if (/econom|contabilidad|administrac|finanz/.test(s)) return 'economics';
+  return 'default';
+}
 
-function StructuredExplanation({ explanation }) {
-  // Retrocompatibilidad: si es string plano, mostrarlo directo
+// ─── Estilos por materia ──────────────────────────────────────────────────────
+const SUBJECT_THEMES = {
+  math: {
+    accent: 'blue',
+    keyPointBg: 'bg-slate-800/70 border-slate-600/40',
+    keyPointTitle: 'text-cyan-300',
+    keyPointContent: 'text-slate-200',
+    exampleBg: 'bg-blue-900/30 border-blue-500/30',
+    exampleQ: 'text-blue-200',
+    exampleS: 'text-cyan-300',
+    introBg: 'bg-blue-500/15 border-blue-500/30',
+    introText: 'text-blue-300',
+    summaryBg: 'bg-violet-500/15 border-violet-500/30',
+    summaryText: 'text-violet-300',
+    exampleLabel: '🔢 Ejercicio',
+    useMono: true,
+  },
+  science: {
+    accent: 'emerald',
+    keyPointBg: 'bg-emerald-900/30 border-emerald-700/30',
+    keyPointTitle: 'text-emerald-300',
+    keyPointContent: 'text-slate-200',
+    exampleBg: 'bg-teal-900/30 border-teal-500/30',
+    exampleQ: 'text-teal-200',
+    exampleS: 'text-emerald-300',
+    introBg: 'bg-emerald-500/15 border-emerald-500/30',
+    introText: 'text-emerald-300',
+    summaryBg: 'bg-teal-500/15 border-teal-500/30',
+    summaryText: 'text-teal-300',
+    exampleLabel: '🧪 Experimento',
+    useMono: false,
+  },
+  humanities: {
+    accent: 'amber',
+    keyPointBg: 'bg-amber-900/25 border-amber-700/30',
+    keyPointTitle: 'text-amber-300',
+    keyPointContent: 'text-slate-200',
+    exampleBg: 'bg-orange-900/25 border-orange-500/30',
+    exampleQ: 'text-orange-200',
+    exampleS: 'text-amber-300',
+    introBg: 'bg-amber-500/15 border-amber-500/30',
+    introText: 'text-amber-300',
+    summaryBg: 'bg-orange-500/15 border-orange-500/30',
+    summaryText: 'text-orange-300',
+    exampleLabel: '📜 Ejemplo histórico',
+    useMono: false,
+  },
+  tech: {
+    accent: 'indigo',
+    keyPointBg: 'bg-slate-900/70 border-indigo-700/40',
+    keyPointTitle: 'text-indigo-300',
+    keyPointContent: 'text-slate-200',
+    exampleBg: 'bg-indigo-900/30 border-indigo-500/30',
+    exampleQ: 'text-indigo-200',
+    exampleS: 'text-cyan-300',
+    introBg: 'bg-indigo-500/15 border-indigo-500/30',
+    introText: 'text-indigo-300',
+    summaryBg: 'bg-slate-800/60 border-slate-600/40',
+    summaryText: 'text-slate-300',
+    exampleLabel: '💻 Ejemplo',
+    useMono: true,
+  },
+  economics: {
+    accent: 'yellow',
+    keyPointBg: 'bg-yellow-900/20 border-yellow-700/30',
+    keyPointTitle: 'text-yellow-300',
+    keyPointContent: 'text-slate-200',
+    exampleBg: 'bg-lime-900/25 border-lime-500/30',
+    exampleQ: 'text-lime-200',
+    exampleS: 'text-yellow-300',
+    introBg: 'bg-yellow-500/15 border-yellow-500/30',
+    introText: 'text-yellow-300',
+    summaryBg: 'bg-lime-500/15 border-lime-500/30',
+    summaryText: 'text-lime-300',
+    exampleLabel: '💰 Caso práctico',
+    useMono: false,
+  },
+  default: {
+    accent: 'violet',
+    keyPointBg: 'bg-white/8 border-white/10',
+    keyPointTitle: 'text-white/95',
+    keyPointContent: 'text-white/75',
+    exampleBg: 'bg-emerald-500/10 border-emerald-500/25',
+    exampleQ: 'text-white/85',
+    exampleS: 'text-emerald-200',
+    introBg: 'bg-blue-500/15 border-blue-500/30',
+    introText: 'text-blue-300',
+    summaryBg: 'bg-violet-500/15 border-violet-500/30',
+    summaryText: 'text-violet-300',
+    exampleLabel: '📌 Ejemplo',
+    useMono: false,
+  },
+};
+
+// ─── Iconos automáticos por key_point.title ───────────────────────────────────
+function mapKeyPointIcon(title = '') {
+  const t = title.toLowerCase();
+  if (/suma|adición|adicionar/.test(t)) return '➕';
+  if (/resta|sustracción|sustracc/.test(t)) return '➖';
+  if (/multiplicac|producto/.test(t)) return '✖️';
+  if (/divisi/.test(t)) return '➗';
+  if (/potencia|exponente/.test(t)) return '🔼';
+  if (/raíz|radical/.test(t)) return '√';
+  if (/ecuaci|inecuaci/.test(t)) return '📐';
+  if (/función|funcion/.test(t)) return '📈';
+  if (/gráfica|grafica|diagrama/.test(t)) return '📊';
+  if (/fórmula|formula|expresi/.test(t)) return '🔢';
+  if (/ley|principio|teorema/.test(t)) return '⚖️';
+  if (/energía|energia|fuerza|movimiento/.test(t)) return '⚡';
+  if (/célula|celula|gen|adn|proteína/.test(t)) return '🧬';
+  if (/reacci|quím|química|compuesto|element/.test(t)) return '⚗️';
+  if (/experimento|laboratorio/.test(t)) return '🧪';
+  if (/historia|cronolog|época|siglo|guerra/.test(t)) return '📜';
+  if (/revoluc|independenc|movimient/.test(t)) return '🏛️';
+  if (/tiempo|fecha|período|periodo/.test(t)) return '⏳';
+  if (/computadora|computac|sistema|software|hardware/.test(t)) return '💻';
+  if (/programac|código|codigo|algoritmo/.test(t)) return '🖥️';
+  if (/econom|mercado|finanz|precio/.test(t)) return '💰';
+  if (/tabla|estadística|estadistica|promedio|media/.test(t)) return '📋';
+  if (/cultura|arte|música|música|literatura|poem/.test(t)) return '🎭';
+  if (/geografía|geografia|territorio|región|pais/.test(t)) return '🌍';
+  if (/animal|especie|evolución|evolucion/.test(t)) return '🦋';
+  if (/planeta|sistema solar|astronomía|universo/.test(t)) return '🪐';
+  if (/definici|concepto|qué es|que es/.test(t)) return '📖';
+  if (/resumen|conclusion|conclusión/.test(t)) return '📝';
+  return '📘';
+}
+
+// ─── Detección de contenido matemático/técnico ────────────────────────────────
+function isMathContent(text = '') {
+  return /[\+\-\×\÷\=\^\%\(\)\[\]\d]{3,}|[a-z]\s*[\+\-\=\^]\s*[a-z0-9]|\d+\s*[\+\-\×\÷\=]\s*\d/.test(text);
+}
+
+function ExampleContent({ text, useMono, colorClass }) {
+  if (useMono || isMathContent(text)) {
+    return (
+      <span className={`font-mono text-sm ${colorClass}`}>{text}</span>
+    );
+  }
+  return <span className={`text-sm ${colorClass}`}>{text}</span>;
+}
+
+// ─── Explicación estructurada ─────────────────────────────────────────────────
+function StructuredExplanation({ explanation, subjectName }) {
+  // Retrocompatibilidad: string plano
   if (typeof explanation === 'string') {
     return (
       <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 mb-4 text-left border border-white/10 max-w-lg w-full">
@@ -20,6 +172,8 @@ function StructuredExplanation({ explanation }) {
 
   if (!explanation || typeof explanation !== 'object') return null;
 
+  const type = detectSubjectType(subjectName);
+  const theme = SUBJECT_THEMES[type] || SUBJECT_THEMES.default;
   const { intro, key_points = [], examples = [], summary } = explanation;
 
   return (
@@ -27,10 +181,10 @@ function StructuredExplanation({ explanation }) {
 
       {/* Intro */}
       {intro && (
-        <div className="bg-blue-500/15 border border-blue-500/30 rounded-xl p-4">
+        <div className={`${theme.introBg} border rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-1.5">
-            <Info className="w-4 h-4 text-blue-400 flex-shrink-0" />
-            <span className="text-xs font-semibold text-blue-300 uppercase tracking-wide">Introducción</span>
+            <Info className="w-4 h-4 flex-shrink-0 opacity-70" />
+            <span className={`text-xs font-semibold uppercase tracking-wide ${theme.introText}`}>Introducción</span>
           </div>
           <p className="text-white/90 text-sm leading-relaxed">{intro}</p>
         </div>
@@ -43,18 +197,33 @@ function StructuredExplanation({ explanation }) {
             <Lightbulb className="w-4 h-4 text-yellow-400" />
             <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Conceptos clave</span>
           </div>
-          {key_points.map((kp, i) => (
-            <div key={i} className="bg-white/8 border border-white/10 rounded-xl p-4">
-              <p className="text-sm font-semibold text-white/95 mb-1">{kp.title}</p>
-              <p className="text-sm text-white/75 leading-relaxed mb-2">{kp.content}</p>
-              {kp.example && (
-                <div className="bg-white/5 border border-white/10 rounded-lg px-3 py-2">
-                  <span className="text-xs text-white/45 font-semibold uppercase tracking-wide">Ejemplo: </span>
-                  <span className="text-xs text-white/80 font-mono">{kp.example}</span>
+          {key_points.map((kp, i) => {
+            const icon = mapKeyPointIcon(kp.title);
+            const hasMathExample = isMathContent(kp.example || '');
+            return (
+              <div key={i} className={`${theme.keyPointBg} border rounded-xl p-4`}>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-base leading-none">{icon}</span>
+                  <p className={`text-sm font-semibold ${theme.keyPointTitle}`}>{kp.title}</p>
                 </div>
-              )}
-            </div>
-          ))}
+                <p className={`text-sm leading-relaxed mb-2 ${theme.keyPointContent}`}>{kp.content}</p>
+                {kp.example && (
+                  <div className={`rounded-lg px-3 py-2 ${
+                    hasMathExample || theme.useMono
+                      ? 'bg-black/30 border border-white/10'
+                      : 'bg-white/5 border border-white/10'
+                  }`}>
+                    <span className="text-xs text-white/40 font-semibold uppercase tracking-wide">Ej: </span>
+                    <ExampleContent
+                      text={kp.example}
+                      useMono={theme.useMono}
+                      colorClass={hasMathExample || theme.useMono ? 'text-white/90' : 'text-white/80'}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -63,26 +232,45 @@ function StructuredExplanation({ explanation }) {
         <div className="space-y-2">
           <div className="flex items-center gap-2 px-1">
             <FlaskConical className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Ejemplos prácticos</span>
+            <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">
+              {theme.exampleLabel}s
+            </span>
           </div>
-          {examples.map((ex, i) => (
-            <div key={i} className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-4">
-              <p className="text-sm text-white/85 mb-2">❓ {ex.question}</p>
-              <div className="bg-emerald-500/15 rounded-lg px-3 py-2">
-                <span className="text-xs text-emerald-300 font-semibold">✅ </span>
-                <span className="text-sm text-emerald-200">{ex.solution}</span>
+          {examples.map((ex, i) => {
+            const mathQ = isMathContent(ex.question || '');
+            const mathS = isMathContent(ex.solution || '');
+            return (
+              <div key={i} className={`${theme.exampleBg} border rounded-xl p-4`}>
+                <div className="mb-2">
+                  <span className="text-xs text-white/40 font-semibold uppercase tracking-wide block mb-1">{theme.exampleLabel}</span>
+                  {mathQ || theme.useMono ? (
+                    <p className={`font-mono text-sm ${theme.exampleQ}`}>{ex.question}</p>
+                  ) : (
+                    <p className={`text-sm ${theme.exampleQ}`}>{ex.question}</p>
+                  )}
+                </div>
+                <div className={`rounded-lg px-3 py-2 ${
+                  mathS || theme.useMono ? 'bg-black/30 border border-white/10' : 'bg-white/5 border border-white/10'
+                }`}>
+                  <span className="text-xs text-white/40 font-semibold uppercase tracking-wide">✅ Solución: </span>
+                  {mathS || theme.useMono ? (
+                    <span className={`font-mono text-sm ${theme.exampleS}`}>{ex.solution}</span>
+                  ) : (
+                    <span className={`text-sm ${theme.exampleS}`}>{ex.solution}</span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* Resumen */}
       {summary && (
-        <div className="bg-violet-500/15 border border-violet-500/30 rounded-xl p-4">
+        <div className={`${theme.summaryBg} border rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-1.5">
-            <Star className="w-4 h-4 text-violet-400 flex-shrink-0" />
-            <span className="text-xs font-semibold text-violet-300 uppercase tracking-wide">Resumen</span>
+            <Star className="w-4 h-4 flex-shrink-0 opacity-70" />
+            <span className={`text-xs font-semibold uppercase tracking-wide ${theme.summaryText}`}>Resumen</span>
           </div>
           <p className="text-white/85 text-sm leading-relaxed">{summary}</p>
         </div>
@@ -92,8 +280,7 @@ function StructuredExplanation({ explanation }) {
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-
-export default function LessonIntro({ lesson, activitiesCount, isMiniEval, alreadyCompleted, previousScore, onStart }) {
+export default function LessonIntro({ lesson, activitiesCount, isMiniEval, alreadyCompleted, previousScore, onStart, subjectName }) {
   return (
     <div className="flex flex-col items-center text-center py-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
       {/* Icon */}
@@ -123,9 +310,9 @@ export default function LessonIntro({ lesson, activitiesCount, isMiniEval, alrea
         </div>
       )}
 
-      {/* Explicación pregenerada (estructurada o legacy string) */}
+      {/* Explicación pregenerada */}
       {lesson.explanation && !isMiniEval && (
-        <StructuredExplanation explanation={lesson.explanation} />
+        <StructuredExplanation explanation={lesson.explanation} subjectName={subjectName || lesson.subject_name || ''} />
       )}
 
       {/* Info */}
