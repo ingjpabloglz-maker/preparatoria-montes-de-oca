@@ -294,7 +294,10 @@ export default function LessonEditor({ subject, lessons, activitiesCounts }) {
     if (!confirm(`¿Eliminar la lección "${lesson.title}" y todas sus actividades?`)) return;
     setDeletingLesson(lesson.id);
     const acts = await base44.entities.CourseActivity.filter({ lesson_id: lesson.id });
-    for (const a of acts) await base44.entities.CourseActivity.delete(a.id);
+    for (const a of acts) {
+      await base44.entities.CourseActivity.delete(a.id);
+      await new Promise(r => setTimeout(r, 150));
+    }
     await base44.entities.CourseLesson.delete(lesson.id);
     queryClient.invalidateQueries(['lessonsForSubject', lesson.subject_id]);
     queryClient.invalidateQueries(['activitiesCount', lesson.subject_id]);
