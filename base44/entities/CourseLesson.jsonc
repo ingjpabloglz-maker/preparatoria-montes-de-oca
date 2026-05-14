@@ -15,8 +15,47 @@
       "description": "T\u00edtulo de la lecci\u00f3n"
     },
     "explanation": {
-      "type": "string",
-      "description": "Texto explicativo de la lecci\u00f3n"
+      "type": "object",
+      "description": "Explicaci\u00f3n estructurada de la lecci\u00f3n",
+      "properties": {
+        "intro": {
+          "type": "string"
+        },
+        "key_points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "content": {
+                "type": "string"
+              },
+              "example": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question": {
+                "type": "string"
+              },
+              "solution": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "summary": {
+          "type": "string"
+        }
+      }
     },
     "order": {
       "type": "number",

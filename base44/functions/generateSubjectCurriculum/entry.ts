@@ -97,11 +97,29 @@ function isValidActivity(act) {
 
 // ─── Normalizar explanation (string legacy → objeto nuevo) ───────────────────
 function normalizeExplanation(raw, title, subjectName) {
-  if (raw && typeof raw === 'object' && raw.intro) return raw;
-  const text = typeof raw === 'string' ? raw : ('Esta lección cubre "' + title + '" dentro de ' + subjectName + '.');
+  // Ya es objeto estructurado válido
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.intro) {
+    return {
+      intro: String(raw.intro || ''),
+      key_points: Array.isArray(raw.key_points) ? raw.key_points.map(kp => ({
+        title: String(kp.title || ''),
+        content: String(kp.content || ''),
+        example: String(kp.example || ''),
+      })) : [],
+      examples: Array.isArray(raw.examples) ? raw.examples.map(ex => ({
+        question: String(ex.question || ''),
+        solution: String(ex.solution || ''),
+      })) : [],
+      summary: String(raw.summary || ''),
+    };
+  }
+  // Retrocompatibilidad: string plano → objeto
+  const text = typeof raw === 'string' && raw.trim()
+    ? raw
+    : 'Esta lección cubre "' + title + '" dentro de ' + subjectName + '.';
   return {
     intro: text,
-    key_points: [{ title: title, content: text, example: '' }],
+    key_points: [],
     examples: [],
     summary: 'Estudia bien este tema para avanzar en ' + subjectName + '.',
   };
