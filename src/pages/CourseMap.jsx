@@ -38,12 +38,14 @@ export default function CourseMap() {
     queryKey: ['courseUnits', subjectId],
     queryFn: async () => {
       const all = await base44.entities.CourseUnit.filter({ subject_id: subjectId }, 'order');
-      // Deduplicar por título: conservar solo el más reciente (mayor created_date) por título
+      // Deduplicar por subject_id + order (clave lógica única): conservar el más reciente
       const seen = new Map();
       for (const u of all) {
-        const prev = seen.get(u.title);
-        if (!prev || u.created_date > prev.created_date) seen.set(u.title, u);
+        const key = String(u.order);
+        const prev = seen.get(key);
+        if (!prev || (u.created_date || '') > (prev.created_date || '')) seen.set(key, u);
       }
+      // Filtrar unidades vacías (sin módulos) se hace en render usando modules
       return Array.from(seen.values()).sort((a, b) => a.order - b.order);
     },
     enabled: !!subjectId,
@@ -55,12 +57,12 @@ export default function CourseMap() {
     queryKey: ['courseModules', subjectId],
     queryFn: async () => {
       const all = await base44.entities.CourseModule.filter({ subject_id: subjectId }, 'order');
-      // Deduplicar por unit_id + título: conservar solo el más reciente
+      // Deduplicar por unit_id + order (clave lógica única): conservar el más reciente
       const seen = new Map();
       for (const m of all) {
-        const key = m.unit_id + '|' + m.title;
+        const key = m.unit_id + '|' + String(m.order);
         const prev = seen.get(key);
-        if (!prev || m.created_date > prev.created_date) seen.set(key, m);
+        if (!prev || (m.created_date || '') > (prev.created_date || '')) seen.set(key, m);
       }
       return Array.from(seen.values()).sort((a, b) => a.order - b.order);
     },
@@ -170,7 +172,7 @@ export default function CourseMap() {
 
         {/* Units */}
         <div className="mt-8 space-y-6">
-          {units.map((unit, unitIndex) => {
+          {units.filter(unit => modules.some(m => m.unit_id === unit.id)).map((unit, unitIndex) => {
             const unitModules = modules.filter(m => m.unit_id === unit.id);
             return (
               <UnitCard

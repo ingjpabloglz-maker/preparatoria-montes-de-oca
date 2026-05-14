@@ -1,9 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// generateSubjectCurriculum — v5 FINAL
+// generateSubjectCurriculum — v6
 // • 1 llamada LLM por lección
 // • Solo: multiple_choice, true_false, fill_blank
-// • Sin legacy, sin safe_mode, sin circuit breaker, sin enrichments
+// • Unicidad lógica por (parent_id + order)
+// • Cleanup total en overwrite=true
+// • Protección contra concurrencia
+// • Validación post-generación con auto-limpieza de duplicados
 
 const VALID_TYPES = ['multiple_choice', 'true_false', 'fill_blank'];
 const MAX_UNITS = 4;
@@ -14,7 +17,7 @@ function ts() { return new Date().toLocaleTimeString('es-MX', { hour12: false })
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ─── LLM con retry simple ─────────────────────────────────────────────────────
-async function invokeLLM(base44, prompt, label) {
+async function invokeLLM(base44, prompt) {
   for (let attempt = 0; attempt <= 2; attempt++) {
     if (attempt > 0) await sleep(attempt * 10000);
     try {
@@ -95,9 +98,8 @@ function isValidActivity(act) {
   return true;
 }
 
-// ─── Normalizar explanation (string legacy → objeto nuevo) ───────────────────
+// ─── Normalizar explanation ───────────────────────────────────────────────────
 function normalizeExplanation(raw, title, subjectName) {
-  // Ya es objeto estructurado válido
   if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.intro) {
     return {
       intro: String(raw.intro || ''),
@@ -113,16 +115,10 @@ function normalizeExplanation(raw, title, subjectName) {
       summary: String(raw.summary || ''),
     };
   }
-  // Retrocompatibilidad: string plano → objeto
   const text = typeof raw === 'string' && raw.trim()
     ? raw
     : 'Esta lección cubre "' + title + '" dentro de ' + subjectName + '.';
-  return {
-    intro: text,
-    key_points: [],
-    examples: [],
-    summary: 'Estudia bien este tema para avanzar en ' + subjectName + '.',
-  };
+  return { intro: text, key_points: [], examples: [], summary: 'Estudia bien este tema para avanzar en ' + subjectName + '.' };
 }
 
 // ─── Fallback local sin LLM ───────────────────────────────────────────────────
@@ -207,19 +203,74 @@ function buildStructure(syllabus) {
   }));
 }
 
-// ─── Generar una lección ──────────────────────────────────────────────────────
+// ─── Cleanup total: Activity → Lesson → Module → Unit ────────────────────────
+async function cleanupSubject(base44, subject_id, log) {
+  await log('[' + ts() + '] 🗑️ Iniciando limpieza completa...');
+
+  const allLessons = await base44.asServiceRole.entities.CourseLesson.filter({ subject_id });
+  let actCount = 0;
+  for (const lesson of allLessons) {
+    const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: lesson.id });
+    for (const a of acts) {
+      await base44.asServiceRole.entities.CourseActivity.delete(a.id);
+      await sleep(50);
+      actCount++;
+    }
+  }
+  for (const lesson of allLessons) {
+    await base44.asServiceRole.entities.CourseLesson.delete(lesson.id);
+    await sleep(50);
+  }
+
+  const allModules = await base44.asServiceRole.entities.CourseModule.filter({ subject_id });
+  for (const mod of allModules) {
+    await base44.asServiceRole.entities.CourseModule.delete(mod.id);
+    await sleep(50);
+  }
+
+  const allUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
+  for (const unit of allUnits) {
+    await base44.asServiceRole.entities.CourseUnit.delete(unit.id);
+    await sleep(50);
+  }
+
+  await log('[' + ts() + '] ✅ Limpieza: ' + actCount + ' actividades, ' + allLessons.length + ' lecciones, ' + allModules.length + ' módulos, ' + allUnits.length + ' unidades eliminadas');
+}
+
+// ─── Upsert por unicidad lógica (parent_id + order) ──────────────────────────
+async function upsertUnit(base44, subject_id, order, title) {
+  const existing = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
+  const match = existing.find(u => u.order === order);
+  if (match) return match;
+  return base44.asServiceRole.entities.CourseUnit.create({ subject_id, title, order });
+}
+
+async function upsertModule(base44, unit_id, subject_id, order, title) {
+  const existing = await base44.asServiceRole.entities.CourseModule.filter({ unit_id });
+  const match = existing.find(m => m.order === order);
+  if (match) return match;
+  return base44.asServiceRole.entities.CourseModule.create({ unit_id, subject_id, title, order });
+}
+
+// ─── Generar una lección (unicidad por module_id + order) ─────────────────────
 async function generateLesson(base44, { module_id, subject_id, subject_name, topic, is_mini_eval, order }, log) {
   await log('[' + ts() + '] 📝 ' + topic);
 
-  // Skip si ya existe completa
+  // Buscar por module_id + order (clave lógica única)
   const existing = (await base44.asServiceRole.entities.CourseLesson.filter({ module_id, subject_id })).filter(l => l.order === order);
+
   if (existing[0]?.generation_completed) {
     const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: existing[0].id });
     if (acts.length >= 4) {
-      await log('[' + ts() + '] ⏭️ SKIP: ya existe');
+      await log('[' + ts() + '] ⏭️ SKIP: ya existe completa');
       return acts.length;
     }
     // Limpiar incompleta
+    for (const a of acts) await base44.asServiceRole.entities.CourseActivity.delete(a.id);
+    await base44.asServiceRole.entities.CourseLesson.delete(existing[0].id);
+  } else if (existing[0]) {
+    // Existe pero sin completar — limpiar
+    const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: existing[0].id });
     for (const a of acts) await base44.asServiceRole.entities.CourseActivity.delete(a.id);
     await base44.asServiceRole.entities.CourseLesson.delete(existing[0].id);
   }
@@ -229,7 +280,7 @@ async function generateLesson(base44, { module_id, subject_id, subject_name, top
   let activities = [];
 
   try {
-    const raw = await invokeLLM(base44, buildPrompt(topic, subject_name), topic);
+    const raw = await invokeLLM(base44, buildPrompt(topic, subject_name));
     if (raw?.title) title = raw.title;
     if (raw?.explanation) explanation = normalizeExplanation(raw.explanation, title, subject_name);
     if (Array.isArray(raw?.activities)) {
@@ -257,15 +308,104 @@ async function generateLesson(base44, { module_id, subject_id, subject_name, top
 
   for (let i = 0; i < activities.length; i++) {
     const a = activities[i];
-    await base44.asServiceRole.entities.CourseActivity.create({
-      lesson_id: lesson.id, type: a.type, question: a.question,
-      options: a.options, correct_answer: a.correct_answer, explanation: a.explanation, order: i + 1,
-    });
+    // Unicidad por lesson_id + order: no crear si ya existe
+    const existingActs = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: lesson.id });
+    const dupAct = existingActs.find(ea => ea.order === i + 1);
+    if (!dupAct) {
+      await base44.asServiceRole.entities.CourseActivity.create({
+        lesson_id: lesson.id, type: a.type, question: a.question,
+        options: a.options, correct_answer: a.correct_answer, explanation: a.explanation, order: i + 1,
+      });
+    }
   }
 
   await base44.asServiceRole.entities.CourseLesson.update(lesson.id, { generation_completed: true });
   await log('[' + ts() + '] ✅ "' + title + '" — ' + activities.length + ' actividades');
   return activities.length;
+}
+
+// ─── Validación post-generación: detecta y limpia duplicados ──────────────────
+async function validateAndCleanDuplicates(base44, subject_id, log) {
+  await log('[' + ts() + '] 🔍 Validando estructura post-generación...');
+  let removed = 0;
+
+  // Validar CourseUnit: duplicados por subject_id + order
+  const units = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
+  const unitsByOrder = {};
+  for (const u of units) {
+    const key = String(u.order);
+    if (!unitsByOrder[key]) { unitsByOrder[key] = []; }
+    unitsByOrder[key].push(u);
+  }
+  for (const key of Object.keys(unitsByOrder)) {
+    const dups = unitsByOrder[key].sort((a, b) => b.created_date?.localeCompare(a.created_date || '') || 0);
+    for (let i = 1; i < dups.length; i++) {
+      await base44.asServiceRole.entities.CourseUnit.delete(dups[i].id);
+      removed++;
+      await log('[' + ts() + '] ⚠️ Unidad duplicada eliminada: order=' + key);
+    }
+  }
+
+  // Validar CourseModule: duplicados por unit_id + order
+  const allModules = await base44.asServiceRole.entities.CourseModule.filter({ subject_id });
+  const modsByKey = {};
+  for (const m of allModules) {
+    const key = m.unit_id + '|' + String(m.order);
+    if (!modsByKey[key]) { modsByKey[key] = []; }
+    modsByKey[key].push(m);
+  }
+  for (const key of Object.keys(modsByKey)) {
+    const dups = modsByKey[key].sort((a, b) => b.created_date?.localeCompare(a.created_date || '') || 0);
+    for (let i = 1; i < dups.length; i++) {
+      await base44.asServiceRole.entities.CourseModule.delete(dups[i].id);
+      removed++;
+      await log('[' + ts() + '] ⚠️ Módulo duplicado eliminado: ' + key);
+    }
+  }
+
+  // Validar CourseLesson: duplicados por module_id + order
+  const allLessons = await base44.asServiceRole.entities.CourseLesson.filter({ subject_id });
+  const lessonsByKey = {};
+  for (const l of allLessons) {
+    const key = l.module_id + '|' + String(l.order);
+    if (!lessonsByKey[key]) { lessonsByKey[key] = []; }
+    lessonsByKey[key].push(l);
+  }
+  for (const key of Object.keys(lessonsByKey)) {
+    const dups = lessonsByKey[key].sort((a, b) => b.created_date?.localeCompare(a.created_date || '') || 0);
+    for (let i = 1; i < dups.length; i++) {
+      const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: dups[i].id });
+      for (const a of acts) await base44.asServiceRole.entities.CourseActivity.delete(a.id);
+      await base44.asServiceRole.entities.CourseLesson.delete(dups[i].id);
+      removed++;
+      await log('[' + ts() + '] ⚠️ Lección duplicada eliminada: ' + key);
+    }
+  }
+
+  // Validar CourseActivity: duplicados por lesson_id + order
+  const freshLessons = await base44.asServiceRole.entities.CourseLesson.filter({ subject_id });
+  for (const lesson of freshLessons) {
+    const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: lesson.id });
+    const actsByOrder = {};
+    for (const a of acts) {
+      const key = String(a.order);
+      if (!actsByOrder[key]) { actsByOrder[key] = []; }
+      actsByOrder[key].push(a);
+    }
+    for (const key of Object.keys(actsByOrder)) {
+      const dups = actsByOrder[key].sort((a, b) => b.created_date?.localeCompare(a.created_date || '') || 0);
+      for (let i = 1; i < dups.length; i++) {
+        await base44.asServiceRole.entities.CourseActivity.delete(dups[i].id);
+        removed++;
+      }
+    }
+  }
+
+  if (removed > 0) {
+    await log('[' + ts() + '] 🧹 Validación: ' + removed + ' duplicados eliminados');
+  } else {
+    await log('[' + ts() + '] ✅ Validación: estructura limpia, sin duplicados');
+  }
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -293,6 +433,17 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, unlocked: n });
     }
 
+    // ── Protección contra concurrencia (ANTES de cualquier otra operación) ──
+    const activeJob = (await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ subject_id }))
+      .find(j => j.status === 'processing' || j.status === 'pending');
+    if (activeJob) {
+      return Response.json({
+        error: 'Ya existe una generación en progreso para esta materia.',
+        locked: true,
+        active_job_id: activeJob.id
+      }, { status: 409 });
+    }
+
     const subject = (await base44.asServiceRole.entities.Subject.filter({ id: subject_id }))[0];
     if (!subject) return Response.json({ error: 'Materia no encontrada' }, { status: 404 });
 
@@ -317,7 +468,7 @@ Deno.serve(async (req) => {
     let totalLessons = 0, totalModules = 0;
     for (const u of filteredStructure) for (const m of u.modules) { totalModules++; totalLessons += m.lessons.length; }
 
-    // Preview — siempre devuelve estructura COMPLETA (sin filtrar) para que el modal muestre todo
+    // Preview — devuelve estructura COMPLETA para que el modal muestre todo
     if (preview_only) {
       let fullTotal = 0, fullModules = 0;
       for (const u of structure) for (const m of u.modules) { fullModules++; fullTotal += m.lessons.length; }
@@ -335,10 +486,6 @@ Deno.serve(async (req) => {
         })),
       });
     }
-
-    // Verificar lock
-    const activeJob = (await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ subject_id })).find(j => j.status === 'processing');
-    if (activeJob) return Response.json({ error: 'Ya hay una generación en curso.', locked: true, active_job_id: activeJob.id }, { status: 409 });
 
     if (!overwrite) {
       const existing = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
@@ -371,56 +518,25 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.CurriculumGenerationJob.update(job.id, { status: 'processing', last_activity_at: new Date().toISOString() });
         await log('[' + ts() + '] 🚀 "' + subject.name + '" — ' + totalLessons + ' lecciones');
 
+        // Cleanup total SIEMPRE en overwrite=true
         if (overwrite) {
-          await log('[' + ts() + '] 🗑️ Limpiando TODO el contenido existente...');
-          // 1. Borrar todas las actividades de la materia
-          const allLessons = await base44.asServiceRole.entities.CourseLesson.filter({ subject_id });
-          for (const lesson of allLessons) {
-            const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: lesson.id });
-            for (const a of acts) {
-              await base44.asServiceRole.entities.CourseActivity.delete(a.id);
-              await sleep(50);
-            }
-          }
-          // 2. Borrar todas las lecciones
-          for (const lesson of allLessons) {
-            await base44.asServiceRole.entities.CourseLesson.delete(lesson.id);
-            await sleep(50);
-          }
-          // 3. Borrar todos los módulos
-          const allModules = await base44.asServiceRole.entities.CourseModule.filter({ subject_id });
-          for (const mod of allModules) {
-            await base44.asServiceRole.entities.CourseModule.delete(mod.id);
-            await sleep(50);
-          }
-          // 4. Borrar todas las unidades
-          const allUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
-          for (const unit of allUnits) {
-            await base44.asServiceRole.entities.CourseUnit.delete(unit.id);
-            await sleep(50);
-          }
-          await log('[' + ts() + '] ✅ Limpieza completa: ' + allLessons.length + ' lecciones, ' + allModules.length + ' módulos, ' + allUnits.length + ' unidades eliminadas');
+          await cleanupSubject(base44, subject_id, log);
         }
 
         for (const unitBp of filteredStructure) {
-          // Anti-duplicado: buscar si ya existe unidad con mismo título y subject_id
-          const existingUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
-          let unit = existingUnits.find(u => u.title === unitBp.title && u.order === unitBp.order);
-          if (!unit) {
-            unit = await base44.asServiceRole.entities.CourseUnit.create({ subject_id, title: unitBp.title, order: unitBp.order });
-          }
+          // Verificar cancelación
+          const freshCheck = (await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ id: job.id }))[0];
+          if (freshCheck?.status === 'failed') { await log('[' + ts() + '] 🛑 Cancelado'); return; }
+
+          // Upsert por subject_id + order
+          const unit = await upsertUnit(base44, subject_id, unitBp.order, unitBp.title);
 
           for (const modBp of unitBp.modules) {
-            // Verificar cancelación externa
             const fresh = (await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ id: job.id }))[0];
             if (fresh?.status === 'failed') { await log('[' + ts() + '] 🛑 Cancelado'); return; }
 
-            // Anti-duplicado: buscar si ya existe módulo con mismo título en esta unidad
-            const existingMods = await base44.asServiceRole.entities.CourseModule.filter({ unit_id: unit.id });
-            let module = existingMods.find(m => m.title === modBp.title && m.order === modBp.order);
-            if (!module) {
-              module = await base44.asServiceRole.entities.CourseModule.create({ unit_id: unit.id, subject_id, title: modBp.title, order: modBp.order });
-            }
+            // Upsert por unit_id + order
+            const module = await upsertModule(base44, unit.id, subject_id, modBp.order, modBp.title);
 
             for (const lessonBp of modBp.lessons) {
               await base44.asServiceRole.entities.CurriculumGenerationJob.update(job.id, {
@@ -444,6 +560,9 @@ Deno.serve(async (req) => {
             }
           }
         }
+
+        // Validación post-generación
+        await validateAndCleanDuplicates(base44, subject_id, log);
 
         const secs = Math.round((Date.now() - start) / 1000);
         await base44.asServiceRole.entities.CurriculumGenerationJob.update(job.id, {
