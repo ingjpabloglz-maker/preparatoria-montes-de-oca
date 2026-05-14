@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
     if (user.role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = await req.json();
-    const { subject_id, overwrite = false, preview_only = false, force_unlock = false } = body;
+    const { subject_id, overwrite = false, preview_only = false, force_unlock = false, lesson_selection = null } = body;
     if (!subject_id) return Response.json({ error: 'subject_id requerido' }, { status: 400 });
 
     // Force unlock
@@ -231,16 +231,39 @@ Deno.serve(async (req) => {
     if (!syllabus?.units?.length) return Response.json({ error: 'Sin temario activo.', no_syllabus: true }, { status: 422 });
 
     const structure = buildStructure(syllabus);
-    let totalLessons = 0, totalModules = 0;
-    for (const u of structure) for (const m of u.modules) { totalModules++; totalLessons += m.lessons.length; }
 
-    // Preview
+    // Filtrar por selección si viene lesson_selection
+    let filteredStructure = structure;
+    if (lesson_selection && Array.isArray(lesson_selection) && lesson_selection.length > 0) {
+      const selSet = new Set(lesson_selection.map(s => `${s.unit_index}-${s.module_index}-${s.lesson_index}`));
+      filteredStructure = structure.map((u, ui) => ({
+        ...u,
+        modules: u.modules.map((m, mi) => ({
+          ...m,
+          lessons: m.lessons.filter((_, li) => selSet.has(`${ui}-${mi}-${li}`)),
+        })).filter(m => m.lessons.length > 0),
+      })).filter(u => u.modules.length > 0);
+    }
+
+    let totalLessons = 0, totalModules = 0;
+    for (const u of filteredStructure) for (const m of u.modules) { totalModules++; totalLessons += m.lessons.length; }
+
+    // Preview — siempre devuelve estructura COMPLETA (sin filtrar) para que el modal muestre todo
     if (preview_only) {
+      let fullTotal = 0, fullModules = 0;
+      for (const u of structure) for (const m of u.modules) { fullModules++; fullTotal += m.lessons.length; }
       return Response.json({
-        preview: true, subject_name: subject.name, units: structure.length, modules: totalModules,
-        total_lessons: totalLessons, estimated_minutes: Math.ceil(totalLessons * 20 / 60),
-        estimated_tokens: totalLessons * 800,
-        structure_summary: structure.map(u => ({ title: u.title, modules: u.modules.map(m => ({ title: m.title, lessons_count: m.lessons.length })) })),
+        preview: true, subject_name: subject.name, units: structure.length, modules: fullModules,
+        total_lessons: fullTotal, estimated_minutes: Math.ceil(fullTotal * 20 / 60),
+        estimated_tokens: fullTotal * 800,
+        structure_summary: structure.map(u => ({
+          title: u.title,
+          modules: u.modules.map(m => ({
+            title: m.title,
+            lessons_count: m.lessons.length,
+            lessons: m.lessons.map(l => ({ topic: l.topic, is_mini_eval: l.is_mini_eval || false })),
+          })),
+        })),
       });
     }
 
@@ -297,7 +320,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        for (const unitBp of structure) {
+        for (const unitBp of filteredStructure) {
           const unit = await base44.asServiceRole.entities.CourseUnit.create({ subject_id, title: unitBp.title, order: unitBp.order });
 
           for (const modBp of unitBp.modules) {

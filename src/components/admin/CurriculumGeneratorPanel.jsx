@@ -4,70 +4,205 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Loader2, CheckCircle2, XCircle, ChevronDown, ChevronUp, AlertTriangle, Download, RefreshCw, Eye, StopCircle } from "lucide-react";
+import { Sparkles, Loader2, CheckCircle2, XCircle, ChevronDown, ChevronUp, AlertTriangle, Download, RefreshCw, Eye, StopCircle, BookOpen, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// ─── Preview Modal ────────────────────────────────────────────────────────────
+// ─── Preview / Selector Modal ─────────────────────────────────────────────────
 function PreviewModal({ preview, onConfirm, onCancel, overwrite, setOverwrite, hasExisting }) {
+  // Estado de selección: unidad → módulo → lección
+  const [selected, setSelected] = useState(() => {
+    const init = {};
+    (preview?.structure_summary || []).forEach((u, ui) => {
+      (u.modules || []).forEach((m, mi) => {
+        (m.lessons || []).forEach((_, li) => {
+          init[`${ui}-${mi}-${li}`] = true;
+        });
+      });
+    });
+    return init;
+  });
+
   if (!preview) return null;
+
+  const allKeys = [];
+  preview.structure_summary?.forEach((u, ui) => {
+    u.modules?.forEach((m, mi) => {
+      m.lessons?.forEach((_, li) => allKeys.push(`${ui}-${mi}-${li}`));
+    });
+  });
+  const allSelected = allKeys.every(k => selected[k]);
+  const noneSelected = allKeys.every(k => !selected[k]);
+
+  const toggleAll = (val) => {
+    const next = {};
+    allKeys.forEach(k => next[k] = val);
+    setSelected(next);
+  };
+
+  const toggleUnit = (ui, val) => {
+    const next = { ...selected };
+    preview.structure_summary[ui].modules?.forEach((m, mi) => {
+      m.lessons?.forEach((_, li) => { next[`${ui}-${mi}-${li}`] = val; });
+    });
+    setSelected(next);
+  };
+
+  const toggleModule = (ui, mi, val) => {
+    const next = { ...selected };
+    preview.structure_summary[ui].modules[mi].lessons?.forEach((_, li) => {
+      next[`${ui}-${mi}-${li}`] = val;
+    });
+    setSelected(next);
+  };
+
+  const toggleLesson = (key) => setSelected(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const isUnitChecked = (ui) => preview.structure_summary[ui].modules?.every((m, mi) =>
+    m.lessons?.every((_, li) => selected[`${ui}-${mi}-${li}`])
+  );
+  const isUnitIndeterminate = (ui) => !isUnitChecked(ui) &&
+    preview.structure_summary[ui].modules?.some((m, mi) =>
+      m.lessons?.some((_, li) => selected[`${ui}-${mi}-${li}`])
+    );
+  const isModuleChecked = (ui, mi) => preview.structure_summary[ui].modules[mi].lessons?.every((_, li) => selected[`${ui}-${mi}-${li}`]);
+  const isModuleIndeterminate = (ui, mi) => !isModuleChecked(ui, mi) &&
+    preview.structure_summary[ui].modules[mi].lessons?.some((_, li) => selected[`${ui}-${mi}-${li}`]);
+
+  const selectedCount = allKeys.filter(k => selected[k]).length;
+
+  // Construir payload de selección
+  const buildSelection = () => {
+    const sel = [];
+    preview.structure_summary?.forEach((u, ui) => {
+      u.modules?.forEach((m, mi) => {
+        m.lessons?.forEach((l, li) => {
+          if (selected[`${ui}-${mi}-${li}`]) sel.push({ unit_index: ui, module_index: mi, lesson_index: li });
+        });
+      });
+    });
+    return sel;
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-5 border-b">
+      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="p-5 border-b flex-shrink-0">
           <div className="flex items-center gap-2">
             <Eye className="w-5 h-5 text-emerald-600" />
-            <h3 className="text-lg font-semibold">Preview — {preview.subject_name}</h3>
+            <h3 className="text-lg font-semibold">Seleccionar contenido — {preview.subject_name}</h3>
           </div>
+          <p className="text-xs text-gray-500 mt-1">Elige qué unidades, módulos o lecciones quieres generar</p>
         </div>
-        <div className="p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+
+        {/* Stats */}
+        <div className="px-5 pt-4 flex-shrink-0">
+          <div className="grid grid-cols-4 gap-2 mb-3">
             {[
               { label: 'Unidades', value: preview.units, color: 'blue' },
               { label: 'Módulos', value: preview.modules, color: 'violet' },
-              { label: 'Lecciones', value: preview.total_lessons, color: 'amber' },
-              { label: 'Tiempo est.', value: '~' + preview.estimated_minutes + ' min', color: 'orange' },
+              { label: 'Total', value: preview.total_lessons, color: 'amber' },
+              { label: 'Selec.', value: selectedCount, color: 'emerald' },
             ].map(({ label, value, color }) => (
-              <div key={label} className={'bg-' + color + '-50 rounded-lg p-3 text-center'}>
-                <div className={'text-2xl font-bold text-' + color + '-700'}>{value}</div>
-                <div className={'text-xs text-' + color + '-600'}>{label}</div>
+              <div key={label} className={`bg-${color}-50 rounded-lg p-2 text-center`}>
+                <div className={`text-xl font-bold text-${color}-700`}>{value}</div>
+                <div className={`text-xs text-${color}-600`}>{label}</div>
               </div>
             ))}
           </div>
-
-          <div className="bg-gray-50 rounded-lg p-3 text-sm flex items-center justify-between">
-            <span className="text-gray-700">Tokens estimados</span>
-            <span className="font-mono font-semibold text-gray-800">~{Math.round(preview.estimated_tokens / 1000)}k tokens</span>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs flex items-center justify-between mb-1">
+            <span className="text-gray-600">Tiempo estimado</span>
+            <span className="font-mono font-semibold text-gray-700">~{Math.ceil(selectedCount * 20 / 60)} min · ~{Math.round(selectedCount * 800 / 1000)}k tokens</span>
           </div>
+          {/* Seleccionar todo / ninguno */}
+          <div className="flex gap-2 my-2">
+            <button onClick={() => toggleAll(true)} className="text-xs text-emerald-700 hover:underline">Seleccionar todo</button>
+            <span className="text-gray-300">·</span>
+            <button onClick={() => toggleAll(false)} className="text-xs text-red-500 hover:underline">Deseleccionar todo</button>
+          </div>
+        </div>
 
-          <div>
-            <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Estructura</p>
-            <div className="space-y-2 max-h-36 overflow-y-auto">
-              {preview.structure_summary?.map((u, i) => (
-                <div key={i} className="border rounded-lg p-2.5">
-                  <p className="text-xs font-semibold text-gray-700">{u.title}</p>
-                  <div className="mt-1 space-y-0.5">
-                    {u.modules?.map((m, j) => (
-                      <p key={j} className="text-xs text-gray-500 pl-3">• {m.title} ({m.lessons_count} lecciones)</p>
-                    ))}
+        {/* Árbol de selección */}
+        <div className="flex-1 overflow-y-auto px-5 pb-2 space-y-2">
+          {preview.structure_summary?.map((u, ui) => (
+            <div key={ui} className="border rounded-lg overflow-hidden">
+              {/* Unidad */}
+              <label className="flex items-center gap-2 px-3 py-2 bg-gray-50 cursor-pointer hover:bg-gray-100">
+                <input
+                  type="checkbox"
+                  checked={isUnitChecked(ui)}
+                  ref={el => { if (el) el.indeterminate = isUnitIndeterminate(ui); }}
+                  onChange={e => toggleUnit(ui, e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm font-semibold text-gray-800">{u.title}</span>
+                <span className="text-xs text-gray-400 ml-auto">
+                  {u.modules?.reduce((s, m) => s + (m.lessons?.length || 0), 0)} lecciones
+                </span>
+              </label>
+              {/* Módulos */}
+              <div className="divide-y">
+                {u.modules?.map((m, mi) => (
+                  <div key={mi}>
+                    <label className="flex items-center gap-2 px-5 py-1.5 bg-white cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={isModuleChecked(ui, mi)}
+                        ref={el => { if (el) el.indeterminate = isModuleIndeterminate(ui, mi); }}
+                        onChange={e => toggleModule(ui, mi, e.target.checked)}
+                        className="rounded"
+                      />
+                      <span className="text-xs font-medium text-gray-700">{m.title}</span>
+                      <span className="text-xs text-gray-400 ml-auto">{m.lessons?.length} lecciones</span>
+                    </label>
+                    {/* Lecciones */}
+                    <div className="pl-10 pb-1 space-y-0.5">
+                      {m.lessons?.map((l, li) => {
+                        const key = `${ui}-${mi}-${li}`;
+                        return (
+                          <label key={li} className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-gray-50">
+                            <input
+                              type="checkbox"
+                              checked={!!selected[key]}
+                              onChange={() => toggleLesson(key)}
+                              className="rounded"
+                            />
+                            <span className="text-xs text-gray-600">{l.topic}</span>
+                            {l.is_mini_eval && (
+                              <Badge className="text-[10px] bg-amber-100 text-amber-700 ml-auto">mini eval</Badge>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          ))}
+        </div>
 
-          {hasExisting && (
-            <label className="flex items-center gap-2 cursor-pointer text-sm border-t pt-3">
+        {/* Overwrite */}
+        {hasExisting && (
+          <div className="px-5 pt-2 flex-shrink-0">
+            <label className="flex items-center gap-2 cursor-pointer text-sm border rounded-lg p-2">
               <input type="checkbox" checked={overwrite} onChange={e => setOverwrite(e.target.checked)} className="rounded" />
               <span className="font-medium text-red-600">Sobreescribir contenido existente</span>
             </label>
-          )}
-        </div>
-        <div className="p-4 border-t flex gap-2">
+          </div>
+        )}
+
+        {/* Acciones */}
+        <div className="p-4 border-t flex gap-2 flex-shrink-0">
           <Button variant="outline" className="flex-1" onClick={onCancel}>Cancelar</Button>
-          <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={onConfirm}>
+          <Button
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+            disabled={noneSelected}
+            onClick={() => onConfirm(buildSelection(), allSelected)}
+          >
             <Sparkles className="w-4 h-4 mr-2" />
-            Generar
+            Generar {selectedCount} lecciones
           </Button>
         </div>
       </div>
@@ -77,7 +212,7 @@ function PreviewModal({ preview, onConfirm, onCancel, overwrite, setOverwrite, h
 
 // ─── Panel principal ──────────────────────────────────────────────────────────
 export default function CurriculumGeneratorPanel({ subject, onComplete }) {
-  const [status, setStatus] = useState('idle'); // idle | generating | completed | failed
+  const [status, setStatus] = useState('idle');
   const [jobId, setJobId] = useState(null);
   const [jobRecord, setJobRecord] = useState(null);
   const [hasExisting, setHasExisting] = useState(false);
@@ -129,7 +264,6 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
     return () => clearInterval(pollRef.current);
   }, [jobId, status]);
 
-  // Auto-scroll logs
   useEffect(() => {
     if (showLogs && logsEndRef.current) logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [jobRecord?.logs, showLogs]);
@@ -145,12 +279,17 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
     finally { setLoadingPreview(false); }
   };
 
-  const handleGenerate = async () => {
+  // onConfirm recibe la selección explícita de lecciones y si es todo completo
+  const handleGenerate = async (selection, isFullGeneration) => {
     setShowPreview(false);
     setStatus('generating');
     setJobRecord(null);
     try {
-      const res = await base44.functions.invoke('generateSubjectCurriculum', { subject_id: subject.id, overwrite });
+      const payload = { subject_id: subject.id, overwrite };
+      // Si no es generación completa, pasar selección al backend
+      if (!isFullGeneration) payload.lesson_selection = selection;
+
+      const res = await base44.functions.invoke('generateSubjectCurriculum', payload);
       const data = res.data;
       if (data?.success && data?.job_id) {
         setJobId(data.job_id);
@@ -227,7 +366,7 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
             {status === 'failed' && <Badge className="bg-red-100 text-red-700 ml-auto">Falló</Badge>}
             {isRunning && <Badge className="bg-blue-100 text-blue-700 ml-auto animate-pulse">Generando...</Badge>}
           </div>
-          <p className="text-xs text-gray-500 mt-1">1 llamada LLM por lección · Solo multiple_choice, true_false, fill_blank</p>
+          <p className="text-xs text-gray-500 mt-1">Selecciona qué unidades, módulos o lecciones generar · 1 llamada LLM por lección</p>
         </CardHeader>
 
         <CardContent className="space-y-4">
@@ -262,18 +401,16 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
             </div>
           )}
 
-          {/* Resultado completado */}
           {status === 'completed' && jobRecord && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5" />
               <div className="text-sm text-green-800">
-                <p className="font-semibold">¡Currículo generado!</p>
+                <p className="font-semibold">¡Generación completada!</p>
                 <p className="text-xs mt-0.5">{jobRecord.completed_lessons} lecciones · {jobRecord.activities_created || 0} actividades</p>
               </div>
             </div>
           )}
 
-          {/* Error */}
           {status === 'failed' && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
               <XCircle className="w-4 h-4 text-red-600 mt-0.5" />
@@ -284,7 +421,6 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
             </div>
           )}
 
-          {/* Logs */}
           {logs.length > 0 && (
             <div>
               <button onClick={() => setShowLogs(v => !v)} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700">
@@ -309,7 +445,6 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
             </div>
           )}
 
-          {/* Job bloqueado */}
           {lockedJobId && (status === 'idle' || status === 'failed') && (
             <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 space-y-2">
               <div className="flex items-start gap-2">
@@ -322,11 +457,10 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
             </div>
           )}
 
-          {/* Botones de acción */}
           {(status === 'idle' || status === 'failed') && (
             <Button onClick={handlePreview} disabled={loadingPreview} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
               {loadingPreview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
-              {loadingPreview ? 'Calculando...' : 'Preview y generar — ' + subject.name}
+              {loadingPreview ? 'Calculando...' : 'Seleccionar y generar — ' + subject.name}
             </Button>
           )}
 
@@ -354,7 +488,7 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
                 <Download className="w-3.5 h-3.5" /> Logs
               </Button>
               <Button onClick={handlePreview} variant="outline" size="sm" className="flex-1 gap-1.5" disabled={loadingPreview}>
-                <RefreshCw className="w-3.5 h-3.5" /> Regenerar
+                <RefreshCw className="w-3.5 h-3.5" /> Regenerar selección
               </Button>
             </div>
           )}
