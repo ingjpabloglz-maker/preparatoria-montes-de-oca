@@ -25,7 +25,15 @@ async function invokeLLM(base44, prompt, label) {
             type: 'object',
             properties: {
               title: { type: 'string' },
-              explanation: { type: 'string' },
+              explanation: {
+                type: 'object',
+                properties: {
+                  intro: { type: 'string' },
+                  key_points: { type: 'array', items: { type: 'object' } },
+                  examples: { type: 'array', items: { type: 'object' } },
+                  summary: { type: 'string' }
+                }
+              },
               activities: { type: 'array', items: { type: 'object' } }
             },
             required: ['title', 'explanation', 'activities']
@@ -40,12 +48,43 @@ async function invokeLLM(base44, prompt, label) {
   }
 }
 
-// ─── Prompt mínimo ────────────────────────────────────────────────────────────
+// ─── Prompt estructurado ──────────────────────────────────────────────────────
 function buildPrompt(topic, subjectName) {
-  return 'Lección de preparatoria en JSON.\nTema: "' + topic + '"\nMateria: "' + subjectName + '"\n\n' +
-    'Responde SOLO este JSON:\n' +
-    '{"title":"...","explanation":"Explicación clara y completa de 150-250 palabras para que un alumno entienda completamente el tema sin conocimiento previo. Sin markdown ni HTML.","activities":[{"type":"multiple_choice","question":"...","options":["A","B","C","D"],"correct_answer":"A","explanation":"..."},{"type":"true_false","question":"...","options":["Verdadero","Falso"],"correct_answer":"Verdadero","explanation":"..."},{"type":"fill_blank","question":"Completa: ___ ...","options":[],"correct_answer":"...","explanation":"..."},{"type":"multiple_choice","question":"...","options":["A","B","C","D"],"correct_answer":"B","explanation":"..."},{"type":"true_false","question":"...","options":["Verdadero","Falso"],"correct_answer":"Falso","explanation":"..."}]}\n\n' +
-    'Reglas: 4-5 actividades, solo tipos multiple_choice/true_false/fill_blank, preguntas distintas, correct_answer exacto de options, solo JSON válido.';
+  return 'Eres un docente experto de preparatoria. Genera una lección completa en JSON puro.\n' +
+    'Tema: "' + topic + '"\nMateria: "' + subjectName + '"\n\n' +
+    'RESPONDE SOLO EL JSON SIGUIENTE, sin texto extra, sin markdown, sin HTML:\n' +
+    '{\n' +
+    '  "title": "Título corto del tema",\n' +
+    '  "explanation": {\n' +
+    '    "intro": "Introducción breve y clara de 1-2 oraciones que explique de qué trata el tema.",\n' +
+    '    "key_points": [\n' +
+    '      { "title": "Subtema o concepto", "content": "Explicación clara y sencilla.", "example": "Ejemplo corto concreto." }\n' +
+    '    ],\n' +
+    '    "examples": [\n' +
+    '      { "question": "Ejercicio o situación práctica", "solution": "Resolución o respuesta." }\n' +
+    '    ],\n' +
+    '    "summary": "Resumen final corto de 1-2 oraciones."\n' +
+    '  },\n' +
+    '  "activities": [\n' +
+    '    { "type": "multiple_choice", "question": "Pregunta", "options": ["A","B","C","D"], "correct_answer": "A", "explanation": "Explicación corta" },\n' +
+    '    { "type": "true_false", "question": "Afirmación", "options": ["Verdadero","Falso"], "correct_answer": "Verdadero", "explanation": "Explicación corta" },\n' +
+    '    { "type": "fill_blank", "question": "Completa: ___ ...", "options": [], "correct_answer": "respuesta", "explanation": "Explicación corta" },\n' +
+    '    { "type": "multiple_choice", "question": "Pregunta 2", "options": ["A","B","C","D"], "correct_answer": "B", "explanation": "Explicación corta" },\n' +
+    '    { "type": "true_false", "question": "Afirmación 2", "options": ["Verdadero","Falso"], "correct_answer": "Falso", "explanation": "Explicación corta" }\n' +
+    '  ]\n' +
+    '}\n\n' +
+    'REGLAS OBLIGATORIAS:\n' +
+    '- explanation.intro: 1-2 oraciones, lenguaje claro para preparatoria.\n' +
+    '- explanation.key_points: entre 3 y 6 elementos. Cada uno con title, content y example.\n' +
+    '  * Si el tema es matemático/científico: incluir operaciones, números, fórmulas simples en content y example.\n' +
+    '  * Si el tema es teórico: usar ejemplos cotidianos, comparaciones o contexto histórico.\n' +
+    '- explanation.examples: entre 1 y 3 ejercicios o situaciones prácticas con su solución.\n' +
+    '- explanation.summary: 1-2 oraciones resumiendo el tema.\n' +
+    '- activities: 4-5 actividades, SOLO tipos multiple_choice/true_false/fill_blank.\n' +
+    '- Todas las preguntas deben ser diferentes entre sí.\n' +
+    '- correct_answer debe ser exactamente igual a uno de los options.\n' +
+    '- NO generar HTML, markdown, SVG, código, imágenes ni propiedades extra.\n' +
+    '- Solo JSON válido.';
 }
 
 // ─── Validación mínima ────────────────────────────────────────────────────────
@@ -54,6 +93,18 @@ function isValidActivity(act) {
   if (!VALID_TYPES.includes(act.type)) return false;
   if (act.type === 'multiple_choice' && (!Array.isArray(act.options) || act.options.length < 2)) return false;
   return true;
+}
+
+// ─── Normalizar explanation (string legacy → objeto nuevo) ───────────────────
+function normalizeExplanation(raw, title, subjectName) {
+  if (raw && typeof raw === 'object' && raw.intro) return raw;
+  const text = typeof raw === 'string' ? raw : ('Esta lección cubre "' + title + '" dentro de ' + subjectName + '.');
+  return {
+    intro: text,
+    key_points: [{ title: title, content: text, example: '' }],
+    examples: [],
+    summary: 'Estudia bien este tema para avanzar en ' + subjectName + '.',
+  };
 }
 
 // ─── Fallback local sin LLM ───────────────────────────────────────────────────
@@ -156,13 +207,13 @@ async function generateLesson(base44, { module_id, subject_id, subject_name, top
   }
 
   let title = topic;
-  let explanation = 'Esta lección cubre "' + topic + '" dentro de ' + subject_name + '.';
+  let explanation = normalizeExplanation(null, topic, subject_name);
   let activities = [];
 
   try {
     const raw = await invokeLLM(base44, buildPrompt(topic, subject_name), topic);
     if (raw?.title) title = raw.title;
-    if (raw?.explanation) explanation = raw.explanation;
+    if (raw?.explanation) explanation = normalizeExplanation(raw.explanation, title, subject_name);
     if (Array.isArray(raw?.activities)) {
       activities = raw.activities.filter(isValidActivity).map(a => ({
         type: a.type,
