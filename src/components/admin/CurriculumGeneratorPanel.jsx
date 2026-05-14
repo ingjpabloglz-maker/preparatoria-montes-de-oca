@@ -329,6 +329,17 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
     } catch (e) { toast.error(e.message); }
   };
 
+  const handleManualUnlock = async () => {
+    try {
+      const jobs = await base44.entities.CurriculumGenerationJob.filter({ subject_id: subject.id, status: 'processing' });
+      if (!jobs.length) { toast.info('No hay jobs bloqueados activos.'); return; }
+      await Promise.all(jobs.map(j => base44.entities.CurriculumGenerationJob.update(j.id, { status: 'failed', error_message: 'Liberado manualmente por admin.' })));
+      setLockedJobId(null);
+      setStatus('idle');
+      toast.success('Lock liberado. ' + jobs.length + ' job(s) marcados como fallidos.');
+    } catch (e) { toast.error(e.message); }
+  };
+
   const handleExportLogs = () => {
     const logs = jobRecord?.logs || [];
     if (!logs.length) { toast.info('No hay logs'); return; }
@@ -455,6 +466,12 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
                 Forzar desbloqueo
               </Button>
             </div>
+          )}
+
+          {(status === 'idle' || status === 'failed') && (
+            <Button onClick={handleManualUnlock} variant="outline" size="sm" className="w-full gap-2 border-orange-300 text-orange-700 hover:bg-orange-50">
+              <RefreshCw className="w-3.5 h-3.5" /> Liberar lock (error 409)
+            </Button>
           )}
 
           {(status === 'idle' || status === 'failed') && (
