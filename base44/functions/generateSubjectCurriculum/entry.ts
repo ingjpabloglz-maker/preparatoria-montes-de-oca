@@ -372,20 +372,27 @@ Deno.serve(async (req) => {
         await log('[' + ts() + '] 🚀 "' + subject.name + '" — ' + totalLessons + ' lecciones');
 
         if (overwrite) {
-          await log('[' + ts() + '] 🗑️ Limpiando...');
-          const units = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
-          for (const u of units) {
-            const mods = await base44.asServiceRole.entities.CourseModule.filter({ unit_id: u.id });
-            for (const m of mods) {
-              const lsns = await base44.asServiceRole.entities.CourseLesson.filter({ module_id: m.id });
-              for (const l of lsns) {
-                const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: l.id });
+          await log('[' + ts() + '] 🗑️ Limpiando contenido seleccionado...');
+          for (const unitBp of filteredStructure) {
+            for (const modBp of unitBp.modules) {
+              // Buscar el módulo por título y subject_id
+              const existingUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
+              const matchUnit = existingUnits.find(u => u.title === unitBp.title);
+              if (!matchUnit) continue;
+              const existingMods = await base44.asServiceRole.entities.CourseModule.filter({ unit_id: matchUnit.id });
+              const matchMod = existingMods.find(m => m.title === modBp.title);
+              if (!matchMod) continue;
+              // Solo borrar las lecciones seleccionadas dentro del módulo
+              for (const lessonBp of modBp.lessons) {
+                const existingLessons = await base44.asServiceRole.entities.CourseLesson.filter({ module_id: matchMod.id });
+                const matchLesson = existingLessons.find(l => l.order === lessonBp.order);
+                if (!matchLesson) continue;
+                const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: matchLesson.id });
                 for (const a of acts) await base44.asServiceRole.entities.CourseActivity.delete(a.id);
-                await base44.asServiceRole.entities.CourseLesson.delete(l.id);
+                await base44.asServiceRole.entities.CourseLesson.delete(matchLesson.id);
+                await log('[' + ts() + '] 🗑️ Eliminada: "' + (matchLesson.title || lessonBp.topic) + '"');
               }
-              await base44.asServiceRole.entities.CourseModule.delete(m.id);
             }
-            await base44.asServiceRole.entities.CourseUnit.delete(u.id);
           }
         }
 
