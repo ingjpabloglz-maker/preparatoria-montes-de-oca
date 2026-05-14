@@ -1,20 +1,32 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// generateSubjectCurriculum — v7
+// generateSubjectCurriculum — v8
+// • Clave semántica estable: normalizeKey(unit_title|module_title|lesson_title)
+// • NO usa order para unicidad lógica
 // • 1 llamada LLM por lección (timeout 45s, fallback inmediato)
 // • Solo: multiple_choice, true_false, fill_blank
-// • Unicidad lógica por (parent_id + order)
-// • Cleanup SELECTIVO en overwrite=true (solo borra la selección actual)
-// • Protección contra concurrencia
-// • Validación post-generación con auto-limpieza de duplicados
 
 const VALID_TYPES = ['multiple_choice', 'true_false', 'fill_blank'];
 
 function ts() { return new Date().toLocaleTimeString('es-MX', { hour12: false }); }
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── Clave semántica estable ──────────────────────────────────────────────────
+function normalizeKey(str = '') {
+  return String(str)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, '-')
+    .trim();
+}
+
+function buildLessonKey(unitTitle, moduleTitle, lessonTitle) {
+  return [normalizeKey(unitTitle), normalizeKey(moduleTitle), normalizeKey(lessonTitle)].join('|');
+}
 
 // ─── LLM con timeout duro ─────────────────────────────────────────────────────
-async function invokeLLMWithTimeout(base44, prompt, ms = 45000) {
+async function invokeLLM(base44, prompt) {
   return Promise.race([
     base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
@@ -36,13 +48,8 @@ async function invokeLLMWithTimeout(base44, prompt, ms = 45000) {
         required: ['title', 'explanation', 'activities']
       }
     }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('LLM_TIMEOUT')), ms))
+    new Promise((_, reject) => setTimeout(() => reject(new Error('LLM_TIMEOUT')), 45000))
   ]);
-}
-
-// 1 intento con timeout duro — si falla, el catch en generateLesson usa fallback
-async function invokeLLM(base44, prompt) {
-  return invokeLLMWithTimeout(base44, prompt, 45000);
 }
 
 // ─── Prompt estructurado ──────────────────────────────────────────────────────
@@ -53,12 +60,12 @@ function buildPrompt(topic, subjectName) {
     '{\n' +
     '  "title": "Título corto del tema",\n' +
     '  "explanation": {\n' +
-    '    "intro": "Introducción breve y clara de 1-2 oraciones que explique de qué trata el tema.",\n' +
+    '    "intro": "Introducción breve y clara de 1-2 oraciones.",\n' +
     '    "key_points": [\n' +
-    '      { "title": "Subtema o concepto", "content": "Explicación clara y sencilla.", "example": "Ejemplo corto concreto." }\n' +
+    '      { "title": "Subtema", "content": "Explicación clara.", "example": "Ejemplo corto." }\n' +
     '    ],\n' +
     '    "examples": [\n' +
-    '      { "question": "Ejercicio o situación práctica", "solution": "Resolución o respuesta." }\n' +
+    '      { "question": "Ejercicio o situación práctica", "solution": "Resolución." }\n' +
     '    ],\n' +
     '    "summary": "Resumen final corto de 1-2 oraciones."\n' +
     '  },\n' +
@@ -71,20 +78,13 @@ function buildPrompt(topic, subjectName) {
     '  ]\n' +
     '}\n\n' +
     'REGLAS OBLIGATORIAS:\n' +
-    '- explanation.intro: 1-2 oraciones, lenguaje claro para preparatoria.\n' +
-    '- explanation.key_points: entre 3 y 6 elementos. Cada uno con title, content y example.\n' +
-    '  * Si el tema es matemático/científico: incluir operaciones, números, fórmulas simples en content y example.\n' +
-    '  * Si el tema es teórico: usar ejemplos cotidianos, comparaciones o contexto histórico.\n' +
-    '- explanation.examples: entre 1 y 3 ejercicios o situaciones prácticas con su solución.\n' +
-    '- explanation.summary: 1-2 oraciones resumiendo el tema.\n' +
+    '- explanation.key_points: entre 3 y 6 elementos, cada uno con title, content y example.\n' +
     '- activities: 4-5 actividades, SOLO tipos multiple_choice/true_false/fill_blank.\n' +
-    '- Todas las preguntas deben ser diferentes entre sí.\n' +
     '- correct_answer debe ser exactamente igual a uno de los options.\n' +
-    '- NO generar HTML, markdown, SVG, código, imágenes ni propiedades extra.\n' +
-    '- Solo JSON válido.';
+    '- Solo JSON válido, sin HTML ni markdown.';
 }
 
-// ─── Validación mínima ────────────────────────────────────────────────────────
+// ─── Validación mínima de actividad ──────────────────────────────────────────
 function isValidActivity(act) {
   if (!act || !act.question || !act.type || !act.correct_answer) return false;
   if (!VALID_TYPES.includes(act.type)) return false;
@@ -127,7 +127,7 @@ function localFallback(title, subjectName, count) {
   return items.slice(0, count);
 }
 
-// ─── Estructura 1:1 del sílabo (sin recortes) ────────────────────────────────
+// ─── Estructura 1:1 del sílabo ────────────────────────────────────────────────
 function buildStructure(syllabus) {
   return (syllabus.units || []).map((unit, ui) => ({
     title: unit.title,
@@ -144,99 +144,42 @@ function buildStructure(syllabus) {
   }));
 }
 
-// ─── Cleanup selectivo: solo borra lo que está en filteredStructure ───────────
-// Orden: Activities → Lessons → Modules vacíos → Units vacías
-async function cleanupSelectedContent(base44, subject_id, filteredStructure, log, selectionSummary) {
-  await log('[' + ts() + '] 🗑️ Limpiando contenido seleccionado: ' + (selectionSummary || filteredStructure.map(u => u.title).join(', ')));
-  let actCount = 0, lessonCount = 0, modCount = 0, unitCount = 0;
-
-  // Obtener todas las unidades existentes para la materia
-  const allUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
-
-  for (const unitBp of filteredStructure) {
-    // Encontrar la unidad existente por order
-    const existingUnit = allUnits.find(u => u.order === unitBp.order);
-    if (!existingUnit) continue;
-
-    // Obtener módulos de esta unidad
-    const allMods = await base44.asServiceRole.entities.CourseModule.filter({ unit_id: existingUnit.id });
-
-    for (const modBp of unitBp.modules) {
-      // Encontrar el módulo existente por order
-      const existingMod = allMods.find(m => m.order === modBp.order);
-      if (!existingMod) continue;
-
-      // Obtener lecciones de este módulo
-      const allLessons = await base44.asServiceRole.entities.CourseLesson.filter({ module_id: existingMod.id });
-
-      for (const lessonBp of modBp.lessons) {
-        // Encontrar la lección existente por order
-        const existingLesson = allLessons.find(l => l.order === lessonBp.order);
-        if (!existingLesson) continue;
-
-        // Borrar actividades de esta lección
-        const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: existingLesson.id });
-        for (const a of acts) {
-          await base44.asServiceRole.entities.CourseActivity.delete(a.id);
-          actCount++;
-        }
-        // Borrar la lección
-        await base44.asServiceRole.entities.CourseLesson.delete(existingLesson.id);
-        lessonCount++;
-      }
-
-      // Borrar módulo solo si quedó completamente vacío
-      const remainingLessons = await base44.asServiceRole.entities.CourseLesson.filter({ module_id: existingMod.id });
-      if (remainingLessons.length === 0) {
-        await base44.asServiceRole.entities.CourseModule.delete(existingMod.id);
-        modCount++;
-      }
-    }
-
-    // Borrar unidad solo si quedó completamente vacía
-    const remainingMods = await base44.asServiceRole.entities.CourseModule.filter({ unit_id: existingUnit.id });
-    if (remainingMods.length === 0) {
-      await base44.asServiceRole.entities.CourseUnit.delete(existingUnit.id);
-      unitCount++;
-    }
-  }
-
-  await log('[' + ts() + '] ✅ Limpieza selectiva: ' + actCount + ' act, ' + lessonCount + ' lec, ' + modCount + ' mod, ' + unitCount + ' uni eliminados');
-}
-
-// ─── Upsert por unicidad lógica (parent_id + order) ──────────────────────────
+// ─── Upsert por título normalizado ────────────────────────────────────────────
 async function upsertUnit(base44, subject_id, order, title) {
   const existing = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
-  const match = existing.find(u => u.order === order);
+  const nk = normalizeKey(title);
+  const match = existing.find(u => normalizeKey(u.title) === nk);
   if (match) return match;
   return base44.asServiceRole.entities.CourseUnit.create({ subject_id, title, order });
 }
 
 async function upsertModule(base44, unit_id, subject_id, order, title) {
   const existing = await base44.asServiceRole.entities.CourseModule.filter({ unit_id });
-  const match = existing.find(m => m.order === order);
+  const nk = normalizeKey(title);
+  const match = existing.find(m => normalizeKey(m.title) === nk);
   if (match) return match;
   return base44.asServiceRole.entities.CourseModule.create({ unit_id, subject_id, title, order });
 }
 
-// ─── Generar una lección (unicidad por module_id + order) ─────────────────────
+// ─── Generar lección — unicidad por título normalizado ────────────────────────
 async function generateLesson(base44, { module_id, subject_id, subject_name, topic, is_mini_eval, order }, log) {
   await log('[' + ts() + '] 📝 ' + topic);
 
-  // Buscar por module_id + order (clave lógica única)
-  const existing = (await base44.asServiceRole.entities.CourseLesson.filter({ module_id, subject_id })).filter(l => l.order === order);
+  const nk = normalizeKey(topic);
+  const allInModule = await base44.asServiceRole.entities.CourseLesson.filter({ module_id, subject_id });
+  const existing = allInModule.filter(l => normalizeKey(l.title) === nk);
 
+  // Si ya existe completa → skip
   if (existing[0]?.generation_completed) {
     const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: existing[0].id });
     if (acts.length >= 4) {
       await log('[' + ts() + '] ⏭️ SKIP: ya existe completa');
       return acts.length;
     }
-    // Limpiar incompleta
+    // Existe pero incompleta → limpiar y regenerar
     for (const a of acts) await base44.asServiceRole.entities.CourseActivity.delete(a.id);
     await base44.asServiceRole.entities.CourseLesson.delete(existing[0].id);
   } else if (existing[0]) {
-    // Existe pero sin completar — limpiar
     const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: existing[0].id });
     for (const a of acts) await base44.asServiceRole.entities.CourseActivity.delete(a.id);
     await base44.asServiceRole.entities.CourseLesson.delete(existing[0].id);
@@ -262,7 +205,6 @@ async function generateLesson(base44, { module_id, subject_id, subject_name, top
   } catch (err) {
     const isTimeout = err.message === 'LLM_TIMEOUT';
     await log('[' + ts() + '] ⚠️ ' + (isTimeout ? 'TIMEOUT — usando fallback' : 'LLM falló: ' + err.message));
-    // Fallback inmediato, no reintentar más
   }
 
   if (activities.length < 4) {
@@ -288,76 +230,122 @@ async function generateLesson(base44, { module_id, subject_id, subject_name, top
   return activities.length;
 }
 
-// ─── Validación post-generación: detecta y limpia duplicados ──────────────────
+// ─── Cleanup selectivo por clave semántica ────────────────────────────────────
+async function cleanupSelectedContent(base44, subject_id, filteredStructure, log, selectionSummary) {
+  await log('[' + ts() + '] 🗑️ Limpiando contenido seleccionado: ' + (selectionSummary || filteredStructure.map(u => u.title).join(', ')));
+  let actCount = 0, lessonCount = 0, modCount = 0, unitCount = 0;
+
+  const allUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
+
+  for (const unitBp of filteredStructure) {
+    const existingUnit = allUnits.find(u => normalizeKey(u.title) === normalizeKey(unitBp.title));
+    if (!existingUnit) continue;
+
+    const allMods = await base44.asServiceRole.entities.CourseModule.filter({ unit_id: existingUnit.id });
+
+    for (const modBp of unitBp.modules) {
+      const existingMod = allMods.find(m => normalizeKey(m.title) === normalizeKey(modBp.title));
+      if (!existingMod) continue;
+
+      const allLessons = await base44.asServiceRole.entities.CourseLesson.filter({ module_id: existingMod.id });
+
+      for (const lessonBp of modBp.lessons) {
+        const existingLesson = allLessons.find(l => normalizeKey(l.title) === normalizeKey(lessonBp.topic));
+        if (!existingLesson) continue;
+
+        const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: existingLesson.id });
+        for (const a of acts) { await base44.asServiceRole.entities.CourseActivity.delete(a.id); actCount++; }
+        await base44.asServiceRole.entities.CourseLesson.delete(existingLesson.id);
+        lessonCount++;
+      }
+
+      const remainingLessons = await base44.asServiceRole.entities.CourseLesson.filter({ module_id: existingMod.id });
+      if (remainingLessons.length === 0) {
+        await base44.asServiceRole.entities.CourseModule.delete(existingMod.id);
+        modCount++;
+      }
+    }
+
+    const remainingMods = await base44.asServiceRole.entities.CourseModule.filter({ unit_id: existingUnit.id });
+    if (remainingMods.length === 0) {
+      await base44.asServiceRole.entities.CourseUnit.delete(existingUnit.id);
+      unitCount++;
+    }
+  }
+
+  await log('[' + ts() + '] ✅ Limpieza selectiva: ' + actCount + ' act, ' + lessonCount + ' lec, ' + modCount + ' mod, ' + unitCount + ' uni eliminados');
+}
+
+// ─── Validación post-generación: duplicados por título normalizado ─────────────
 async function validateAndCleanDuplicates(base44, subject_id, log) {
   await log('[' + ts() + '] 🔍 Validando estructura post-generación...');
   let removed = 0;
 
-  // Validar CourseUnit: duplicados por subject_id + order
+  // CourseUnit: duplicados por subject_id + normalized title
   const units = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
-  const unitsByOrder = {};
+  const unitsByKey = {};
   for (const u of units) {
-    const key = String(u.order);
-    if (!unitsByOrder[key]) { unitsByOrder[key] = []; }
-    unitsByOrder[key].push(u);
+    const key = normalizeKey(u.title);
+    if (!unitsByKey[key]) unitsByKey[key] = [];
+    unitsByKey[key].push(u);
   }
-  for (const key of Object.keys(unitsByOrder)) {
-    const dups = unitsByOrder[key].sort((a, b) => b.created_date?.localeCompare(a.created_date || '') || 0);
+  for (const key of Object.keys(unitsByKey)) {
+    const dups = unitsByKey[key].sort((a, b) => (a.created_date || '').localeCompare(b.created_date || ''));
     for (let i = 1; i < dups.length; i++) {
       await base44.asServiceRole.entities.CourseUnit.delete(dups[i].id);
       removed++;
-      await log('[' + ts() + '] ⚠️ Unidad duplicada eliminada: order=' + key);
+      await log('[' + ts() + '] ⚠️ Unidad duplicada eliminada: "' + key + '"');
     }
   }
 
-  // Validar CourseModule: duplicados por unit_id + order
+  // CourseModule: duplicados por unit_id + normalized title
   const allModules = await base44.asServiceRole.entities.CourseModule.filter({ subject_id });
   const modsByKey = {};
   for (const m of allModules) {
-    const key = m.unit_id + '|' + String(m.order);
-    if (!modsByKey[key]) { modsByKey[key] = []; }
+    const key = m.unit_id + '|' + normalizeKey(m.title);
+    if (!modsByKey[key]) modsByKey[key] = [];
     modsByKey[key].push(m);
   }
   for (const key of Object.keys(modsByKey)) {
-    const dups = modsByKey[key].sort((a, b) => b.created_date?.localeCompare(a.created_date || '') || 0);
+    const dups = modsByKey[key].sort((a, b) => (a.created_date || '').localeCompare(b.created_date || ''));
     for (let i = 1; i < dups.length; i++) {
       await base44.asServiceRole.entities.CourseModule.delete(dups[i].id);
       removed++;
-      await log('[' + ts() + '] ⚠️ Módulo duplicado eliminado: ' + key);
+      await log('[' + ts() + '] ⚠️ Módulo duplicado eliminado: "' + key + '"');
     }
   }
 
-  // Validar CourseLesson: duplicados por module_id + order
+  // CourseLesson: duplicados por module_id + normalized title
   const allLessons = await base44.asServiceRole.entities.CourseLesson.filter({ subject_id });
   const lessonsByKey = {};
   for (const l of allLessons) {
-    const key = l.module_id + '|' + String(l.order);
-    if (!lessonsByKey[key]) { lessonsByKey[key] = []; }
+    const key = l.module_id + '|' + normalizeKey(l.title);
+    if (!lessonsByKey[key]) lessonsByKey[key] = [];
     lessonsByKey[key].push(l);
   }
   for (const key of Object.keys(lessonsByKey)) {
-    const dups = lessonsByKey[key].sort((a, b) => b.created_date?.localeCompare(a.created_date || '') || 0);
+    const dups = lessonsByKey[key].sort((a, b) => (a.created_date || '').localeCompare(b.created_date || ''));
     for (let i = 1; i < dups.length; i++) {
       const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: dups[i].id });
       for (const a of acts) await base44.asServiceRole.entities.CourseActivity.delete(a.id);
       await base44.asServiceRole.entities.CourseLesson.delete(dups[i].id);
       removed++;
-      await log('[' + ts() + '] ⚠️ Lección duplicada eliminada: ' + key);
+      await log('[' + ts() + '] ⚠️ Lección duplicada eliminada: "' + key + '"');
     }
   }
 
-  // Validar CourseActivity: duplicados por lesson_id + order
+  // CourseActivity: duplicados por lesson_id + question normalizada
   const freshLessons = await base44.asServiceRole.entities.CourseLesson.filter({ subject_id });
   for (const lesson of freshLessons) {
     const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: lesson.id });
-    const actsByOrder = {};
+    const actsByKey = {};
     for (const a of acts) {
-      const key = String(a.order);
-      if (!actsByOrder[key]) { actsByOrder[key] = []; }
-      actsByOrder[key].push(a);
+      const key = normalizeKey(a.question);
+      if (!actsByKey[key]) actsByKey[key] = [];
+      actsByKey[key].push(a);
     }
-    for (const key of Object.keys(actsByOrder)) {
-      const dups = actsByOrder[key].sort((a, b) => b.created_date?.localeCompare(a.created_date || '') || 0);
+    for (const key of Object.keys(actsByKey)) {
+      const dups = actsByKey[key].sort((a, b) => (a.created_date || '').localeCompare(b.created_date || ''));
       for (let i = 1; i < dups.length; i++) {
         await base44.asServiceRole.entities.CourseActivity.delete(dups[i].id);
         removed++;
@@ -372,41 +360,39 @@ async function validateAndCleanDuplicates(base44, subject_id, log) {
   }
 }
 
-// ─── Detectar faltantes comparando estructura vs BD ──────────────────────────
+// ─── Detectar faltantes por clave semántica ───────────────────────────────────
 async function detectMissingLessons(base44, subject_id, structure) {
   const existingUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
   const allModules = await base44.asServiceRole.entities.CourseModule.filter({ subject_id });
   const allLessons = await base44.asServiceRole.entities.CourseLesson.filter({ subject_id });
 
-  // Indexar por clave lógica (order)
-  const unitByOrder = {};
-  for (const u of existingUnits) unitByOrder[u.order] = u;
+  // Indexar unidades por título normalizado
+  const unitByKey = {};
+  for (const u of existingUnits) unitByKey[normalizeKey(u.title)] = u;
 
-  const modByKey = {}; // "unit_order|mod_order"
+  // Indexar módulos por unit_id + título normalizado
+  const modByKey = {};
   for (const m of allModules) {
-    const unit = existingUnits.find(u => u.id === m.unit_id);
-    if (unit) modByKey[unit.order + '|' + m.order] = m;
+    const key = m.unit_id + '|' + normalizeKey(m.title);
+    if (!modByKey[key] || (m.created_date || '') > (modByKey[key].created_date || '')) modByKey[key] = m;
   }
 
-  // Indexar lecciones por module_id+order, keeping most recent for duplicates
-  const lessonByKey = {}; // "mod_db_id|lesson_order"
+  // Indexar lecciones por module_id + título normalizado, manteniendo la más reciente
+  const lessonByKey = {};
   for (const l of allLessons) {
-    const key = l.module_id + '|' + l.order;
-    if (!lessonByKey[key] || (l.created_date || '') > (lessonByKey[key].created_date || '')) {
-      lessonByKey[key] = l;
-    }
+    const key = l.module_id + '|' + normalizeKey(l.title);
+    if (!lessonByKey[key] || (l.created_date || '') > (lessonByKey[key].created_date || '')) lessonByKey[key] = l;
   }
 
   const missingUnits = [], missingModules = [], missingLessons = [], completedLessons = [];
-  const missingSelection = []; // {unit_index, module_index, lesson_index}
-
+  const missingSelection = [];
   let totalSyllabus = 0;
 
   for (const [ui, unitBp] of structure.entries()) {
-    const existingUnit = unitByOrder[unitBp.order];
+    const existingUnit = unitByKey[normalizeKey(unitBp.title)];
+
     if (!existingUnit) {
       missingUnits.push(unitBp);
-      // Todos los módulos y lecciones de esta unidad son faltantes
       for (const [mi, modBp] of unitBp.modules.entries()) {
         missingModules.push({ unit_title: unitBp.title, ...modBp });
         for (const [li, lessonBp] of modBp.lessons.entries()) {
@@ -419,8 +405,9 @@ async function detectMissingLessons(base44, subject_id, structure) {
     }
 
     for (const [mi, modBp] of unitBp.modules.entries()) {
-      const modKey = unitBp.order + '|' + modBp.order;
+      const modKey = existingUnit.id + '|' + normalizeKey(modBp.title);
       const existingMod = modByKey[modKey];
+
       if (!existingMod) {
         missingModules.push({ unit_title: unitBp.title, ...modBp });
         for (const [li, lessonBp] of modBp.lessons.entries()) {
@@ -433,7 +420,7 @@ async function detectMissingLessons(base44, subject_id, structure) {
 
       for (const [li, lessonBp] of modBp.lessons.entries()) {
         totalSyllabus++;
-        const lessonKey = existingMod.id + '|' + lessonBp.order;
+        const lessonKey = existingMod.id + '|' + normalizeKey(lessonBp.topic);
         const existingLesson = lessonByKey[lessonKey];
         if (!existingLesson || !existingLesson.generation_completed) {
           missingLessons.push({ unit_title: unitBp.title, module_title: modBp.title, ...lessonBp });
@@ -477,15 +464,11 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, unlocked: n });
     }
 
-    // ── Protección contra concurrencia (ANTES de cualquier otra operación) ──
+    // ── Protección contra concurrencia ──
     const activeJob = (await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ subject_id }))
       .find(j => j.status === 'processing' || j.status === 'pending');
     if (activeJob) {
-      return Response.json({
-        error: 'Ya existe una generación en progreso para esta materia.',
-        locked: true,
-        active_job_id: activeJob.id
-      }, { status: 409 });
+      return Response.json({ error: 'Ya existe una generación en progreso para esta materia.', locked: true, active_job_id: activeJob.id }, { status: 409 });
     }
 
     const subject = (await base44.asServiceRole.entities.Subject.filter({ id: subject_id }))[0];
@@ -513,7 +496,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Filtrar por selección si viene lesson_selection
+    // ── Filtrar por lesson_selection (índices en estructura) ──
     let filteredStructure = structure;
     if (lesson_selection && Array.isArray(lesson_selection) && lesson_selection.length > 0) {
       const selSet = new Set(lesson_selection.map(s => `${s.unit_index}-${s.module_index}-${s.lesson_index}`));
@@ -529,7 +512,7 @@ Deno.serve(async (req) => {
     let totalLessons = 0, totalModules = 0;
     for (const u of filteredStructure) for (const m of u.modules) { totalModules++; totalLessons += m.lessons.length; }
 
-    // Preview — devuelve estructura COMPLETA para que el modal muestre todo
+    // Preview — devuelve estructura COMPLETA
     if (preview_only) {
       let fullTotal = 0, fullModules = 0;
       for (const u of structure) for (const m of u.modules) { fullModules++; fullTotal += m.lessons.length; }
@@ -553,7 +536,7 @@ Deno.serve(async (req) => {
       throw new Error('lesson_selection is required. Refusing full-subject overwrite.');
     }
 
-    // Solo bloquear si hay contenido existente Y no hay selección explícita de faltantes
+    // Solo bloquear si hay contenido existente Y no hay selección explícita
     if (!overwrite && (!lesson_selection || lesson_selection.length === 0)) {
       const existing = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
       if (existing.length > 0) return Response.json({ error: 'Ya tiene contenido. Usa overwrite=true.', has_content: true }, { status: 409 });
@@ -585,26 +568,22 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.CurriculumGenerationJob.update(job.id, { status: 'processing', last_activity_at: new Date().toISOString() });
         await log('[' + ts() + '] 🚀 "' + subject.name + '" — ' + totalLessons + ' lecciones');
 
-        // Cleanup selectivo: solo borra lo que está en la selección actual
+        // Cleanup selectivo por clave semántica
         if (overwrite) {
-          console.log('SELECTION_RECEIVED', lesson_selection);
           const selectionSummary = filteredStructure.map(u => u.title).join(', ');
           await cleanupSelectedContent(base44, subject_id, filteredStructure, log, selectionSummary);
         }
 
         for (const unitBp of filteredStructure) {
-          // Verificar cancelación
           const freshCheck = (await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ id: job.id }))[0];
           if (freshCheck?.status === 'failed') { await log('[' + ts() + '] 🛑 Cancelado'); return; }
 
-          // Upsert por subject_id + order
           const unit = await upsertUnit(base44, subject_id, unitBp.order, unitBp.title);
 
           for (const modBp of unitBp.modules) {
             const fresh = (await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ id: job.id }))[0];
             if (fresh?.status === 'failed') { await log('[' + ts() + '] 🛑 Cancelado'); return; }
 
-            // Upsert por unit_id + order
             const module = await upsertModule(base44, unit.id, subject_id, modBp.order, modBp.title);
 
             for (const lessonBp of modBp.lessons) {
@@ -630,7 +609,6 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Validación post-generación
         await validateAndCleanDuplicates(base44, subject_id, log);
 
         const secs = Math.round((Date.now() - start) / 1000);
