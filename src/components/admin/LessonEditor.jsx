@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, ClipboardList, ChevronDown, ChevronUp, Pencil, Save, X, Loader2, Plus, Trash2 } from "lucide-react";
+import { BookOpen, ClipboardList, ChevronDown, ChevronUp, Pencil, Save, X, Loader2, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 // ─── Editor de actividades de una lección ─────────────────────────────────────
@@ -285,8 +285,22 @@ function LessonEditPanel({ lesson, subjectName, onClose, onSaved }) {
 
 // ─── Panel principal: lista lecciones con botón editar ─────────────────────────
 export default function LessonEditor({ subject, lessons, activitiesCounts }) {
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState(null);
+  const [deletingLesson, setDeletingLesson] = useState(null);
+
+  const handleDeleteLesson = async (lesson) => {
+    if (!confirm(`¿Eliminar la lección "${lesson.title}" y todas sus actividades?`)) return;
+    setDeletingLesson(lesson.id);
+    const acts = await base44.entities.CourseActivity.filter({ lesson_id: lesson.id });
+    for (const a of acts) await base44.entities.CourseActivity.delete(a.id);
+    await base44.entities.CourseLesson.delete(lesson.id);
+    queryClient.invalidateQueries(['lessonsForSubject', lesson.subject_id]);
+    queryClient.invalidateQueries(['activitiesCount', lesson.subject_id]);
+    toast.success(`Lección "${lesson.title}" eliminada`);
+    setDeletingLesson(null);
+  };
 
   if (!subject) return null;
 
@@ -344,6 +358,9 @@ export default function LessonEditor({ subject, lessons, activitiesCounts }) {
                       </div>
                       <Button size="sm" variant="outline" onClick={() => setEditingLesson(lesson)} className="gap-1.5 flex-shrink-0">
                         <Pencil className="w-3.5 h-3.5" />Editar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleDeleteLesson(lesson)} disabled={deletingLesson === lesson.id} className="text-red-500 hover:text-red-700 flex-shrink-0">
+                        {deletingLesson === lesson.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                       </Button>
                     </div>
                   );
