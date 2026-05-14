@@ -372,39 +372,55 @@ Deno.serve(async (req) => {
         await log('[' + ts() + '] 🚀 "' + subject.name + '" — ' + totalLessons + ' lecciones');
 
         if (overwrite) {
-          await log('[' + ts() + '] 🗑️ Limpiando contenido seleccionado...');
-          for (const unitBp of filteredStructure) {
-            for (const modBp of unitBp.modules) {
-              // Buscar el módulo por título y subject_id
-              const existingUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
-              const matchUnit = existingUnits.find(u => u.title === unitBp.title);
-              if (!matchUnit) continue;
-              const existingMods = await base44.asServiceRole.entities.CourseModule.filter({ unit_id: matchUnit.id });
-              const matchMod = existingMods.find(m => m.title === modBp.title);
-              if (!matchMod) continue;
-              // Solo borrar las lecciones seleccionadas dentro del módulo
-              for (const lessonBp of modBp.lessons) {
-                const existingLessons = await base44.asServiceRole.entities.CourseLesson.filter({ module_id: matchMod.id });
-                const matchLesson = existingLessons.find(l => l.order === lessonBp.order);
-                if (!matchLesson) continue;
-                const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: matchLesson.id });
-                for (const a of acts) await base44.asServiceRole.entities.CourseActivity.delete(a.id);
-                await base44.asServiceRole.entities.CourseLesson.delete(matchLesson.id);
-                await log('[' + ts() + '] 🗑️ Eliminada: "' + (matchLesson.title || lessonBp.topic) + '"');
-              }
+          await log('[' + ts() + '] 🗑️ Limpiando TODO el contenido existente...');
+          // 1. Borrar todas las actividades de la materia
+          const allLessons = await base44.asServiceRole.entities.CourseLesson.filter({ subject_id });
+          for (const lesson of allLessons) {
+            const acts = await base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: lesson.id });
+            for (const a of acts) {
+              await base44.asServiceRole.entities.CourseActivity.delete(a.id);
+              await sleep(50);
             }
           }
+          // 2. Borrar todas las lecciones
+          for (const lesson of allLessons) {
+            await base44.asServiceRole.entities.CourseLesson.delete(lesson.id);
+            await sleep(50);
+          }
+          // 3. Borrar todos los módulos
+          const allModules = await base44.asServiceRole.entities.CourseModule.filter({ subject_id });
+          for (const mod of allModules) {
+            await base44.asServiceRole.entities.CourseModule.delete(mod.id);
+            await sleep(50);
+          }
+          // 4. Borrar todas las unidades
+          const allUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
+          for (const unit of allUnits) {
+            await base44.asServiceRole.entities.CourseUnit.delete(unit.id);
+            await sleep(50);
+          }
+          await log('[' + ts() + '] ✅ Limpieza completa: ' + allLessons.length + ' lecciones, ' + allModules.length + ' módulos, ' + allUnits.length + ' unidades eliminadas');
         }
 
         for (const unitBp of filteredStructure) {
-          const unit = await base44.asServiceRole.entities.CourseUnit.create({ subject_id, title: unitBp.title, order: unitBp.order });
+          // Anti-duplicado: buscar si ya existe unidad con mismo título y subject_id
+          const existingUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
+          let unit = existingUnits.find(u => u.title === unitBp.title && u.order === unitBp.order);
+          if (!unit) {
+            unit = await base44.asServiceRole.entities.CourseUnit.create({ subject_id, title: unitBp.title, order: unitBp.order });
+          }
 
           for (const modBp of unitBp.modules) {
             // Verificar cancelación externa
             const fresh = (await base44.asServiceRole.entities.CurriculumGenerationJob.filter({ id: job.id }))[0];
             if (fresh?.status === 'failed') { await log('[' + ts() + '] 🛑 Cancelado'); return; }
 
-            const module = await base44.asServiceRole.entities.CourseModule.create({ unit_id: unit.id, subject_id, title: modBp.title, order: modBp.order });
+            // Anti-duplicado: buscar si ya existe módulo con mismo título en esta unidad
+            const existingMods = await base44.asServiceRole.entities.CourseModule.filter({ unit_id: unit.id });
+            let module = existingMods.find(m => m.title === modBp.title && m.order === modBp.order);
+            if (!module) {
+              module = await base44.asServiceRole.entities.CourseModule.create({ unit_id: unit.id, subject_id, title: modBp.title, order: modBp.order });
+            }
 
             for (const lessonBp of modBp.lessons) {
               await base44.asServiceRole.entities.CurriculumGenerationJob.update(job.id, {

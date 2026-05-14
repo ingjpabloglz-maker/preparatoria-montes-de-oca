@@ -36,17 +36,36 @@ export default function CourseMap() {
 
   const { data: units = [] } = useQuery({
     queryKey: ['courseUnits', subjectId],
-    queryFn: () => base44.entities.CourseUnit.filter({ subject_id: subjectId }, 'order'),
+    queryFn: async () => {
+      const all = await base44.entities.CourseUnit.filter({ subject_id: subjectId }, 'order');
+      // Deduplicar por título: conservar solo el más reciente (mayor created_date) por título
+      const seen = new Map();
+      for (const u of all) {
+        const prev = seen.get(u.title);
+        if (!prev || u.created_date > prev.created_date) seen.set(u.title, u);
+      }
+      return Array.from(seen.values()).sort((a, b) => a.order - b.order);
+    },
     enabled: !!subjectId,
-    staleTime: 30 * 60 * 1000, // estático
+    staleTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
   const { data: modules = [] } = useQuery({
     queryKey: ['courseModules', subjectId],
-    queryFn: () => base44.entities.CourseModule.filter({ subject_id: subjectId }, 'order'),
+    queryFn: async () => {
+      const all = await base44.entities.CourseModule.filter({ subject_id: subjectId }, 'order');
+      // Deduplicar por unit_id + título: conservar solo el más reciente
+      const seen = new Map();
+      for (const m of all) {
+        const key = m.unit_id + '|' + m.title;
+        const prev = seen.get(key);
+        if (!prev || m.created_date > prev.created_date) seen.set(key, m);
+      }
+      return Array.from(seen.values()).sort((a, b) => a.order - b.order);
+    },
     enabled: !!subjectId,
-    staleTime: 30 * 60 * 1000, // estático
+    staleTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
