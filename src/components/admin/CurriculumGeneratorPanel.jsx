@@ -223,6 +223,8 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
   const [cancelling, setCancelling] = useState(false);
   const [lockedJobId, setLockedJobId] = useState(null);
   const [showLogs, setShowLogs] = useState(false);
+  const [missingInfo, setMissingInfo] = useState(null);
+  const [loadingMissing, setLoadingMissing] = useState(false);
   const pollRef = useRef(null);
   const logsEndRef = useRef(null);
 
@@ -231,9 +233,23 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
     setStatus('idle'); setJobId(null); setJobRecord(null);
     setHasExisting(false); setOverwrite(false);
     setPreview(null); setShowPreview(false); setLockedJobId(null);
+    setMissingInfo(null);
     base44.entities.CourseUnit.filter({ subject_id: subject.id })
-      .then(units => setHasExisting(units.length > 0)).catch(() => {});
+      .then(units => {
+        setHasExisting(units.length > 0);
+        if (units.length > 0) loadMissingInfo();
+      }).catch(() => {});
   }, [subject?.id]);
+
+  const loadMissingInfo = async () => {
+    if (!subject) return;
+    setLoadingMissing(true);
+    try {
+      const res = await base44.functions.invoke('generateSubjectCurriculum', { subject_id: subject.id, detect_missing: true });
+      if (res.data?.detect_missing) setMissingInfo(res.data);
+    } catch (_) {}
+    finally { setLoadingMissing(false); }
+  };
 
   // Polling del job
   useEffect(() => {
@@ -251,6 +267,8 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
           setStatus('completed');
           clearInterval(pollRef.current);
           toast.success('✅ Currículo generado: ' + rec.completed_lessons + ' lecciones, ' + (rec.activities_created || 0) + ' actividades');
+          setHasExisting(true);
+          loadMissingInfo();
           if (onComplete) onComplete();
         } else if (rec.status === 'failed') {
           setStatus('failed');
@@ -277,6 +295,28 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
       else toast.error(res.data?.error || 'Error al cargar preview');
     } catch (e) { toast.error(e.message); }
     finally { setLoadingPreview(false); }
+  };
+
+  const handleGenerateMissing = async () => {
+    if (!missingInfo?.missing_selection?.length) return;
+    setStatus('generating');
+    setJobRecord(null);
+    try {
+      const payload = { subject_id: subject.id, overwrite: false, lesson_selection: missingInfo.missing_selection };
+      const res = await base44.functions.invoke('generateSubjectCurriculum', payload);
+      const data = res.data;
+      if (data?.success && data?.job_id) {
+        setJobId(data.job_id);
+        toast.info('Generando ' + missingInfo.missing_count + ' lecciones faltantes...');
+      } else if (data?.locked) {
+        setStatus('idle'); setLockedJobId(data.active_job_id);
+        toast.error('🔒 ' + data.error);
+      } else {
+        setStatus('failed'); toast.error(data?.error || 'Error desconocido');
+      }
+    } catch (e) {
+      setStatus('failed'); toast.error(e.message);
+    }
   };
 
   // onConfirm recibe la selección explícita de lecciones y si es todo completo
@@ -450,6 +490,58 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
                     )}>{l}</p>
                   ))}
                   <div ref={logsEndRef} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Panel de faltantes */}
+          {(status === 'idle' || status === 'completed') && hasExisting && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-3 py-2 flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-700">Estado del currículo</span>
+                <button onClick={loadMissingInfo} disabled={loadingMissing} className="text-xs text-blue-600 hover:underline disabled:opacity-50">
+                  {loadingMissing ? 'Verificando...' : 'Actualizar'}
+                </button>
+              </div>
+              {loadingMissing && !missingInfo && (
+                <div className="px-3 py-3 text-xs text-gray-500 flex items-center gap-2">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Analizando temario...
+                </div>
+              )}
+              {missingInfo && (
+                <div className="px-3 py-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-gray-500 font-medium mb-1">Temario</p>
+                      <p className="text-gray-700">{missingInfo.syllabus_units} un · {missingInfo.syllabus_modules} mód · {missingInfo.syllabus_lessons} lec</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 font-medium mb-1">Generado</p>
+                      <p className="text-emerald-700 font-semibold">✅ {missingInfo.completed_count} lecciones</p>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div className="bg-emerald-500 h-1.5 rounded-full transition-all" style={{ width: missingInfo.completion_percentage + '%' }} />
+                  </div>
+                  <p className="text-xs text-gray-500 text-right">{missingInfo.completion_percentage}% completado</p>
+                  {missingInfo.missing_count > 0 ? (
+                    <>
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-800">
+                        ⚠️ Faltantes: {missingInfo.missing_modules_count > 0 ? missingInfo.missing_modules_count + ' mód · ' : ''}{missingInfo.missing_count} lecciones
+                      </div>
+                      <Button
+                        onClick={handleGenerateMissing}
+                        className="w-full bg-amber-500 hover:bg-amber-600 text-white gap-2"
+                        size="sm"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Generar {missingInfo.missing_count} faltantes
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-xs text-emerald-700 font-semibold text-center">🎉 Currículo completo</p>
+                  )}
                 </div>
               )}
             </div>

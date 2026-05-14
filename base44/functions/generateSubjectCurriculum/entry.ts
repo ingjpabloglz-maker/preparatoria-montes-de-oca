@@ -372,6 +372,86 @@ async function validateAndCleanDuplicates(base44, subject_id, log) {
   }
 }
 
+// ─── Detectar faltantes comparando estructura vs BD ──────────────────────────
+async function detectMissingLessons(base44, subject_id, structure) {
+  const existingUnits = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
+  const allModules = await base44.asServiceRole.entities.CourseModule.filter({ subject_id });
+  const allLessons = await base44.asServiceRole.entities.CourseLesson.filter({ subject_id });
+
+  // Indexar por clave lógica (order)
+  const unitByOrder = {};
+  for (const u of existingUnits) unitByOrder[u.order] = u;
+
+  const modByKey = {}; // "unit_order|mod_order"
+  for (const m of allModules) {
+    const unit = existingUnits.find(u => u.id === m.unit_id);
+    if (unit) modByKey[unit.order + '|' + m.order] = m;
+  }
+
+  // Indexar lecciones por module_id+order, keeping most recent for duplicates
+  const lessonByKey = {}; // "mod_db_id|lesson_order"
+  for (const l of allLessons) {
+    const key = l.module_id + '|' + l.order;
+    if (!lessonByKey[key] || (l.created_date || '') > (lessonByKey[key].created_date || '')) {
+      lessonByKey[key] = l;
+    }
+  }
+
+  const missingUnits = [], missingModules = [], missingLessons = [], completedLessons = [];
+  const missingSelection = []; // {unit_index, module_index, lesson_index}
+
+  let totalSyllabus = 0;
+
+  for (const [ui, unitBp] of structure.entries()) {
+    const existingUnit = unitByOrder[unitBp.order];
+    if (!existingUnit) {
+      missingUnits.push(unitBp);
+      // Todos los módulos y lecciones de esta unidad son faltantes
+      for (const [mi, modBp] of unitBp.modules.entries()) {
+        missingModules.push({ unit_title: unitBp.title, ...modBp });
+        for (const [li, lessonBp] of modBp.lessons.entries()) {
+          totalSyllabus++;
+          missingLessons.push({ unit_title: unitBp.title, module_title: modBp.title, ...lessonBp });
+          missingSelection.push({ unit_index: ui, module_index: mi, lesson_index: li });
+        }
+      }
+      continue;
+    }
+
+    for (const [mi, modBp] of unitBp.modules.entries()) {
+      const modKey = unitBp.order + '|' + modBp.order;
+      const existingMod = modByKey[modKey];
+      if (!existingMod) {
+        missingModules.push({ unit_title: unitBp.title, ...modBp });
+        for (const [li, lessonBp] of modBp.lessons.entries()) {
+          totalSyllabus++;
+          missingLessons.push({ unit_title: unitBp.title, module_title: modBp.title, ...lessonBp });
+          missingSelection.push({ unit_index: ui, module_index: mi, lesson_index: li });
+        }
+        continue;
+      }
+
+      for (const [li, lessonBp] of modBp.lessons.entries()) {
+        totalSyllabus++;
+        const lessonKey = existingMod.id + '|' + lessonBp.order;
+        const existingLesson = lessonByKey[lessonKey];
+        if (!existingLesson || !existingLesson.generation_completed) {
+          missingLessons.push({ unit_title: unitBp.title, module_title: modBp.title, ...lessonBp });
+          missingSelection.push({ unit_index: ui, module_index: mi, lesson_index: li });
+        } else {
+          completedLessons.push(existingLesson);
+        }
+      }
+    }
+  }
+
+  const completionPercentage = totalSyllabus > 0
+    ? Math.round((completedLessons.length / totalSyllabus) * 100)
+    : 0;
+
+  return { missingUnits, missingModules, missingLessons, completedLessons, completionPercentage, missingSelection, totalSyllabus };
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   try {
@@ -381,7 +461,7 @@ Deno.serve(async (req) => {
     if (user.role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = await req.json();
-    const { subject_id, overwrite = false, preview_only = false, force_unlock = false, lesson_selection = null } = body;
+    const { subject_id, overwrite = false, preview_only = false, force_unlock = false, lesson_selection = null, detect_missing = false } = body;
     if (!subject_id) return Response.json({ error: 'subject_id requerido' }, { status: 400 });
 
     // Force unlock
@@ -415,6 +495,23 @@ Deno.serve(async (req) => {
     if (!syllabus?.units?.length) return Response.json({ error: 'Sin temario activo.', no_syllabus: true }, { status: 422 });
 
     const structure = buildStructure(syllabus);
+
+    // ── Modo detect_missing ──
+    if (detect_missing) {
+      const result = await detectMissingLessons(base44, subject_id, structure);
+      return Response.json({
+        detect_missing: true,
+        subject_name: subject.name,
+        syllabus_units: structure.length,
+        syllabus_modules: structure.reduce((s, u) => s + u.modules.length, 0),
+        syllabus_lessons: result.totalSyllabus,
+        completed_count: result.completedLessons.length,
+        missing_count: result.missingLessons.length,
+        missing_modules_count: result.missingModules.length,
+        completion_percentage: result.completionPercentage,
+        missing_selection: result.missingSelection,
+      });
+    }
 
     // Filtrar por selección si viene lesson_selection
     let filteredStructure = structure;
@@ -456,7 +553,8 @@ Deno.serve(async (req) => {
       throw new Error('lesson_selection is required. Refusing full-subject overwrite.');
     }
 
-    if (!overwrite) {
+    // Solo bloquear si hay contenido existente Y no hay selección explícita de faltantes
+    if (!overwrite && (!lesson_selection || lesson_selection.length === 0)) {
       const existing = await base44.asServiceRole.entities.CourseUnit.filter({ subject_id });
       if (existing.length > 0) return Response.json({ error: 'Ya tiene contenido. Usa overwrite=true.', has_content: true }, { status: 409 });
     }
