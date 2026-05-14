@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import AdminGuard from '../components/auth/AdminGuard';
 import CurriculumGeneratorPanel from '../components/admin/CurriculumGeneratorPanel';
 import SyllabusEditor from '../components/admin/SyllabusEditor';
+import LessonEditor from '../components/admin/LessonEditor';
 
 export default function ManageActivities() {
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
@@ -195,6 +196,15 @@ export default function ManageActivities() {
                 queryClient.invalidateQueries(['lessonsForSubject', selectedSubjectId]);
                 queryClient.invalidateQueries(['activitiesCount', selectedSubjectId]);
               }}
+            />
+          )}
+
+          {/* Panel: Editar lecciones generadas */}
+          {selectedSubjectId && (
+            <LessonEditor
+              subject={selectedSubject}
+              lessons={lessons}
+              activitiesCounts={activitiesCounts}
             />
           )}
 
