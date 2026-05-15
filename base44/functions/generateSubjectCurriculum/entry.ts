@@ -67,27 +67,92 @@ function detectSubjectType(subjectName = '') {
   return 'default';
 }
 
-// ─── Fallback visual por tipo de materia ──────────────────────────────────────
-function generateFallbackVisualBlock(subjectType, topic, subjectName) {
+// ─── Generar visual_block por defecto (determinístico, sin LLM) ───────────────
+// Retorna un bloque ya validado y listo para guardar, nunca null.
+function generateDefaultVisualBlock(title, subjectName) {
+  const subjectType = detectSubjectType(subjectName);
+  const t = title || subjectName;
+
   switch (subjectType) {
     case 'math':
-      return { type: 'equation', title: 'Ejemplo de ' + topic, equations: ['x + y = z', 'Expresión relacionada con ' + topic] };
     case 'physics':
-      return { type: 'equation', title: 'Fórmula clave', equations: ['F = m × a', 'Relación fundamental'] };
+      return {
+        type: 'steps',
+        title: 'Pasos para resolver: ' + t,
+        items: [
+          'Leer y comprender el problema',
+          'Identificar las variables y datos',
+          'Aplicar la fórmula o procedimiento',
+          'Verificar el resultado'
+        ]
+      };
     case 'chemistry':
-      return { type: 'table', title: 'Conceptos de ' + topic, headers: ['Concepto', 'Descripción'], rows: [['Elemento clave', 'Relacionado con ' + topic], ['Aplicación', 'Uso práctico']] };
-    case 'biology':
-      return { type: 'flow', title: 'Proceso de ' + topic, steps: ['Inicio', 'Desarrollo', 'Resultado'] };
+      return {
+        type: 'table',
+        title: 'Conceptos clave: ' + t,
+        headers: ['Concepto', 'Descripción'],
+        rows: [
+          ['Definición', 'Concepto fundamental de ' + t],
+          ['Aplicación', 'Uso práctico en ' + subjectName],
+          ['Ejemplo', 'Caso concreto relacionado']
+        ]
+      };
     case 'history':
-      return { type: 'timeline', title: 'Cronología de ' + topic, events: [{ year: 'Fecha clave', event: 'Evento importante de ' + topic }] };
-    case 'humanities':
-      return { type: 'map', title: 'Mapa conceptual', data: { center: topic, branches: ['Concepto 1', 'Concepto 2'] } };
+      return {
+        type: 'timeline',
+        title: 'Línea del tiempo: ' + t,
+        events: [
+          { year: 'Antecedentes', event: 'Contexto previo a ' + t },
+          { year: 'Desarrollo', event: 'Eventos principales de ' + t },
+          { year: 'Consecuencias', event: 'Impacto posterior de ' + t }
+        ]
+      };
+    case 'biology':
+      return {
+        type: 'comparison',
+        title: 'Comparación: ' + t,
+        left_title: 'Características',
+        right_title: 'Funciones',
+        left_items: ['Estructura principal', 'Componentes clave', 'Propiedades'],
+        right_items: ['Función en el organismo', 'Importancia biológica', 'Relación con otros sistemas']
+      };
     case 'tech':
-      return { type: 'steps', title: 'Proceso de ' + topic, items: ['Paso 1: Preparación', 'Paso 2: Ejecución', 'Paso 3: Verificación'] };
+      return {
+        type: 'flow',
+        title: 'Proceso: ' + t,
+        steps: ['Entrada de datos', 'Procesamiento', 'Resultado o salida', 'Verificación']
+      };
     case 'economics':
-      return { type: 'table', title: 'Análisis de ' + topic, headers: ['Factor', 'Impacto'], rows: [['Variable clave', 'Efecto en ' + topic], ['Indicador', 'Medición']] };
+      return {
+        type: 'table',
+        title: 'Análisis: ' + t,
+        headers: ['Factor', 'Impacto'],
+        rows: [
+          ['Oferta', 'Relación con ' + t],
+          ['Demanda', 'Efecto en el mercado'],
+          ['Equilibrio', 'Punto de balance']
+        ]
+      };
+    case 'humanities':
+      return {
+        type: 'comparison',
+        title: 'Ideas clave: ' + t,
+        left_title: 'Concepto',
+        right_title: 'Significado',
+        left_items: ['Idea principal', 'Contexto histórico', 'Relevancia actual'],
+        right_items: ['Interpretación central', 'Época y autores', 'Impacto en la sociedad']
+      };
     default:
-      return { type: 'table', title: 'Resumen de ' + topic, headers: ['Aspecto', 'Detalle'], rows: [['Tema principal', topic], ['Materia', subjectName]] };
+      return {
+        type: 'steps',
+        title: 'Puntos esenciales: ' + t,
+        items: [
+          'Comprender el concepto principal',
+          'Identificar sus componentes',
+          'Aplicar en ejemplos concretos',
+          'Relacionar con otros temas'
+        ]
+      };
   }
 }
 
@@ -190,21 +255,15 @@ function normalizeVisualBlock(vb) {
 
 // ─── Normalizar explanation ───────────────────────────────────────────────────
 function normalizeExplanation(raw, title, subjectName) {
-  const subjectType = detectSubjectType(subjectName);
-  
+  let result;
+
   if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.intro) {
-    let visual_blocks = Array.isArray(raw.visual_blocks)
+    // Intentar usar visual_blocks del LLM (pueden ser inválidos → se filtran)
+    const llmBlocks = Array.isArray(raw.visual_blocks)
       ? raw.visual_blocks.map(normalizeVisualBlock).filter(Boolean).slice(0, 2)
       : [];
-    
-    // REGLA OBLIGATORIA: Si no hay visual_blocks, generar uno automáticamente
-    if (visual_blocks.length === 0) {
-      const fallback = generateFallbackVisualBlock(subjectType, title, subjectName);
-      const normalized = normalizeVisualBlock(fallback);
-      if (normalized) visual_blocks = [normalized];
-    }
-    
-    return {
+
+    result = {
       intro: String(raw.intro || ''),
       key_points: Array.isArray(raw.key_points) ? raw.key_points.map(kp => ({
         title: String(kp.title || ''),
@@ -215,25 +274,28 @@ function normalizeExplanation(raw, title, subjectName) {
         question: String(ex.question || ''),
         solution: String(ex.solution || ''),
       })) : [],
-      visual_blocks,
+      visual_blocks: llmBlocks,
       summary: String(raw.summary || ''),
     };
+  } else {
+    const text = typeof raw === 'string' && raw.trim()
+      ? raw
+      : 'Esta lección cubre "' + title + '" dentro de ' + subjectName + '.';
+    result = {
+      intro: text,
+      key_points: [],
+      examples: [],
+      visual_blocks: [],
+      summary: 'Estudia bien este tema para avanzar en ' + subjectName + '.',
+    };
   }
-  
-  // Fallback completo: siempre incluir al menos 1 visual_block
-  const text = typeof raw === 'string' && raw.trim()
-    ? raw
-    : 'Esta lección cubre "' + title + '" dentro de ' + subjectName + '.';
-  const fallbackVB = generateFallbackVisualBlock(subjectType, title, subjectName);
-  const normalizedVB = normalizeVisualBlock(fallbackVB);
-  
-  return { 
-    intro: text, 
-    key_points: [], 
-    examples: [], 
-    visual_blocks: normalizedVB ? [normalizedVB] : [], 
-    summary: 'Estudia bien este tema para avanzar en ' + subjectName + '.' 
-  };
+
+  // GARANTÍA FINAL: nunca retornar visual_blocks vacío
+  if (!Array.isArray(result.visual_blocks) || result.visual_blocks.length === 0) {
+    result.visual_blocks = [generateDefaultVisualBlock(title, subjectName)];
+  }
+
+  return result;
 }
 
 // ─── Fallback local sin LLM ───────────────────────────────────────────────────
