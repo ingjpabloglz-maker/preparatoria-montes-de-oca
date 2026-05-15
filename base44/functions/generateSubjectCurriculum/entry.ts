@@ -53,6 +53,44 @@ async function invokeLLM(base44, prompt) {
   ]);
 }
 
+// ─── Detección de tipo de materia ─────────────────────────────────────────────
+function detectSubjectType(subjectName = '') {
+  const s = subjectName.toLowerCase();
+  if (/matem|álgebra|algebra|cálculo|calculo|geometr|trigon|estadíst/.test(s)) return 'math';
+  if (/física|fisica/.test(s)) return 'physics';
+  if (/química|quimica/.test(s)) return 'chemistry';
+  if (/biolog|ciencia/.test(s)) return 'biology';
+  if (/historia|filosofía|filosofia|sociolog/.test(s)) return 'history';
+  if (/literatura|ética|etica|lengua|español/.test(s)) return 'humanities';
+  if (/informát|informatic|programac|computac|tecnolog|software|hardware/.test(s)) return 'tech';
+  if (/econom|contabilidad|administrac|finanz/.test(s)) return 'economics';
+  return 'default';
+}
+
+// ─── Fallback visual por tipo de materia ──────────────────────────────────────
+function generateFallbackVisualBlock(subjectType, topic, subjectName) {
+  switch (subjectType) {
+    case 'math':
+      return { type: 'equation', title: 'Ejemplo de ' + topic, equations: ['x + y = z', 'Expresión relacionada con ' + topic] };
+    case 'physics':
+      return { type: 'equation', title: 'Fórmula clave', equations: ['F = m × a', 'Relación fundamental'] };
+    case 'chemistry':
+      return { type: 'table', title: 'Conceptos de ' + topic, headers: ['Concepto', 'Descripción'], rows: [['Elemento clave', 'Relacionado con ' + topic], ['Aplicación', 'Uso práctico']] };
+    case 'biology':
+      return { type: 'flow', title: 'Proceso de ' + topic, steps: ['Inicio', 'Desarrollo', 'Resultado'] };
+    case 'history':
+      return { type: 'timeline', title: 'Cronología de ' + topic, events: [{ year: 'Fecha clave', event: 'Evento importante de ' + topic }] };
+    case 'humanities':
+      return { type: 'map', title: 'Mapa conceptual', data: { center: topic, branches: ['Concepto 1', 'Concepto 2'] } };
+    case 'tech':
+      return { type: 'steps', title: 'Proceso de ' + topic, items: ['Paso 1: Preparación', 'Paso 2: Ejecución', 'Paso 3: Verificación'] };
+    case 'economics':
+      return { type: 'table', title: 'Análisis de ' + topic, headers: ['Factor', 'Impacto'], rows: [['Variable clave', 'Efecto en ' + topic], ['Indicador', 'Medición']] };
+    default:
+      return { type: 'table', title: 'Resumen de ' + topic, headers: ['Aspecto', 'Detalle'], rows: [['Tema principal', topic], ['Materia', subjectName]] };
+  }
+}
+
 // ─── Prompt estructurado ──────────────────────────────────────────────────────
 function buildPrompt(topic, subjectName) {
   return 'Eres un docente experto de preparatoria. Genera una lección completa en JSON puro.\n' +
@@ -68,7 +106,9 @@ function buildPrompt(topic, subjectName) {
     '    "examples": [\n' +
     '      { "question": "Ejercicio o situación práctica", "solution": "Resolución." }\n' +
     '    ],\n' +
-    '    "visual_blocks": [],\n' +
+    '    "visual_blocks": [\n' +
+    '      { "type": "equation", "title": "Ejemplo", "equations": ["x+5=10"] }\n' +
+    '    ],\n' +
     '    "summary": "Resumen final corto de 1-2 oraciones."\n' +
     '  },\n' +
     '  "activities": [\n' +
@@ -81,9 +121,17 @@ function buildPrompt(topic, subjectName) {
     '}\n\n' +
     'REGLAS OBLIGATORIAS:\n' +
     '- explanation.key_points: entre 3 y 6 elementos, cada uno con title, content y example.\n' +
-    '- explanation.visual_blocks: OPCIONAL. Máximo 2 bloques. SOLO si aportan valor pedagógico real. Array vacío [] si no aplica.\n' +
+    '- explanation.visual_blocks: OBLIGATORIO mínimo 1 bloque. Máximo 2 bloques. SIEMPRE incluir al menos uno relacionado con el tema.\n' +
     '  Tipos permitidos: table, comparison, steps, equation, flow, timeline, map.\n' +
-    '  Adaptar al tipo de materia: matemáticas→equation/steps, historia→timeline/comparison, química/biología→flow/table, economía→comparison/table.\n' +
+    '  Prioridad por materia:\n' +
+    '  - Matemáticas/Álgebra/Cálculo: equation, table, steps\n' +
+    '  - Física: equation, flow, table\n' +
+    '  - Química: table, comparison, flow\n' +
+    '  - Biología: flow, map, comparison\n' +
+    '  - Historia: timeline, comparison, map\n' +
+    '  - Literatura/Humanidades: map, comparison, timeline\n' +
+    '  - Tecnología/Informática: flow, steps, table\n' +
+    '  - Economía/Administración: table, flow, comparison\n' +
     '  Formatos:\n' +
     '  - table: {"type":"table","title":"...","headers":["col1","col2"],"rows":[["v1","v2"]]}\n' +
     '  - comparison: {"type":"comparison","title":"...","left_title":"...","right_title":"...","left_items":["..."],"right_items":["..."]}\n' +
@@ -142,10 +190,20 @@ function normalizeVisualBlock(vb) {
 
 // ─── Normalizar explanation ───────────────────────────────────────────────────
 function normalizeExplanation(raw, title, subjectName) {
+  const subjectType = detectSubjectType(subjectName);
+  
   if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.intro) {
-    const visual_blocks = Array.isArray(raw.visual_blocks)
+    let visual_blocks = Array.isArray(raw.visual_blocks)
       ? raw.visual_blocks.map(normalizeVisualBlock).filter(Boolean).slice(0, 2)
       : [];
+    
+    // REGLA OBLIGATORIA: Si no hay visual_blocks, generar uno automáticamente
+    if (visual_blocks.length === 0) {
+      const fallback = generateFallbackVisualBlock(subjectType, title, subjectName);
+      const normalized = normalizeVisualBlock(fallback);
+      if (normalized) visual_blocks = [normalized];
+    }
+    
     return {
       intro: String(raw.intro || ''),
       key_points: Array.isArray(raw.key_points) ? raw.key_points.map(kp => ({
@@ -161,10 +219,21 @@ function normalizeExplanation(raw, title, subjectName) {
       summary: String(raw.summary || ''),
     };
   }
+  
+  // Fallback completo: siempre incluir al menos 1 visual_block
   const text = typeof raw === 'string' && raw.trim()
     ? raw
     : 'Esta lección cubre "' + title + '" dentro de ' + subjectName + '.';
-  return { intro: text, key_points: [], examples: [], visual_blocks: [], summary: 'Estudia bien este tema para avanzar en ' + subjectName + '.' };
+  const fallbackVB = generateFallbackVisualBlock(subjectType, title, subjectName);
+  const normalizedVB = normalizeVisualBlock(fallbackVB);
+  
+  return { 
+    intro: text, 
+    key_points: [], 
+    examples: [], 
+    visual_blocks: normalizedVB ? [normalizedVB] : [], 
+    summary: 'Estudia bien este tema para avanzar en ' + subjectName + '.' 
+  };
 }
 
 // ─── Fallback local sin LLM ───────────────────────────────────────────────────
