@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { BookOpen, ClipboardList, CheckCircle2, Star, Zap, Info, Lightbulb, FlaskConical } from "lucide-react";
+import VisualBlockRenderer from './VisualBlockRenderer';
 
 // ─── Detección de materia ─────────────────────────────────────────────────────
 function detectSubjectType(subjectName = '') {
@@ -174,7 +175,7 @@ function StructuredExplanation({ explanation, subjectName }) {
 
   const type = detectSubjectType(subjectName);
   const theme = SUBJECT_THEMES[type] || SUBJECT_THEMES.default;
-  const { intro, key_points = [], examples = [], summary } = explanation;
+  const { intro, key_points = [], examples = [], summary, visual_blocks = [] } = explanation;
 
   return (
     <div className="max-w-lg w-full space-y-3 mb-4 text-left">
@@ -262,6 +263,19 @@ function StructuredExplanation({ explanation, subjectName }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Visual Blocks */}
+      {visual_blocks.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <span className="text-base">🗂️</span>
+            <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Apoyo visual</span>
+          </div>
+          {visual_blocks.map((vb, i) => (
+            <VisualBlockRenderer key={i} block={vb} subjectType={type} />
+          ))}
         </div>
       )}
 
