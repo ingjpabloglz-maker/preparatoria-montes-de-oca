@@ -40,6 +40,7 @@ async function invokeLLM(base44, prompt) {
               intro: { type: 'string' },
               key_points: { type: 'array', items: { type: 'object' } },
               examples: { type: 'array', items: { type: 'object' } },
+              visual_blocks: { type: 'array', items: { type: 'object' } },
               summary: { type: 'string' }
             }
           },
@@ -67,6 +68,7 @@ function buildPrompt(topic, subjectName) {
     '    "examples": [\n' +
     '      { "question": "Ejercicio o situación práctica", "solution": "Resolución." }\n' +
     '    ],\n' +
+    '    "visual_blocks": [],\n' +
     '    "summary": "Resumen final corto de 1-2 oraciones."\n' +
     '  },\n' +
     '  "activities": [\n' +
@@ -79,6 +81,17 @@ function buildPrompt(topic, subjectName) {
     '}\n\n' +
     'REGLAS OBLIGATORIAS:\n' +
     '- explanation.key_points: entre 3 y 6 elementos, cada uno con title, content y example.\n' +
+    '- explanation.visual_blocks: OPCIONAL. Máximo 2 bloques. SOLO si aportan valor pedagógico real. Array vacío [] si no aplica.\n' +
+    '  Tipos permitidos: table, comparison, steps, equation, flow, timeline, map.\n' +
+    '  Adaptar al tipo de materia: matemáticas→equation/steps, historia→timeline/comparison, química/biología→flow/table, economía→comparison/table.\n' +
+    '  Formatos:\n' +
+    '  - table: {"type":"table","title":"...","headers":["col1","col2"],"rows":[["v1","v2"]]}\n' +
+    '  - comparison: {"type":"comparison","title":"...","left_title":"...","right_title":"...","left_items":["..."],"right_items":["..."]}\n' +
+    '  - steps: {"type":"steps","title":"...","items":["paso 1","paso 2"]}\n' +
+    '  - equation: {"type":"equation","title":"...","equations":["2x+5=15","x=5"]}\n' +
+    '  - flow: {"type":"flow","title":"...","steps":["Entrada","Proceso","Resultado"]}\n' +
+    '  - timeline: {"type":"timeline","title":"...","events":[{"year":"1800","event":"..."}]}\n' +
+    '  - map: {"type":"map","title":"...","nodes":[{"label":"...","connects_to":["..."]}]}\n' +
     '- activities: 4-5 actividades, SOLO tipos multiple_choice/true_false/fill_blank.\n' +
     '- correct_answer debe ser exactamente igual a uno de los options.\n' +
     '- Solo JSON válido, sin HTML ni markdown.';
@@ -92,9 +105,47 @@ function isValidActivity(act) {
   return true;
 }
 
+// ─── Tipos de visual_blocks permitidos ───────────────────────────────────────
+const VALID_VB_TYPES = ['table', 'comparison', 'steps', 'equation', 'flow', 'timeline', 'map'];
+
+function normalizeVisualBlock(vb) {
+  if (!vb || typeof vb !== 'object' || !VALID_VB_TYPES.includes(vb.type)) return null;
+  const b = { type: vb.type, title: String(vb.title || '') };
+  if (vb.type === 'table') {
+    if (!Array.isArray(vb.headers) || !Array.isArray(vb.rows)) return null;
+    b.headers = vb.headers.map(String);
+    b.rows = vb.rows.filter(Array.isArray).map(r => r.map(String));
+  } else if (vb.type === 'comparison') {
+    if (!Array.isArray(vb.left_items) || !Array.isArray(vb.right_items)) return null;
+    b.left_title = String(vb.left_title || '');
+    b.right_title = String(vb.right_title || '');
+    b.left_items = vb.left_items.map(String);
+    b.right_items = vb.right_items.map(String);
+  } else if (vb.type === 'steps') {
+    if (!Array.isArray(vb.items) || vb.items.length < 2) return null;
+    b.items = vb.items.map(String);
+  } else if (vb.type === 'equation') {
+    if (!Array.isArray(vb.equations) || vb.equations.length === 0) return null;
+    b.equations = vb.equations.map(String);
+  } else if (vb.type === 'flow') {
+    if (!Array.isArray(vb.steps) || vb.steps.length < 2) return null;
+    b.steps = vb.steps.map(String);
+  } else if (vb.type === 'timeline') {
+    if (!Array.isArray(vb.events) || vb.events.length === 0) return null;
+    b.events = vb.events.map(e => ({ year: String(e.year || ''), event: String(e.event || '') }));
+  } else if (vb.type === 'map') {
+    if (!Array.isArray(vb.nodes) || vb.nodes.length === 0) return null;
+    b.nodes = vb.nodes.map(n => ({ label: String(n.label || ''), connects_to: Array.isArray(n.connects_to) ? n.connects_to.map(String) : [] }));
+  }
+  return b;
+}
+
 // ─── Normalizar explanation ───────────────────────────────────────────────────
 function normalizeExplanation(raw, title, subjectName) {
   if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.intro) {
+    const visual_blocks = Array.isArray(raw.visual_blocks)
+      ? raw.visual_blocks.map(normalizeVisualBlock).filter(Boolean).slice(0, 2)
+      : [];
     return {
       intro: String(raw.intro || ''),
       key_points: Array.isArray(raw.key_points) ? raw.key_points.map(kp => ({
@@ -106,13 +157,14 @@ function normalizeExplanation(raw, title, subjectName) {
         question: String(ex.question || ''),
         solution: String(ex.solution || ''),
       })) : [],
+      visual_blocks,
       summary: String(raw.summary || ''),
     };
   }
   const text = typeof raw === 'string' && raw.trim()
     ? raw
     : 'Esta lección cubre "' + title + '" dentro de ' + subjectName + '.';
-  return { intro: text, key_points: [], examples: [], summary: 'Estudia bien este tema para avanzar en ' + subjectName + '.' };
+  return { intro: text, key_points: [], examples: [], visual_blocks: [], summary: 'Estudia bien este tema para avanzar en ' + subjectName + '.' };
 }
 
 // ─── Fallback local sin LLM ───────────────────────────────────────────────────

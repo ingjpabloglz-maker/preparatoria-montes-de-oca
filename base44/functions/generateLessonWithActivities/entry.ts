@@ -239,6 +239,38 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'module_id y topic son requeridos' }, { status: 400 });
     }
 
+    // ─── Tipos de visual_blocks permitidos ───────────────────────────────────
+    const VALID_VB_TYPES = ['table', 'comparison', 'steps', 'equation', 'flow', 'timeline', 'map'];
+    function normalizeVisualBlock(vb) {
+      if (!vb || typeof vb !== 'object' || !VALID_VB_TYPES.includes(vb.type)) return null;
+      const b = { type: vb.type, title: String(vb.title || '') };
+      if (vb.type === 'table') {
+        if (!Array.isArray(vb.headers) || !Array.isArray(vb.rows)) return null;
+        b.headers = vb.headers.map(String);
+        b.rows = vb.rows.filter(Array.isArray).map(r => r.map(String));
+      } else if (vb.type === 'comparison') {
+        if (!Array.isArray(vb.left_items) || !Array.isArray(vb.right_items)) return null;
+        b.left_title = String(vb.left_title || ''); b.right_title = String(vb.right_title || '');
+        b.left_items = vb.left_items.map(String); b.right_items = vb.right_items.map(String);
+      } else if (vb.type === 'steps') {
+        if (!Array.isArray(vb.items) || vb.items.length < 2) return null;
+        b.items = vb.items.map(String);
+      } else if (vb.type === 'equation') {
+        if (!Array.isArray(vb.equations) || vb.equations.length === 0) return null;
+        b.equations = vb.equations.map(String);
+      } else if (vb.type === 'flow') {
+        if (!Array.isArray(vb.steps) || vb.steps.length < 2) return null;
+        b.steps = vb.steps.map(String);
+      } else if (vb.type === 'timeline') {
+        if (!Array.isArray(vb.events) || vb.events.length === 0) return null;
+        b.events = vb.events.map(e => ({ year: String(e.year || ''), event: String(e.event || '') }));
+      } else if (vb.type === 'map') {
+        if (!Array.isArray(vb.nodes) || vb.nodes.length === 0) return null;
+        b.nodes = vb.nodes.map(n => ({ label: String(n.label || ''), connects_to: Array.isArray(n.connects_to) ? n.connects_to.map(String) : [] }));
+      }
+      return b;
+    }
+
     // ── PASO 1: Generar contenido de la lección ──────────────────────────────
     const lessonPrompt = `Eres un experto en diseño instruccional para preparatoria mexicana. Crea el contenido teórico completo para una lección.
 
@@ -247,11 +279,37 @@ TEMA: "${topic}"
 MATERIA: "${subject_name || 'General'}"
 TIPO: ${is_mini_eval ? 'MINI EVALUACIÓN (resumen y refuerzo del módulo)' : 'LECCIÓN NORMAL (enseñanza nueva)'}
 
-Genera:
-- title: título claro y específico de la lección (máximo 8 palabras)
-- explanation: explicación teórica clara y didáctica (máximo 150 palabras). Incluye definiciones clave, propiedades importantes y contexto. Para matemáticas usa LaTeX dentro de $...$: por ejemplo $\\mathbb{N}$, $x^2$, $\\frac{a}{b}$.
+Genera un JSON con la siguiente estructura:
+{
+  "title": "Título claro y específico (máximo 8 palabras)",
+  "explanation": {
+    "intro": "Introducción breve de 1-2 oraciones.",
+    "key_points": [
+      { "title": "Subtema", "content": "Explicación clara.", "example": "Ejemplo corto." }
+    ],
+    "examples": [
+      { "question": "Ejercicio práctico", "solution": "Resolución." }
+    ],
+    "visual_blocks": [],
+    "summary": "Resumen final de 1-2 oraciones."
+  }
+}
 
-Devuelve SOLO un objeto JSON con: { "title": "...", "explanation": "..." }`;
+REGLAS:
+- key_points: 3 a 6 elementos con title, content y example.
+- Para matemáticas/física usa LaTeX dentro de $...$: $x^2$, $\\frac{a}{b}$, $\\mathbb{N}$.
+- visual_blocks: OPCIONAL. Máximo 2. SOLO si aportan valor pedagógico real. Array vacío [] si no aplica.
+  Tipos permitidos: table, comparison, steps, equation, flow, timeline, map.
+  Adaptar al tipo de materia: matemáticas→equation/steps, historia→timeline/comparison, química/biología→flow/table, economía→comparison/table.
+  Formatos:
+  - table: {"type":"table","title":"...","headers":["col1","col2"],"rows":[["v1","v2"]]}
+  - comparison: {"type":"comparison","title":"...","left_title":"...","right_title":"...","left_items":["..."],"right_items":["..."]}
+  - steps: {"type":"steps","title":"...","items":["paso 1","paso 2"]}
+  - equation: {"type":"equation","title":"...","equations":["2x+5=15","x=5"]}
+  - flow: {"type":"flow","title":"...","steps":["Entrada","Proceso","Resultado"]}
+  - timeline: {"type":"timeline","title":"...","events":[{"year":"1800","event":"..."}]}
+  - map: {"type":"map","title":"...","nodes":[{"label":"...","connects_to":["..."]}]}
+- Solo JSON válido. Sin HTML, markdown ni texto extra.`;
 
     const lessonResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: lessonPrompt,
@@ -259,7 +317,16 @@ Devuelve SOLO un objeto JSON con: { "title": "...", "explanation": "..." }`;
         type: "object",
         properties: {
           title: { type: "string" },
-          explanation: { type: "string" }
+          explanation: {
+            type: "object",
+            properties: {
+              intro: { type: "string" },
+              key_points: { type: "array", items: { type: "object" } },
+              examples: { type: "array", items: { type: "object" } },
+              visual_blocks: { type: "array", items: { type: "object" } },
+              summary: { type: "string" }
+            }
+          }
         },
         required: ["title", "explanation"]
       }
@@ -269,12 +336,28 @@ Devuelve SOLO un objeto JSON con: { "title": "...", "explanation": "..." }`;
       return Response.json({ error: 'El LLM no generó contenido válido para la lección' }, { status: 500 });
     }
 
+    // Normalizar explanation con visual_blocks validados
+    const rawExpl = lessonResult.explanation;
+    const explanation = {
+      intro: String(rawExpl.intro || ''),
+      key_points: Array.isArray(rawExpl.key_points) ? rawExpl.key_points.map(kp => ({
+        title: String(kp.title || ''), content: String(kp.content || ''), example: String(kp.example || ''),
+      })) : [],
+      examples: Array.isArray(rawExpl.examples) ? rawExpl.examples.map(ex => ({
+        question: String(ex.question || ''), solution: String(ex.solution || ''),
+      })) : [],
+      visual_blocks: Array.isArray(rawExpl.visual_blocks)
+        ? rawExpl.visual_blocks.map(normalizeVisualBlock).filter(Boolean).slice(0, 2)
+        : [],
+      summary: String(rawExpl.summary || ''),
+    };
+
     // Guardar la lección
     const lesson = await base44.asServiceRole.entities.CourseLesson.create({
       module_id,
       subject_id: subject_id || '',
       title: lessonResult.title,
-      explanation: lessonResult.explanation,
+      explanation,
       order: lesson_order,
       is_mini_eval,
     });
