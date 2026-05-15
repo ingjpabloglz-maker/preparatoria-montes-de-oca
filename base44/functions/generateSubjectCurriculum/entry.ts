@@ -174,7 +174,8 @@ function buildPrompt(topic, subjectName) {
     '    "visual_blocks": [\n' +
     '      { "type": "equation", "title": "Ejemplo", "equations": ["x+5=10"] }\n' +
     '    ],\n' +
-    '    "summary": "Resumen final corto de 1-2 oraciones."\n' +
+    '    "summary": "Resumen final corto de 1-2 oraciones.",\n' +
+    '    "image_search_terms": ["término educativo 1", "término educativo 2"]\n' +
     '  },\n' +
     '  "activities": [\n' +
     '    { "type": "multiple_choice", "question": "Pregunta", "options": ["A","B","C","D"], "correct_answer": "A", "explanation": "Explicación corta" },\n' +
@@ -205,6 +206,7 @@ function buildPrompt(topic, subjectName) {
     '  - flow: {"type":"flow","title":"...","steps":["Entrada","Proceso","Resultado"]}\n' +
     '  - timeline: {"type":"timeline","title":"...","events":[{"year":"1800","event":"..."}]}\n' +
     '  - map: {"type":"map","title":"...","nodes":[{"label":"...","connects_to":["..."]}]}\n' +
+    '- explanation.image_search_terms: OBLIGATORIO. Array de 2-3 strings. Términos cortos, específicos y educativos en español relacionados directamente con el tema. Ejemplos: ["tabla periódica moderna", "enlace covalente diagrama"], ["revolución francesa pintura", "Napoleón Bonaparte"]. NO incluir URLs ni nombres de sitios web.\n' +
     '- activities: 4-5 actividades, SOLO tipos multiple_choice/true_false/fill_blank.\n' +
     '- correct_answer debe ser exactamente igual a uno de los options.\n' +
     '- Solo JSON válido, sin HTML ni markdown.';
@@ -276,6 +278,9 @@ function normalizeExplanation(raw, title, subjectName) {
       })) : [],
       visual_blocks: llmBlocks,
       summary: String(raw.summary || ''),
+      image_search_terms: Array.isArray(raw.image_search_terms)
+        ? raw.image_search_terms.filter(t => typeof t === 'string' && t.trim()).slice(0, 3)
+        : [],
     };
   } else {
     const text = typeof raw === 'string' && raw.trim()
@@ -286,6 +291,7 @@ function normalizeExplanation(raw, title, subjectName) {
       key_points: [],
       examples: [],
       visual_blocks: [],
+      image_search_terms: [],
       summary: 'Estudia bien este tema para avanzar en ' + subjectName + '.',
     };
   }

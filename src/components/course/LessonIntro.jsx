@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { BookOpen, ClipboardList, CheckCircle2, Star, Zap, Info, Lightbulb, FlaskConical } from "lucide-react";
 import VisualBlockRenderer from './VisualBlockRenderer';
+import EducationalImages from './EducationalImages';
 
 // ─── Detección de materia ─────────────────────────────────────────────────────
 function detectSubjectType(subjectName = '') {
@@ -175,7 +176,7 @@ function StructuredExplanation({ explanation, subjectName }) {
 
   const type = detectSubjectType(subjectName);
   const theme = SUBJECT_THEMES[type] || SUBJECT_THEMES.default;
-  const { intro, key_points = [], examples = [], summary, visual_blocks = [] } = explanation;
+  const { intro, key_points = [], examples = [], summary, visual_blocks = [], image_search_terms = [] } = explanation;
 
   return (
     <div className="max-w-lg w-full space-y-3 mb-4 text-left">
@@ -288,6 +289,11 @@ function StructuredExplanation({ explanation, subjectName }) {
           </div>
           <p className="text-white/85 text-sm leading-relaxed">{summary}</p>
         </div>
+      )}
+
+      {/* Imágenes educativas */}
+      {image_search_terms.length > 0 && (
+        <EducationalImages imageSearchTerms={image_search_terms} />
       )}
     </div>
   );
