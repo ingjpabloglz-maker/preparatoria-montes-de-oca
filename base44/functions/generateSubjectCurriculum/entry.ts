@@ -396,6 +396,8 @@ async function generateLesson(base44, { module_id, subject_id, subject_name, top
     await log('[' + ts() + '] 🔧 ' + needed + ' fallback añadidas');
   }
 
+  console.log('[VISUAL_BLOCKS]', title, JSON.stringify(explanation.visual_blocks));
+
   const lesson = await base44.asServiceRole.entities.CourseLesson.create({
     module_id, subject_id, title, explanation, order, is_mini_eval: is_mini_eval || false, generation_completed: false,
   });
