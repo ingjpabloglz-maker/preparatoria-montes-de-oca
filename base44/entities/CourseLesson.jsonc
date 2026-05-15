@@ -54,6 +54,134 @@
         },
         "summary": {
           "type": "string"
+        },
+        "visual_blocks": {
+          "type": "array",
+          "description": "Bloques visuales pedag\u00f3gicos (tabla, comparaci\u00f3n, pasos, ecuaci\u00f3n, flujo, l\u00ednea de tiempo, mapa)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "table",
+                  "comparison",
+                  "steps",
+                  "equation",
+                  "flow",
+                  "timeline",
+                  "map"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "headers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "equations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "year": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "left_title": {
+                "type": "string"
+              },
+              "right_title": {
+                "type": "string"
+              },
+              "left_items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "right_items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "nodes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "connects_to": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "content": {
+                "type": "string"
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "image_search_terms": {
+          "type": "array",
+          "description": "T\u00e9rminos de b\u00fasqueda para im\u00e1genes educativas reales (2-3 strings cortos y espec\u00edficos)",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

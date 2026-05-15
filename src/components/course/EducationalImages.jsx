@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ZoomIn } from 'lucide-react';
-
-const PEXELS_API_KEY = 'Bh3HPfLjG7N3bvjNj7bAekq3SThqD5fHWLWwHPGKOAphYqUgzZDTkJq0';
+import { base44 } from '@/api/base44Client';
 
 // Lightbox simple
 function Lightbox({ image, onClose }) {
@@ -23,7 +22,7 @@ function Lightbox({ image, onClose }) {
         <X className="w-5 h-5" />
       </button>
       <img
-        src={image.src.large}
+        src={image.url_large}
         alt={image.alt}
         className="max-w-full max-h-[85vh] rounded-xl object-contain shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -37,7 +36,6 @@ function Lightbox({ image, onClose }) {
   );
 }
 
-// Un bloque de imagen individual
 function ImageCard({ photo, onClick }) {
   const [loaded, setLoaded] = useState(false);
 
@@ -50,11 +48,12 @@ function ImageCard({ photo, onClick }) {
         <div className="absolute inset-0 bg-white/5 animate-pulse rounded-xl" />
       )}
       <img
-        src={photo.src.medium}
+        src={photo.url_medium}
         alt={photo.alt || 'Imagen educativa'}
         loading="lazy"
         className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         onLoad={() => setLoaded(true)}
+        onError={() => setLoaded(true)}
       />
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center">
         <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
@@ -63,11 +62,10 @@ function ImageCard({ photo, onClick }) {
   );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
 export default function EducationalImages({ imageSearchTerms }) {
   const [photos, setPhotos] = useState([]);
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!imageSearchTerms || imageSearchTerms.length === 0) return;
@@ -76,36 +74,20 @@ export default function EducationalImages({ imageSearchTerms }) {
     setLoading(true);
     setPhotos([]);
 
-    const fetchImages = async () => {
-      const results = [];
-      // Buscar 1 imagen por término (máx 3 términos)
-      const terms = imageSearchTerms.slice(0, 3);
-      for (const term of terms) {
-        try {
-          const res = await fetch(
-            `https://api.pexels.com/v1/search?query=${encodeURIComponent(term)}&per_page=1&orientation=landscape`,
-            { headers: { Authorization: PEXELS_API_KEY } }
-          );
-          if (!res.ok) continue;
-          const data = await res.json();
-          if (data.photos && data.photos.length > 0) {
-            results.push(data.photos[0]);
-          }
-        } catch (_) {
-          // silencioso — si falla un término, continúa
+    base44.functions.invoke('getEducationalImages', { search_terms: imageSearchTerms })
+      .then((res) => {
+        if (!cancelled) {
+          setPhotos(res.data?.photos || []);
+          setLoading(false);
         }
-      }
-      if (!cancelled) {
-        setPhotos(results);
-        setLoading(false);
-      }
-    };
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-    fetchImages();
     return () => { cancelled = true; };
   }, [JSON.stringify(imageSearchTerms)]);
 
-  // No renderizar nada si no hay términos o no hay fotos
   if (!imageSearchTerms || imageSearchTerms.length === 0) return null;
   if (!loading && photos.length === 0) return null;
 
@@ -114,7 +96,7 @@ export default function EducationalImages({ imageSearchTerms }) {
       <div className="max-w-lg w-full mb-4">
         <div className="flex items-center gap-2 px-1 mb-3">
           <span className="text-base">🖼️</span>
-          <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Apoyo visual</span>
+          <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">Apoyo visual — imágenes reales</span>
         </div>
 
         {loading ? (
