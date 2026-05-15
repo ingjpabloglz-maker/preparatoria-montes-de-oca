@@ -291,6 +291,7 @@ Genera un JSON con la siguiente estructura:
       { "question": "Ejercicio práctico", "solution": "Resolución." }
     ],
     "visual_blocks": [],
+    "image_search_terms": ["término1 específico", "término2 específico"],
     "summary": "Resumen final de 1-2 oraciones."
   }
 }
@@ -309,6 +310,7 @@ REGLAS:
   - flow: {"type":"flow","title":"...","steps":["Entrada","Proceso","Resultado"]}
   - timeline: {"type":"timeline","title":"...","events":[{"year":"1800","event":"..."}]}
   - map: {"type":"map","title":"...","nodes":[{"label":"...","connects_to":["..."]}]}
+- image_search_terms: OBLIGATORIO. Array de 2-3 strings en inglés, cortos y específicos, para buscar imágenes educativas reales. Ej: ["periodic table elements", "chemical bonding diagram"].
 - Solo JSON válido. Sin HTML, markdown ni texto extra.`;
 
     const lessonResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
@@ -324,6 +326,7 @@ REGLAS:
               key_points: { type: "array", items: { type: "object" } },
               examples: { type: "array", items: { type: "object" } },
               visual_blocks: { type: "array", items: { type: "object" } },
+              image_search_terms: { type: "array", items: { type: "string" } },
               summary: { type: "string" }
             }
           }
@@ -348,6 +351,9 @@ REGLAS:
       })) : [],
       visual_blocks: Array.isArray(rawExpl.visual_blocks)
         ? rawExpl.visual_blocks.map(normalizeVisualBlock).filter(Boolean).slice(0, 2)
+        : [],
+      image_search_terms: Array.isArray(rawExpl.image_search_terms)
+        ? rawExpl.image_search_terms.map(String).filter(Boolean).slice(0, 3)
         : [],
       summary: String(rawExpl.summary || ''),
     };
