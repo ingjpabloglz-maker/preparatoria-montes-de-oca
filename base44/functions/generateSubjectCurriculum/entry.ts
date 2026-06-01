@@ -28,27 +28,7 @@ function buildLessonKey(unitTitle, moduleTitle, lessonTitle) {
 // ─── LLM con timeout duro ─────────────────────────────────────────────────────
 async function invokeLLM(base44, prompt) {
   return Promise.race([
-    base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt,
-      response_json_schema: {
-        type: 'object',
-        properties: {
-          title: { type: 'string' },
-          explanation: {
-            type: 'object',
-            properties: {
-              intro: { type: 'string' },
-              key_points: { type: 'array', items: { type: 'string' } },
-              examples: { type: 'array', items: { type: 'string' } },
-              image_search_terms: { type: 'array', items: { type: 'string' } },
-              summary: { type: 'string' }
-            }
-          },
-          activities: { type: 'array', items: { type: 'object' } }
-        },
-        required: ['title', 'explanation', 'activities']
-      }
-    }),
+    base44.asServiceRole.integrations.Core.InvokeLLM({ prompt }),
     new Promise((_, reject) => setTimeout(() => reject(new Error('LLM_TIMEOUT')), 45000))
   ]);
 }

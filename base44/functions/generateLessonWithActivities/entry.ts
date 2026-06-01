@@ -313,27 +313,9 @@ REGLAS:
 - image_search_terms: OBLIGATORIO. Array de 2-3 strings en inglés, cortos y específicos, para buscar imágenes educativas reales. Ej: ["periodic table elements", "chemical bonding diagram"].
 - Solo JSON válido. Sin HTML, markdown ni texto extra.`;
 
-    const lessonSchemaToSend = {
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        explanation: {
-          type: "object",
-          properties: {
-            intro: { type: "string" },
-            key_points: { type: "array", items: { type: "string" } },
-            examples: { type: "array", items: { type: "string" } },
-            summary: { type: "string" },
-            image_search_terms: { type: "array", items: { type: "string" } }
-          }
-        }
-      },
-      required: ["title", "explanation"]
-    };
-    console.log('[SCHEMA_SENT] explanation:', JSON.stringify(lessonSchemaToSend.properties.explanation, null, 2));
+    console.log('[NO_SCHEMA] Enviando prompt sin response_json_schema para evitar SDK transformer bug');
     const lessonResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt: lessonPrompt,
-      response_json_schema: lessonSchemaToSend
+      prompt: lessonPrompt
     });
 
     if (!lessonResult?.title || !lessonResult?.explanation) {
