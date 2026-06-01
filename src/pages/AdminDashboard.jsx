@@ -134,7 +134,7 @@ export default function AdminDashboard() {
                 <BookOpen className="w-4 h-4 mr-2" />
                 Actividades IA
               </Button>
-              <Button size="sm" onClick={() => window.location.href = createPageUrl('ManageFolios')}>
+              <Button size="sm" onClick={() => window.location.href = createPageUrl('ManageFolios')} className="bg-[#10892c]">
                 <CreditCard className="w-4 h-4 mr-2" />
                 Gestionar Folios
               </Button>
