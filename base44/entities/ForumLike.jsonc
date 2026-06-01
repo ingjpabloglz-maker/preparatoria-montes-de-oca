@@ -1,0 +1,21 @@
+{
+  "name": "ForumLike",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario que dio like"
+    },
+    "thread_id": {
+      "type": "string",
+      "description": "ID del hilo (opcional)"
+    },
+    "post_id": {
+      "type": "string",
+      "description": "ID de la respuesta (opcional)"
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}

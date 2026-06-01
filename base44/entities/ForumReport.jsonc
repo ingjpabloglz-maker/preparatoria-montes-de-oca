@@ -1,0 +1,40 @@
+{
+  "name": "ForumReport",
+  "type": "object",
+  "properties": {
+    "post_id": {
+      "type": "string",
+      "description": "ID del post reportado (opcional si es un hilo)"
+    },
+    "thread_id": {
+      "type": "string",
+      "description": "ID del hilo reportado (opcional)"
+    },
+    "reported_by": {
+      "type": "string",
+      "description": "Email del usuario que reporta"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Raz\u00f3n del reporte"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "reviewed",
+        "dismissed"
+      ],
+      "default": "pending",
+      "description": "Estado del reporte"
+    },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Email del moderador que revis\u00f3"
+    }
+  },
+  "required": [
+    "reported_by",
+    "reason"
+  ]
+}

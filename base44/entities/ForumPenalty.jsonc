@@ -1,0 +1,32 @@
+{
+  "name": "ForumPenalty",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario penalizado"
+    },
+    "incident_count": {
+      "type": "number",
+      "default": 1,
+      "description": "N\u00famero de incidencias acumuladas"
+    },
+    "banned_until": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha hasta la que el usuario est\u00e1 bloqueado del foro"
+    },
+    "last_incident_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de la \u00faltima incidencia"
+    },
+    "last_incident_reason": {
+      "type": "string",
+      "description": "Raz\u00f3n de la \u00faltima incidencia"
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}

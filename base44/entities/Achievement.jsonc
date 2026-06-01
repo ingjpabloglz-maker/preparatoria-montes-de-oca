@@ -1,0 +1,64 @@
+{
+  "name": "Achievement",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del logro"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del logro"
+    },
+    "icon_name": {
+      "type": "string",
+      "description": "Nombre del \u00edcono de Lucide React"
+    },
+    "category": {
+      "type": "string",
+      "description": "Categor\u00eda: Constancia, Esfuerzo, Conocimiento, etc."
+    },
+    "condition_key": {
+      "type": "string",
+      "description": "Coincide con event_type de handleUserEvent"
+    },
+    "condition_value": {
+      "type": "number",
+      "description": "Valor num\u00e9rico objetivo de la condici\u00f3n"
+    },
+    "condition_details": {
+      "type": "object",
+      "description": "Detalles adicionales JSON para condiciones complejas"
+    },
+    "rarity": {
+      "type": "string",
+      "enum": [
+        "common",
+        "rare",
+        "epic",
+        "legendary"
+      ],
+      "default": "common"
+    },
+    "is_sequential": {
+      "type": "boolean",
+      "default": false
+    },
+    "next_achievement_id": {
+      "type": "string",
+      "description": "ID del siguiente logro en secuencia"
+    },
+    "xp_reward": {
+      "type": "number",
+      "default": 10,
+      "description": "XP que otorga al desbloquearse"
+    }
+  },
+  "required": [
+    "name",
+    "description",
+    "icon_name",
+    "condition_key",
+    "rarity"
+  ]
+}

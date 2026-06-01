@@ -1,0 +1,33 @@
+{
+  "name": "UserAchievement",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string"
+    },
+    "achievement_id": {
+      "type": "string",
+      "description": "ID del Achievement"
+    },
+    "unlocked_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "progress_current": {
+      "type": "number",
+      "default": 0
+    },
+    "progress_target": {
+      "type": "number",
+      "description": "Valor objetivo para logros incrementales"
+    },
+    "is_unlocked": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "user_email",
+    "achievement_id"
+  ]
+}

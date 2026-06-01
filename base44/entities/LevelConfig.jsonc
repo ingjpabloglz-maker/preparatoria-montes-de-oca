@@ -1,0 +1,27 @@
+{
+  "name": "LevelConfig",
+  "type": "object",
+  "properties": {
+    "level_number": {
+      "type": "number",
+      "description": "N\u00famero del nivel (1-6)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre del nivel"
+    },
+    "time_limit_days": {
+      "type": "number",
+      "description": "Tiempo l\u00edmite en d\u00edas para completar el nivel"
+    },
+    "price": {
+      "type": "number",
+      "description": "Precio del nivel"
+    }
+  },
+  "required": [
+    "level_number",
+    "name",
+    "time_limit_days"
+  ]
+}

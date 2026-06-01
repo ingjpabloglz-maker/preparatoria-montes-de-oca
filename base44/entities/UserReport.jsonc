@@ -12,15 +12,11 @@
     },
     "reported_by": {
       "type": "string",
-      "description": "Email de quien reporta"
-    },
-    "reported_by_name": {
-      "type": "string",
-      "description": "Nombre de quien reporta"
+      "description": "Email del reportante"
     },
     "reported_by_role": {
       "type": "string",
-      "description": "Rol de quien reporta (docente | admin | user)"
+      "description": "Rol del reportante"
     },
     "reason": {
       "type": "string",
@@ -28,24 +24,31 @@
     },
     "description": {
       "type": "string",
-      "description": "Descripci\u00f3n adicional"
+      "description": "Descripci\u00f3n detallada"
     },
     "thread_id": {
       "type": "string",
-      "description": "ID del hilo relacionado (opcional)"
+      "description": "ID del hilo donde ocurri\u00f3"
     },
-    "post_id": {
+    "comment_id": {
       "type": "string",
-      "description": "ID del post relacionado (opcional)"
+      "description": "ID del comentario relacionado"
     },
     "status": {
       "type": "string",
       "enum": [
         "pending",
-        "reviewed",
-        "dismissed"
+        "reviewed"
       ],
       "default": "pending"
+    },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Email del admin que revis\u00f3"
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time"
     }
   },
   "required": [

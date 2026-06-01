@@ -30,7 +30,7 @@
     },
     "level_required": {
       "type": "number",
-      "description": "Nivel acad\u00e9mico requerido para ver el hilo (1-6)",
+      "description": "Nivel acad\u00e9mico requerido",
       "default": 1
     },
     "status": {
@@ -40,8 +40,7 @@
         "closed",
         "resolved"
       ],
-      "default": "open",
-      "description": "Estado del hilo"
+      "default": "open"
     },
     "views_count": {
       "type": "number",
@@ -59,6 +58,19 @@
       "type": "string",
       "description": "ID de materia relacionada (opcional)"
     },
+    "is_closed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Cerrado por moderador"
+    },
+    "closed_by": {
+      "type": "string",
+      "description": "Email del moderador que cerr\u00f3"
+    },
+    "closed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "is_deleted": {
       "type": "boolean",
       "default": false,
@@ -68,23 +80,9 @@
       "type": "string",
       "description": "Email del moderador que elimin\u00f3"
     },
-    "deleted_by_name": {
-      "type": "string",
-      "description": "Nombre del moderador que elimin\u00f3"
-    },
     "deleted_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Timestamp de eliminaci\u00f3n"
-    },
-    "closed_by": {
-      "type": "string",
-      "description": "Email del moderador que cerr\u00f3 el hilo"
-    },
-    "closed_at": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Timestamp de cierre"
+      "format": "date-time"
     },
     "resolved_by": {
       "type": "string",
@@ -92,8 +90,7 @@
     },
     "resolved_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Timestamp de resoluci\u00f3n"
+      "format": "date-time"
     }
   },
   "required": [

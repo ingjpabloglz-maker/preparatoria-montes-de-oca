@@ -31,7 +31,7 @@
     "is_solution": {
       "type": "boolean",
       "default": false,
-      "description": "Si esta respuesta es la soluci\u00f3n marcada"
+      "description": "Respuesta soluci\u00f3n marcada"
     },
     "is_deleted": {
       "type": "boolean",
@@ -42,28 +42,22 @@
       "type": "string",
       "description": "Email del moderador que elimin\u00f3"
     },
-    "deleted_by_name": {
-      "type": "string",
-      "description": "Nombre del moderador que elimin\u00f3"
-    },
     "deleted_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Timestamp de eliminaci\u00f3n"
+      "format": "date-time"
     },
     "is_correct": {
       "type": "boolean",
       "default": false,
-      "description": "Marcada como correcta por docente/admin"
+      "description": "Marcada como correcta por docente"
     },
-    "marked_correct_by": {
+    "marked_by": {
       "type": "string",
       "description": "Email del moderador que marc\u00f3 como correcta"
     },
-    "marked_correct_at": {
+    "marked_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Timestamp de marcado correcto"
+      "format": "date-time"
     }
   },
   "required": [

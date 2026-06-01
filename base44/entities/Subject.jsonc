@@ -1,0 +1,30 @@
+{
+  "name": "Subject",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre de la materia"
+    },
+    "level": {
+      "type": "number",
+      "description": "Nivel al que pertenece (1-6)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n de la materia"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Icono representativo"
+    },
+    "order": {
+      "type": "number",
+      "description": "Orden de la materia en el nivel"
+    }
+  },
+  "required": [
+    "name",
+    "level"
+  ]
+}

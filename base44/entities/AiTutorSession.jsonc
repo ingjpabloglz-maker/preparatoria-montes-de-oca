@@ -1,0 +1,33 @@
+{
+  "name": "AiTutorSession",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "ID de la lecci\u00f3n activa"
+    },
+    "questions_used": {
+      "type": "number",
+      "default": 0,
+      "description": "N\u00famero de preguntas usadas en esta sesi\u00f3n"
+    },
+    "max_questions": {
+      "type": "number",
+      "default": 8,
+      "description": "L\u00edmite m\u00e1ximo de preguntas para esta sesi\u00f3n"
+    },
+    "last_interaction": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de la \u00faltima interacci\u00f3n"
+    }
+  },
+  "required": [
+    "user_email",
+    "lesson_id"
+  ]
+}

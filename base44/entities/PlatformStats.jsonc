@@ -1,0 +1,50 @@
+{
+  "name": "PlatformStats",
+  "type": "object",
+  "properties": {
+    "total_students": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de estudiantes registrados (no admins)"
+    },
+    "active_students": {
+      "type": "number",
+      "default": 0,
+      "description": "Estudiantes con actividad en los \u00faltimos 7 d\u00edas"
+    },
+    "blocked_students": {
+      "type": "number",
+      "default": 0,
+      "description": "Estudiantes bloqueados por tiempo"
+    },
+    "students_per_level": {
+      "type": "object",
+      "description": "JSON: { '1': 5, '2': 3, ... } \u2014 alumnos por nivel"
+    },
+    "progress_per_level": {
+      "type": "object",
+      "description": "JSON: { '1': 72, '2': 45, ... } \u2014 progreso promedio % por nivel"
+    },
+    "completed_subjects_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de materias aprobadas en toda la plataforma"
+    },
+    "used_folios": {
+      "type": "number",
+      "default": 0,
+      "description": "Folios de pago usados"
+    },
+    "available_folios": {
+      "type": "number",
+      "default": 0,
+      "description": "Folios de pago disponibles"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de \u00faltima actualizaci\u00f3n de las estad\u00edsticas"
+    }
+  },
+  "required": []
+}

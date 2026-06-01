@@ -1,0 +1,28 @@
+{
+  "name": "CourseModule",
+  "type": "object",
+  "properties": {
+    "unit_id": {
+      "type": "string",
+      "description": "ID de la unidad a la que pertenece"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "ID de la materia (para filtros r\u00e1pidos)"
+    },
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo del m\u00f3dulo"
+    },
+    "order": {
+      "type": "number",
+      "description": "Orden del m\u00f3dulo dentro de la unidad"
+    }
+  },
+  "required": [
+    "unit_id",
+    "subject_id",
+    "title",
+    "order"
+  ]
+}

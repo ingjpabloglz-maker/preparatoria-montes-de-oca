@@ -1,0 +1,44 @@
+{
+  "name": "UserMetrics",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string"
+    },
+    "last_daily_active": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "total_days_active": {
+      "type": "number",
+      "default": 0
+    },
+    "total_streak_breaks": {
+      "type": "number",
+      "default": 0
+    },
+    "avg_session_time_seconds": {
+      "type": "number",
+      "default": 0
+    },
+    "total_events_processed": {
+      "type": "number",
+      "default": 0
+    },
+    "last_event_minute": {
+      "type": "string",
+      "description": "Minuto del \u00faltimo evento para rate limiting (ISO truncado)"
+    },
+    "events_this_minute": {
+      "type": "number",
+      "default": 0
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}

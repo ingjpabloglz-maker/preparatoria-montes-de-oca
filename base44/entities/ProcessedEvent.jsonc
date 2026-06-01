@@ -1,0 +1,26 @@
+{
+  "name": "ProcessedEvent",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "UUID \u00fanico del evento generado por el frontend"
+    },
+    "user_email": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string"
+    },
+    "processed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "event_id",
+    "user_email",
+    "event_type",
+    "processed_at"
+  ]
+}

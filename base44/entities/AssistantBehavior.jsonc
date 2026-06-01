@@ -1,0 +1,52 @@
+{
+  "name": "AssistantBehavior",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario"
+    },
+    "messages_ignored": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de mensajes cerrados sin hacer clic en CTA"
+    },
+    "messages_clicked": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de veces que el usuario hizo clic en un CTA"
+    },
+    "last_interaction_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima vez que interactu\u00f3 con el asistente"
+    },
+    "streak_risk_warnings_seen": {
+      "type": "number",
+      "default": 0,
+      "description": "Cu\u00e1ntas veces ha visto advertencias de racha en riesgo"
+    },
+    "last_action_taken": {
+      "type": "string",
+      "description": "\u00daltima acci\u00f3n que tom\u00f3 el usuario desde el asistente"
+    },
+    "engagement_score": {
+      "type": "number",
+      "default": 50,
+      "description": "Score de engagement 0-100. Baja al ignorar, sube al hacer clic."
+    },
+    "onboarding_step": {
+      "type": "number",
+      "default": 0,
+      "description": "Paso actual del onboarding guiado (0-2)"
+    },
+    "onboarding_completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el onboarding guiado fue completado"
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "CourseUnit",
+  "type": "object",
+  "properties": {
+    "subject_id": {
+      "type": "string",
+      "description": "ID de la materia a la que pertenece"
+    },
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo de la unidad"
+    },
+    "order": {
+      "type": "number",
+      "description": "Orden de la unidad dentro de la materia"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n breve de la unidad"
+    }
+  },
+  "required": [
+    "subject_id",
+    "title",
+    "order"
+  ]
+}

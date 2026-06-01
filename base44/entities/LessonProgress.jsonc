@@ -1,0 +1,57 @@
+{
+  "name": "LessonProgress",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "ID de la lecci\u00f3n"
+    },
+    "module_id": {
+      "type": "string",
+      "description": "ID del m\u00f3dulo"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "ID de la materia"
+    },
+    "completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la lecci\u00f3n fue completada"
+    },
+    "score": {
+      "type": "number",
+      "description": "Puntuaci\u00f3n obtenida (0-100)"
+    },
+    "passed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si aprob\u00f3 (para mini evaluaciones, requiere 80%+)"
+    },
+    "correct_answers": {
+      "type": "number",
+      "default": 0,
+      "description": "N\u00famero de respuestas correctas"
+    },
+    "total_questions": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de preguntas respondidas"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de finalizaci\u00f3n"
+    }
+  },
+  "required": [
+    "user_email",
+    "lesson_id",
+    "module_id",
+    "subject_id"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "NotificationLog",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string"
+    },
+    "template_id": {
+      "type": "string"
+    },
+    "sent_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "sent",
+        "failed",
+        "opened",
+        "clicked"
+      ],
+      "default": "sent"
+    },
+    "cooldown_end_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "emails_sent_this_week": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "user_email",
+    "template_id",
+    "sent_date"
+  ]
+}

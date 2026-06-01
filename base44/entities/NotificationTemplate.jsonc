@@ -1,0 +1,43 @@
+{
+  "name": "NotificationTemplate",
+  "type": "object",
+  "properties": {
+    "template_id": {
+      "type": "string",
+      "description": "ID \u00fanico de la plantilla"
+    },
+    "subject": {
+      "type": "string",
+      "description": "Asunto del email con placeholders {nombre}"
+    },
+    "body_html": {
+      "type": "string",
+      "description": "Cuerpo HTML con placeholders y enlace de desuscripci\u00f3n"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "inactivity_3d",
+        "inactivity_7d",
+        "inactivity_14d",
+        "streak_danger",
+        "lesson_reminder"
+      ],
+      "description": "Tipo de notificaci\u00f3n (no se env\u00eda email en 1 d\u00eda)"
+    },
+    "priority": {
+      "type": "number",
+      "default": 1
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "template_id",
+    "subject",
+    "body_html",
+    "type"
+  ]
+}

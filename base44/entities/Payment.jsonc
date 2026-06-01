@@ -1,0 +1,59 @@
+{
+  "name": "Payment",
+  "type": "object",
+  "properties": {
+    "folio": {
+      "type": "string",
+      "description": "Folio de pago \u00fanico"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario que us\u00f3 el folio"
+    },
+    "level": {
+      "type": "number",
+      "description": "Nivel que desbloquea este pago"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Monto del pago"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "used",
+        "expired"
+      ],
+      "default": "available",
+      "description": "Estado del folio"
+    },
+    "used_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha en que se us\u00f3 el folio"
+    },
+    "student_name": {
+      "type": "string",
+      "description": "Nombre del estudiante asignado"
+    },
+    "folio_type": {
+      "type": "string",
+      "enum": [
+        "level_advance",
+        "time_unlock",
+        "extraordinary_test"
+      ],
+      "default": "level_advance",
+      "description": "Tipo de folio: avance de nivel, desbloqueo por tiempo, o prueba extraordinaria"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "ID de la materia (solo para folios de prueba extraordinaria)"
+    }
+  },
+  "required": [
+    "folio",
+    "level"
+  ]
+}
