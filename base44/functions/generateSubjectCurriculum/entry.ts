@@ -40,7 +40,6 @@ async function invokeLLM(base44, prompt) {
               intro: { type: 'string' },
               key_points: { type: 'array', items: { type: 'string' } },
               examples: { type: 'array', items: { type: 'string' } },
-              visual_blocks: { type: 'array', items: { type: 'object' } },
               image_search_terms: { type: 'array', items: { type: 'string' } },
               summary: { type: 'string' }
             }
