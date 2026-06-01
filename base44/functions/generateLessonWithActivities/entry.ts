@@ -313,29 +313,31 @@ REGLAS:
 - image_search_terms: OBLIGATORIO. Array de 2-3 strings en inglés, cortos y específicos, para buscar imágenes educativas reales. Ej: ["periodic table elements", "chemical bonding diagram"].
 - Solo JSON válido. Sin HTML, markdown ni texto extra.`;
 
+    const lessonSchemaToSend = {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        title: { type: "string" },
+        explanation: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            intro: { type: "string" },
+            key_points: { type: "array", items: { type: "string" } },
+            examples: { type: "array", items: { type: "string" } },
+            summary: { type: "string" },
+            visual_blocks: { type: "array", items: { type: "object" } },
+            image_search_terms: { type: "array", items: { type: "string" } }
+          },
+          required: ["intro", "key_points", "examples", "summary", "visual_blocks", "image_search_terms"]
+        }
+      },
+      required: ["title", "explanation"]
+    };
+    console.log('[SCHEMA_SENT] explanation:', JSON.stringify(lessonSchemaToSend.properties.explanation, null, 2));
     const lessonResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: lessonPrompt,
-      response_json_schema: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          title: { type: "string" },
-          explanation: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              intro: { type: "string" },
-              key_points: { type: "array", items: { type: "string" } },
-              examples: { type: "array", items: { type: "string" } },
-              summary: { type: "string" },
-              visual_blocks: { type: "array", items: { type: "object" } },
-              image_search_terms: { type: "array", items: { type: "string" } }
-            },
-            required: ["intro", "key_points", "examples", "summary", "visual_blocks", "image_search_terms"]
-          }
-        },
-        required: ["title", "explanation"]
-      }
+      response_json_schema: lessonSchemaToSend
     });
 
     if (!lessonResult?.title || !lessonResult?.explanation) {

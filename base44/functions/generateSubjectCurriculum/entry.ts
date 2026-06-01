@@ -32,17 +32,21 @@ async function invokeLLM(base44, prompt) {
       prompt,
       response_json_schema: {
         type: 'object',
+        additionalProperties: false,
         properties: {
           title: { type: 'string' },
           explanation: {
             type: 'object',
+            additionalProperties: false,
             properties: {
               intro: { type: 'string' },
-              key_points: { type: 'array', items: { type: 'object' } },
-              examples: { type: 'array', items: { type: 'object' } },
+              key_points: { type: 'array', items: { type: 'string' } },
+              examples: { type: 'array', items: { type: 'string' } },
               visual_blocks: { type: 'array', items: { type: 'object' } },
+              image_search_terms: { type: 'array', items: { type: 'string' } },
               summary: { type: 'string' }
-            }
+            },
+            required: ['intro', 'key_points', 'examples', 'visual_blocks', 'image_search_terms', 'summary']
           },
           activities: { type: 'array', items: { type: 'object' } }
         },
