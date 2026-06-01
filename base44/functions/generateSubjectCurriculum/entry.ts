@@ -158,58 +158,18 @@ function generateDefaultVisualBlock(title, subjectName) {
 
 // ─── Prompt estructurado ──────────────────────────────────────────────────────
 function buildPrompt(topic, subjectName) {
-  return 'Eres un docente experto de preparatoria. Genera una lección completa en JSON puro.\n' +
-    'Tema: "' + topic + '"\nMateria: "' + subjectName + '"\n\n' +
-    'RESPONDE SOLO EL JSON SIGUIENTE, sin texto extra, sin markdown, sin HTML:\n' +
-    '{\n' +
-    '  "title": "Título corto del tema",\n' +
-    '  "explanation": {\n' +
-    '    "intro": "Introducción breve y clara de 1-2 oraciones.",\n' +
-    '    "key_points": [\n' +
-    '      { "title": "Subtema", "content": "Explicación clara.", "example": "Ejemplo corto." }\n' +
-    '    ],\n' +
-    '    "examples": [\n' +
-    '      { "question": "Ejercicio o situación práctica", "solution": "Resolución." }\n' +
-    '    ],\n' +
-    '    "visual_blocks": [\n' +
-    '      { "type": "equation", "title": "Ejemplo", "equations": ["x+5=10"] }\n' +
-    '    ],\n' +
-    '    "summary": "Resumen final corto de 1-2 oraciones.",\n' +
-    '    "image_search_terms": ["término educativo 1", "término educativo 2"]\n' +
-    '  },\n' +
-    '  "activities": [\n' +
-    '    { "type": "multiple_choice", "question": "Pregunta", "options": ["A","B","C","D"], "correct_answer": "A", "explanation": "Explicación corta" },\n' +
-    '    { "type": "true_false", "question": "Afirmación", "options": ["Verdadero","Falso"], "correct_answer": "Verdadero", "explanation": "Explicación corta" },\n' +
-    '    { "type": "fill_blank", "question": "Completa: ___ ...", "options": [], "correct_answer": "respuesta", "explanation": "Explicación corta" },\n' +
-    '    { "type": "multiple_choice", "question": "Pregunta 2", "options": ["A","B","C","D"], "correct_answer": "B", "explanation": "Explicación corta" },\n' +
-    '    { "type": "true_false", "question": "Afirmación 2", "options": ["Verdadero","Falso"], "correct_answer": "Falso", "explanation": "Explicación corta" }\n' +
-    '  ]\n' +
-    '}\n\n' +
-    'REGLAS OBLIGATORIAS:\n' +
-    '- explanation.key_points: entre 3 y 6 elementos, cada uno con title, content y example.\n' +
-    '- explanation.visual_blocks: OBLIGATORIO mínimo 1 bloque. Máximo 2 bloques. SIEMPRE incluir al menos uno relacionado con el tema.\n' +
-    '  Tipos permitidos: table, comparison, steps, equation, flow, timeline, map.\n' +
-    '  Prioridad por materia:\n' +
-    '  - Matemáticas/Álgebra/Cálculo: equation, table, steps\n' +
-    '  - Física: equation, flow, table\n' +
-    '  - Química: table, comparison, flow\n' +
-    '  - Biología: flow, map, comparison\n' +
-    '  - Historia: timeline, comparison, map\n' +
-    '  - Literatura/Humanidades: map, comparison, timeline\n' +
-    '  - Tecnología/Informática: flow, steps, table\n' +
-    '  - Economía/Administración: table, flow, comparison\n' +
-    '  Formatos:\n' +
-    '  - table: {"type":"table","title":"...","headers":["col1","col2"],"rows":[["v1","v2"]]}\n' +
-    '  - comparison: {"type":"comparison","title":"...","left_title":"...","right_title":"...","left_items":["..."],"right_items":["..."]}\n' +
-    '  - steps: {"type":"steps","title":"...","items":["paso 1","paso 2"]}\n' +
-    '  - equation: {"type":"equation","title":"...","equations":["2x+5=15","x=5"]}\n' +
-    '  - flow: {"type":"flow","title":"...","steps":["Entrada","Proceso","Resultado"]}\n' +
-    '  - timeline: {"type":"timeline","title":"...","events":[{"year":"1800","event":"..."}]}\n' +
-    '  - map: {"type":"map","title":"...","nodes":[{"label":"...","connects_to":["..."]}]}\n' +
-    '- explanation.image_search_terms: OBLIGATORIO. Array de 2-3 strings. Términos cortos, específicos y educativos en español relacionados directamente con el tema. Ejemplos: ["tabla periódica moderna", "enlace covalente diagrama"], ["revolución francesa pintura", "Napoleón Bonaparte"]. NO incluir URLs ni nombres de sitios web.\n' +
-    '- activities: 4-5 actividades, SOLO tipos multiple_choice/true_false/fill_blank.\n' +
-    '- correct_answer debe ser exactamente igual a uno de los options.\n' +
-    '- Solo JSON válido, sin HTML ni markdown.';
+  return 'Eres un docente experto de preparatoria mexicana. Genera una lección educativa completa en formato JSON.\n' +
+    'Tema: ' + topic + '\n' +
+    'Materia: ' + subjectName + '\n\n' +
+    'Responde ÚNICAMENTE con un objeto JSON válido (sin texto adicional, sin markdown).\n' +
+    'El objeto debe tener exactamente estas claves:\n' +
+    '- title: string con el título corto de la lección\n' +
+    '- explanation: objeto con las claves intro (string), key_points (array de objetos con title/content/example), examples (array de objetos con question/solution), summary (string), image_search_terms (array de 2-3 strings en español)\n' +
+    '- activities: array de 5 preguntas educativas. Cada pregunta es un objeto con las claves type (solo: multiple_choice, true_false o fill_blank), question (string), options (array de strings, vacío para fill_blank), correct_answer (string), explanation (string)\n\n' +
+    'Para multiple_choice: incluir 4 opciones en el array options, correct_answer debe ser exactamente una de las opciones.\n' +
+    'Para true_false: options debe ser ["Verdadero","Falso"], correct_answer es "Verdadero" o "Falso".\n' +
+    'Para fill_blank: la pregunta debe contener ___ donde va la respuesta, options es array vacío, correct_answer es la palabra o frase correcta.\n' +
+    'Incluir al menos 2 multiple_choice, 1 true_false y 1 fill_blank en las activities.';
 }
 
 // ─── Normalización + Validación tolerante ─────────────────────────────────────
