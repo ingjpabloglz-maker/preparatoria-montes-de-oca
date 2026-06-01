@@ -192,12 +192,105 @@ function buildPrompt(topic, subjectName) {
     '- Solo JSON válido, sin HTML ni markdown.';
 }
 
-// ─── Validación mínima de actividad ──────────────────────────────────────────
-function isValidActivity(act) {
-  if (!act || !act.question || !act.type || !act.correct_answer) return false;
-  if (!VALID_TYPES.includes(act.type)) return false;
-  if (act.type === 'multiple_choice' && (!Array.isArray(act.options) || act.options.length < 2)) return false;
-  return true;
+// ─── Normalización + Validación tolerante ─────────────────────────────────────
+// Retorna { ok: bool, act: normalized, reason: string|null, wasNormalized: bool }
+function normalizeAndValidateActivity(raw) {
+  if (!raw || typeof raw !== 'object') return { ok: false, reason: 'actividad nula o no-objeto', wasNormalized: false };
+
+  const act = { ...raw };
+  let wasNormalized = false;
+
+  // 1. Trim strings básicos
+  if (typeof act.question === 'string') act.question = act.question.trim();
+  if (typeof act.correct_answer === 'string') act.correct_answer = act.correct_answer.trim();
+  if (typeof act.type === 'string') act.type = act.type.trim().toLowerCase();
+  if (typeof act.explanation === 'string') act.explanation = act.explanation.trim();
+
+  // 2. Compatibilidad: correct_answers array → correct_answer string
+  if ((!act.correct_answer || act.correct_answer === '') && Array.isArray(act.correct_answers) && act.correct_answers.length === 1) {
+    act.correct_answer = String(act.correct_answers[0]).trim();
+    wasNormalized = true;
+  }
+
+  // 3. Validar campos obligatorios básicos
+  if (!act.question) return { ok: false, reason: 'question vacío', wasNormalized };
+  if (!VALID_TYPES.includes(act.type)) return { ok: false, reason: 'tipo inválido: ' + act.type, wasNormalized };
+
+  // 4. Normalizar options
+  if (Array.isArray(act.options)) {
+    act.options = act.options.map(o => String(o).trim()).filter(Boolean);
+  } else {
+    act.options = [];
+    wasNormalized = true;
+  }
+
+  // 5. Por tipo
+  if (act.type === 'multiple_choice') {
+    if (act.options.length < 2) return { ok: false, reason: 'multiple_choice con menos de 2 options', wasNormalized };
+    if (!act.correct_answer) return { ok: false, reason: 'multiple_choice sin correct_answer', wasNormalized };
+
+    // Intentar match exacto, luego case-insensitive, luego trim, luego parcial
+    const ca = act.correct_answer;
+    const exactMatch = act.options.includes(ca);
+    if (!exactMatch) {
+      const caLower = ca.toLowerCase();
+      const ciMatch = act.options.find(o => o.toLowerCase() === caLower);
+      if (ciMatch) {
+        act.correct_answer = ciMatch; // normalizar al valor real de la opción
+        wasNormalized = true;
+      } else {
+        const partialMatch = act.options.find(o => o.toLowerCase().includes(caLower) || caLower.includes(o.toLowerCase()));
+        if (partialMatch) {
+          act.correct_answer = partialMatch;
+          wasNormalized = true;
+        }
+        // Si no hay match parcial, igual aceptar — el LLM puede poner el texto ligeramente diferente
+        // Registrar pero no rechazar
+        else {
+          console.log('[NORMALIZE] multiple_choice: correct_answer no encontrado en options, aceptando igual', { ca, options: act.options });
+          wasNormalized = true;
+        }
+      }
+    }
+  }
+
+  if (act.type === 'true_false') {
+    if (!act.correct_answer) return { ok: false, reason: 'true_false sin correct_answer', wasNormalized };
+    const ca = act.correct_answer.toLowerCase();
+    const normalized = { 'verdadero': 'Verdadero', 'true': 'Verdadero', 'falso': 'Falso', 'false': 'Falso', 'v': 'Verdadero', 'f': 'Falso' };
+    if (normalized[ca]) {
+      if (act.correct_answer !== normalized[ca]) wasNormalized = true;
+      act.correct_answer = normalized[ca];
+    }
+    // Si no matchea, dejar como está — no rechazar por esto
+    if (!act.options || act.options.length === 0) {
+      act.options = ['Verdadero', 'Falso'];
+      wasNormalized = true;
+    }
+  }
+
+  if (act.type === 'fill_blank') {
+    // fill_blank es muy flexible — aceptar aunque correct_answer esté vacío temporalmente
+    if (!act.correct_answer) {
+      if (Array.isArray(act.accepted_answers) && act.accepted_answers.length > 0) {
+        act.correct_answer = String(act.accepted_answers[0]).trim();
+        wasNormalized = true;
+      } else {
+        // Último recurso: dejar en blanco pero no rechazar si la pregunta tiene ___
+        if (act.question.includes('___')) {
+          act.correct_answer = '(respuesta)';
+          wasNormalized = true;
+        } else {
+          return { ok: false, reason: 'fill_blank sin correct_answer ni accepted_answers', wasNormalized };
+        }
+      }
+    }
+  }
+
+  // 6. Auto-fill defaults opcionales
+  if (!act.explanation) { act.explanation = act.question; wasNormalized = true; }
+
+  return { ok: true, act, reason: null, wasNormalized };
 }
 
 // ─── Tipos de visual_blocks permitidos ───────────────────────────────────────
@@ -363,13 +456,24 @@ async function generateLesson(base44, { module_id, subject_id, subject_name, top
     if (raw?.title) title = raw.title;
     if (raw?.explanation) explanation = normalizeExplanation(raw.explanation, title, subject_name);
     if (Array.isArray(raw?.activities)) {
-      activities = raw.activities.filter(isValidActivity).map(a => ({
-        type: a.type,
-        question: String(a.question).trim(),
-        options: Array.isArray(a.options) ? a.options.map(String) : [],
-        correct_answer: String(a.correct_answer).trim(),
-        explanation: typeof a.explanation === 'string' ? a.explanation.trim() : '',
-      }));
+      let passedDirect = 0, normalized = 0, rejected = 0;
+      for (const rawAct of raw.activities) {
+        const result = normalizeAndValidateActivity(rawAct);
+        if (result.ok) {
+          activities.push({
+            type: result.act.type,
+            question: result.act.question,
+            options: result.act.options,
+            correct_answer: result.act.correct_answer,
+            explanation: result.act.explanation,
+          });
+          if (result.wasNormalized) normalized++; else passedDirect++;
+        } else {
+          rejected++;
+          console.log('[REJECT_ACTIVITY]', { reason: result.reason, activityType: rawAct?.type, activity: rawAct });
+        }
+      }
+      await log('[' + ts() + '] 📊 Actividades: ' + passedDirect + ' directas, ' + normalized + ' normalizadas, ' + rejected + ' rechazadas');
     }
   } catch (err) {
     const isTimeout = err.message === 'LLM_TIMEOUT';
