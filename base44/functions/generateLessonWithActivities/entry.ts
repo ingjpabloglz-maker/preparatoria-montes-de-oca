@@ -315,12 +315,10 @@ REGLAS:
 
     const lessonSchemaToSend = {
       type: "object",
-      additionalProperties: false,
       properties: {
         title: { type: "string" },
         explanation: {
           type: "object",
-          additionalProperties: false,
           properties: {
             intro: { type: "string" },
             key_points: { type: "array", items: { type: "string" } },
@@ -328,8 +326,7 @@ REGLAS:
             summary: { type: "string" },
             visual_blocks: { type: "array", items: { type: "object" } },
             image_search_terms: { type: "array", items: { type: "string" } }
-          },
-          required: ["intro", "key_points", "examples", "summary", "visual_blocks", "image_search_terms"]
+          }
         }
       },
       required: ["title", "explanation"]
