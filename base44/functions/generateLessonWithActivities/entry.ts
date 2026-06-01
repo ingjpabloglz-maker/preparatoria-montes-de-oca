@@ -35,23 +35,39 @@ function sanitizeActivity(activity) {
   }
 
   // --- CORRECT ANSWERS (dual field) ---
-  if (safe.type === 'multiple_select') {
+  // Compatibilidad: si correct_answer es array, mover a correct_answers
+  if (Array.isArray(safe.correct_answer)) {
+    safe.correct_answers = safe.correct_answer.map(x => String(x));
     safe.correct_answer = '';
-    if (!Array.isArray(safe.correct_answer) && typeof safe.correct_answer === 'string' && safe.correct_answer.startsWith('[')) {
-      try {
-        safe.correct_answer = JSON.parse(safe.correct_answer).map(x => String(x));
-      } catch { safe.correct_answer = []; }
-    }
-    if (!Array.isArray(safe.correct_answer)) {
-      safe.correct_answer = [];
-    }
-    if (safe.correct_answer.length === 0) {
-      safe.correct_answer = [safe.options?.[0] || 'Opción A'];
+  }
+
+  const MULTI_TYPES = ['multiple_select', 'order_steps'];
+  if (MULTI_TYPES.includes(safe.type)) {
+    // Tipos multi-respuesta: usar correct_answers
+    if (!Array.isArray(safe.correct_answers) || safe.correct_answers.length === 0) {
+      if (typeof safe.correct_answer === 'string' && safe.correct_answer.startsWith('[')) {
+        try { safe.correct_answers = JSON.parse(safe.correct_answer).map(x => String(x)); } catch (e) { safe.correct_answers = []; }
+      } else if (safe.correct_answer) {
+        safe.correct_answers = [String(safe.correct_answer)];
+      } else {
+        safe.correct_answers = [safe.options?.[0] || 'Opci\u00f3n A'];
+      }
     } else {
-      safe.correct_answer = safe.correct_answer.map(x => String(x));
+      safe.correct_answers = safe.correct_answers.map(x => String(x));
     }
+    safe.correct_answer = '';
   } else {
-    safe.correct_answer = !safe.correct_answer || typeof safe.correct_answer !== 'string' ? (safe.options?.[0] || 'Respuesta correcta') : String(safe.correct_answer);
+    // Tipos single-answer: usar correct_answer
+    // Fallback inverso: si correct_answers tiene 1 elemento y correct_answer est\u00e1 vac\u00edo
+    if ((!safe.correct_answer || typeof safe.correct_answer !== 'string') &&
+        Array.isArray(safe.correct_answers) && safe.correct_answers.length >= 1) {
+      safe.correct_answer = safe.correct_answers[0];
+    } else if (!safe.correct_answer || typeof safe.correct_answer !== 'string') {
+      safe.correct_answer = safe.options?.[0] || 'Respuesta correcta';
+    } else {
+      safe.correct_answer = String(safe.correct_answer);
+    }
+    if (!Array.isArray(safe.correct_answers)) safe.correct_answers = [];
   }
 
   // --- ACCEPTED ANSWERS ---
@@ -188,38 +204,46 @@ function assertValidForPersistence(activity) {
 // CAPA 4: Validador inteligente por tipo
 function validateActivity(act) {
   const q = act.question?.toString().trim();
-  if (!q) return 'question vacío';
-  if (!VALID_TYPES.includes(act.type)) return `tipo inválido: ${act.type}`;
+  if (!q) { console.log(`[REJECT] type=${act.type} reason=question_vacio`); return 'question vac\u00edo'; }
+  if (!VALID_TYPES.includes(act.type)) { console.log(`[REJECT] type=${act.type} reason=tipo_invalido`); return `tipo inv\u00e1lido: ${act.type}`; }
+
+  console.log(`[VALIDATE] type=${act.type} correct_answer=${JSON.stringify(act.correct_answer)} correct_answers=${JSON.stringify(act.correct_answers)}`);
 
   switch (act.type) {
     case 'multiple_choice':
-      if (!Array.isArray(act.options) || act.options.length < 3) return 'options insuficientes (mínimo 3)';
-      if (!act.correct_answer) return 'correct_answer faltante';
+      if (!Array.isArray(act.options) || act.options.length < 3) { console.log(`[REJECT] ${act.type} reason=options<3`); return 'options insuficientes (m\u00ednimo 3)'; }
+      if (!act.correct_answer) { console.log(`[REJECT] ${act.type} reason=no_correct_answer`); return 'correct_answer faltante'; }
       break;
     case 'multiple_select':
-      if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes';
-      if (!Array.isArray(act.correct_answer) || act.correct_answer.length === 0) return 'correct_answer debe ser array no vacío';
+      if (!Array.isArray(act.options) || act.options.length < 2) { console.log(`[REJECT] ${act.type} reason=options<2`); return 'options insuficientes'; }
+      // correct_answers ya normalizados en sanitize; aceptar si hay elementos
+      if (!Array.isArray(act.correct_answers) || act.correct_answers.length === 0) { console.log(`[REJECT] ${act.type} reason=correct_answers_vacio`); return 'correct_answers debe ser array no vac\u00edo'; }
       break;
     case 'true_false': {
       const ca = act.correct_answer?.toString().toLowerCase().trim();
-      if (!['verdadero','falso','true','false'].includes(ca)) return `correct_answer inválido para true_false: ${ca}`;
+      if (!['verdadero','falso','true','false'].includes(ca)) { console.log(`[REJECT] ${act.type} reason=correct_answer_invalido val=${ca}`); return `correct_answer inv\u00e1lido para true_false: ${ca}`; }
       break;
     }
     case 'fill_blank':
-      if (act.accepted_answers.length === 0 && !act.correct_answer) return 'accepted_answers o correct_answer requerido';
+      // NO rechazar por mismatch — aceptar si hay cualquiera de los dos
+      if (!act.correct_answer && (!Array.isArray(act.accepted_answers) || act.accepted_answers.length === 0)) {
+        console.log(`[REJECT] ${act.type} reason=sin_respuesta`);
+        return 'accepted_answers o correct_answer requerido';
+      }
       break;
     case 'solve':
-      if (!act.correct_answer && act.accepted_answers.length === 0) return 'correct_answer o accepted_answers requerido';
+      if (!act.correct_answer && (!Array.isArray(act.accepted_answers) || act.accepted_answers.length === 0)) { console.log(`[REJECT] ${act.type} reason=sin_respuesta`); return 'correct_answer o accepted_answers requerido'; }
       break;
     case 'drag_drop':
-      if (act.drag_items.length === 0) return 'drag_items vacío';
-      if (act.drop_targets.length === 0) return 'drop_targets vacío';
+      if (!Array.isArray(act.drag_items) || act.drag_items.length === 0) { console.log(`[REJECT] ${act.type} reason=drag_items_vacio`); return 'drag_items vac\u00edo'; }
+      if (!Array.isArray(act.drop_targets) || act.drop_targets.length === 0) { console.log(`[REJECT] ${act.type} reason=drop_targets_vacio`); return 'drop_targets vac\u00edo'; }
       break;
     case 'step_by_step':
-      if (act.steps.length < 2) return 'steps requiere mínimo 2 pasos';
+      if (!Array.isArray(act.steps) || act.steps.length < 2) { console.log(`[REJECT] ${act.type} reason=steps<2`); return 'steps requiere m\u00ednimo 2 pasos'; }
       break;
     case 'order_steps':
-      if (!Array.isArray(act.options) || act.options.length < 2) return 'options insuficientes para order_steps';
+      if (!Array.isArray(act.options) || act.options.length < 2) { console.log(`[REJECT] ${act.type} reason=options<2`); return 'options insuficientes para order_steps'; }
+      if (!Array.isArray(act.correct_answers) || act.correct_answers.length === 0) { console.log(`[REJECT] ${act.type} reason=correct_answers_vacio`); return 'correct_answers requerido para order_steps'; }
       break;
   }
   return null;
@@ -386,27 +410,23 @@ DISTRIBUCIÓN DE DIFICULTAD:
 TIPOS OBLIGATORIOS (incluir todos):
 - multiple_choice, multiple_select, true_false, fill_blank, drag_drop, step_by_step
 
-REGLAS POR TIPO:
-- multiple_choice: options mínimo 3. correct_answer = string EXACTO de una opción.
-- multiple_select: options mínimo 4. correct_answer = ARRAY REAL de strings correctos, ej: ["op1","op3"] (NO string serializado).
-- true_false: correct_answer = "true" o "false" (en minúsculas).
-- fill_blank: pregunta con ___. accepted_answers = array con mínimo 1 respuesta. correct_answer = string con la respuesta principal.
-- drag_drop: drag_items y drop_targets obligatorios (mínimo 2 cada uno). correct_answer = JSON object mapeando target→item.
-- step_by_step: steps = array de objetos {instruction, answer, hint} con mínimo 3 pasos. correct_answer = "step_by_step".
-- order_steps: options = pasos MEZCLADOS. correct_answer = ARRAY REAL en ORDEN CORRECTO (NO string serializado).
-- solve: correct_answer = resultado numérico o expresión como string.
+REGLAS POR TIPO Y CAMPOS DE RESPUESTA:
 
-CALIDAD PEDAGÓGICA:
-- Preguntas claras, sin ambigüedad.
-- Para matemáticas usar LaTeX dentro de $...$: $x^2$, $\\frac{a}{b}$, $\\mathbb{N}$, $\\{1,2,3\\}$.
-- explanation: string corto con la explicación básica (1-2 oraciones).
-- explanation_levels: SOLO incluir {basic: "..."} — NO generar detailed ni example.
-- NO incluir hints ni incorrect_feedback.
-- points: easy=8, medium=10, hard=14.
+Tipos de RESPUESTA Única - usar "correct_answer" (string simple, NUNCA array):
+- multiple_choice: options mínimo 3. "correct_answer": "texto exacto de una opción"
+- true_false: "correct_answer": "true" o "false" (minúsculas, sin comillas extra)
+- fill_blank: pregunta con ___. "correct_answer": "respuesta", "accepted_answers": ["respuesta"]
+- solve: "correct_answer": "resultado como string"
+- step_by_step: steps=[{instruction,answer,hint}] mínimo 2 pasos. "correct_answer": "step_by_step"
+- drag_drop: drag_items y drop_targets obligatorios (mínimo 2). "correct_answer": JSON stringify del mapeo target-item
+
+Tipos de RESPUESTA MÚLTIPLE - usar "correct_answers" (array), NO usar "correct_answer" para la respuesta:
+- multiple_select: options mínimo 4. "correct_answers": ["op1", "op3"] (array real, NO string)
+- order_steps: options = pasos mezclados. "correct_answers": ["Paso1", "Paso2", "Paso3"] (orden correcto, array real)
 
 EJEMPLOS DE REFERENCIA:
 {"type":"multiple_choice","question":"¿Cuánto es 3 + 5?","options":["6","7","8","9"],"correct_answer":"8","explanation":"3 + 5 = 8","explanation_levels":{"basic":"Al sumar 3 y 5 obtenemos 8."},"difficulty":"easy","points":8}
-{"type":"multiple_select","question":"Selecciona los números primos","options":["2","3","4","5"],"correct_answer":["2","3","5"],"explanation":"2, 3 y 5 son primos","explanation_levels":{"basic":"Un número primo solo es divisible entre 1 y sí mismo."},"difficulty":"medium","points":10}
+{"type":"multiple_select","question":"Selecciona los números primos","options":["2","3","4","5"],"correct_answers":["2","3","5"],"explanation":"2, 3 y 5 son primos","explanation_levels":{"basic":"Un número primo solo es divisible entre 1 y sí mismo."},"difficulty":"medium","points":10}
 {"type":"true_false","question":"5 es un número par","correct_answer":"false","explanation":"5 no es divisible entre 2","explanation_levels":{"basic":"Los números pares son divisibles entre 2. El 5 no lo es."},"difficulty":"easy","points":8}
 {"type":"fill_blank","question":"Completa: 7 + 3 = ___","accepted_answers":["10"],"explanation":"7 + 3 = 10","explanation_levels":{"basic":"Al sumar 7 y 3 el resultado es 10."},"difficulty":"easy","points":8}
 {"type":"drag_drop","question":"Relaciona cada número con su tipo","drag_items":["2","-3","1/2"],"drop_targets":["Natural","Entero","Racional"],"correct_answer":"{\\"Natural\\":\\"2\\",\\"Entero\\":\\"-3\\",\\"Racional\\":\\"1/2\\"}","explanation":"2 es natural, -3 es entero, 1/2 es racional","explanation_levels":{"basic":"Cada número pertenece a un conjunto específico según sus características."},"difficulty":"medium","points":10}
