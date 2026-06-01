@@ -26,11 +26,31 @@ function buildLessonKey(unitTitle, moduleTitle, lessonTitle) {
 }
 
 // ─── LLM con timeout duro ─────────────────────────────────────────────────────
+// Parse JSON from LLM response (may be string or object)
+function parseJsonFromLLM(raw) {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  if (typeof raw !== 'string') return null;
+  const s = raw.trim();
+  // Intento 1: parse directo
+  try { return JSON.parse(s); } catch (_) {}
+  // Intento 2: extraer de bloque ```json ... ```
+  const mdMatch = s.match(/```(?:json)?[\s\S]*?({[\s\S]*})[\s\S]*?```/);
+  if (mdMatch) { try { return JSON.parse(mdMatch[1].trim()); } catch (_) {} }
+  // Intento 3: extraer primer { ... } balanceado
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start !== -1 && end > start) { try { return JSON.parse(s.slice(start, end + 1)); } catch (_) {} }
+  return null;
+}
+
 async function invokeLLM(base44, prompt) {
-  return Promise.race([
+  const rawResult = await Promise.race([
     base44.asServiceRole.integrations.Core.InvokeLLM({ prompt }),
     new Promise((_, reject) => setTimeout(() => reject(new Error('LLM_TIMEOUT')), 45000))
   ]);
+  const parsed = parseJsonFromLLM(rawResult);
+  console.log('[LLM_RESPONSE]', 'rawType=' + typeof rawResult, 'parsed=' + (parsed ? 'OK keys=' + Object.keys(parsed).join(',') : 'NULL'));
+  return parsed;
 }
 
 // ─── Detección de tipo de materia ─────────────────────────────────────────────
