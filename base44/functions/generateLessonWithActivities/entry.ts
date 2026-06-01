@@ -415,42 +415,7 @@ EJEMPLOS DE REFERENCIA:
 FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
 
     const activitiesResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt: activitiesPrompt,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          activities: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                type: { type: "string" },
-                question: { type: "string" },
-                options: { type: "array", items: { type: "string" } },
-                correct_answer: {},
-                accepted_answers: { type: "array", items: { type: "string" } },
-                explanation: { type: "string" },
-                explanation_levels: {
-                  type: "object",
-                  properties: {
-                    basic: { type: "string" },
-                    detailed: { type: "string" },
-                    example: { type: "string" }
-                  }
-                },
-                incorrect_feedback: { type: "object" },
-                hints: { type: "array", items: { type: "string" } },
-                difficulty: { type: "string" },
-                points: { type: "number" },
-                order: { type: "number" },
-                steps: { type: "array", items: { type: "object" } },
-                drag_items: { type: "array", items: { type: "string" } },
-                drop_targets: { type: "array", items: { type: "string" } }
-              }
-            }
-          }
-        }
-      }
+      prompt: activitiesPrompt
     });
 
     let activities = Array.isArray(activitiesResult)
@@ -471,11 +436,7 @@ FORMATO FINAL: Responder SOLO con { "activities": [ ... ] }`;
       retryAttempts++;
       const needed = min - valid.length;
       const retryResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
-        prompt: `${activitiesPrompt}\n\nNOTA: Solo necesito ${needed} actividades adicionales válidas.`,
-        response_json_schema: {
-          type: "object",
-          properties: { activities: { type: "array", items: { type: "object" } } }
-        }
+        prompt: `${activitiesPrompt}\n\nNOTA: Solo necesito ${needed} actividades adicionales válidas.`
       });
       const retryActivities = Array.isArray(retryResult) ? retryResult : (retryResult?.activities || []);
       for (const rawAct of retryActivities) {
