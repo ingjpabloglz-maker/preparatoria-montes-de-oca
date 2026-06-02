@@ -120,7 +120,16 @@ Deno.serve(async (req) => {
     if (!subject) return Response.json({ error: 'Materia no encontrada' }, { status: 404 });
 
     // ── 4. Banco de preguntas con normalización flexible ──
-    const allActivities = await base44.asServiceRole.entities.CourseActivity.filter({ subject_id });
+    // CourseActivity NO tiene subject_id directo. Traversal: Subject → CourseLesson → CourseActivity
+    const lessons = await base44.asServiceRole.entities.CourseLesson.filter({ subject_id });
+    const lessonIds = lessons.map(l => l.id);
+
+    console.log(JSON.stringify({ event: 'EXAM_LESSONS_FOUND', subject_id, lesson_count: lessonIds.length }));
+
+    const activitiesPerLesson = await Promise.all(
+      lessonIds.map(lid => base44.asServiceRole.entities.CourseActivity.filter({ lesson_id: lid }))
+    );
+    const allActivities = activitiesPerLesson.flat();
 
     let normalized_from_correct_answers = 0;
     let rejected_missing_question = 0;
