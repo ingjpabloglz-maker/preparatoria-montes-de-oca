@@ -14,20 +14,26 @@
       "type": "string",
       "description": "Nombre de la materia"
     },
+    "exam_version": {
+      "type": "string",
+      "default": "2.0",
+      "description": "Versi\u00f3n del sistema de examen (para debugging y migraciones)"
+    },
     "status": {
       "type": "string",
       "enum": [
         "in_progress",
         "completed",
         "submitted_late",
-        "expired"
+        "expired",
+        "auto_graded"
       ],
       "default": "in_progress"
     },
     "is_locked": {
       "type": "boolean",
       "default": false,
-      "description": "Bloqueado tras submit o timeout \u2014 sin m\u00e1s modificaciones"
+      "description": "Bloqueado tras submit, timeout o auto-grade \u2014 sin m\u00e1s modificaciones"
     },
     "exam_started_at": {
       "type": "string",
@@ -53,9 +59,14 @@
       "type": "number",
       "default": 1
     },
+    "auto_graded": {
+      "type": "boolean",
+      "default": false,
+      "description": "true si fue calificado autom\u00e1ticamente por el backend por timeout"
+    },
     "questions": {
       "type": "array",
-      "description": "Copia completa e inmutable de las preguntas seleccionadas. correct_answer NUNCA se env\u00eda al frontend.",
+      "description": "Copia inmutable de preguntas. correct_answer NUNCA se env\u00eda al frontend hasta despu\u00e9s del submit.",
       "items": {
         "type": "object",
         "properties": {
@@ -92,39 +103,33 @@
           },
           "correct_answer": {
             "type": "string",
-            "description": "Almacenado en DB. JAM\u00c1S enviado al frontend."
+            "description": "Solo en DB. JAM\u00c1S al frontend antes del submit."
           },
           "explanation": {
             "type": "string",
             "description": "Solo se env\u00eda al frontend despu\u00e9s del submit."
           },
           "user_answer": {
-            "type": "string",
-            "description": "Respuesta del alumno (null = sin responder)"
+            "type": "string"
           },
           "is_correct": {
-            "type": "boolean",
-            "description": "Calculado solo en submit."
+            "type": "boolean"
           },
           "score_points": {
-            "type": "number",
-            "description": "Calculado solo en submit."
+            "type": "number"
           },
           "flagged": {
             "type": "boolean",
-            "default": false,
-            "description": "Marcada para revisar por el alumno."
+            "default": false
           }
         }
       }
     },
     "score": {
-      "type": "number",
-      "description": "0-100, calculado en submit"
+      "type": "number"
     },
     "passed": {
-      "type": "boolean",
-      "description": "score >= 70"
+      "type": "boolean"
     },
     "correct_count": {
       "type": "number"

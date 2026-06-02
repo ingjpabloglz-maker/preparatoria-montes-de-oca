@@ -8,6 +8,7 @@ import ExamQuestion from '@/components/exam/ExamQuestion';
 import { CheckCircle, XCircle, AlertTriangle, BookOpen, Send, Loader2 } from 'lucide-react';
 
 const AUTOSAVE_INTERVAL_MS = 75000; // 75 segundos
+const LS_KEY = (sessionId) => `feo_backup_${sessionId}`;
 
 export default function FinalExamOnline() {
   const { user } = useAuth();
@@ -37,6 +38,33 @@ export default function FinalExamOnline() {
     loadSession();
   }, [subjectId]);
 
+  // Guardar en localStorage como backup de emergencia (beforeunload, offline, suspend)
+  const saveToLocalStorage = useCallback((qs, sessId) => {
+    if (!sessId) return;
+    try {
+      localStorage.setItem(LS_KEY(sessId), JSON.stringify({ questions: qs, saved_at: Date.now() }));
+    } catch (_) {}
+  }, []);
+
+  // Fusionar respuestas del localStorage con las del servidor (gana el más reciente)
+  const mergeWithLocalStorage = useCallback((serverQuestions, sessId) => {
+    try {
+      const raw = localStorage.getItem(LS_KEY(sessId));
+      if (!raw) return serverQuestions;
+      const backup = JSON.parse(raw);
+      // Solo usar backup si es reciente (últimas 2h)
+      if (Date.now() - backup.saved_at > 2 * 60 * 60 * 1000) return serverQuestions;
+      const lsMap = {};
+      for (const q of backup.questions) lsMap[q.activity_id] = q;
+      return serverQuestions.map(sq => {
+        const lsQ = lsMap[sq.activity_id];
+        // Preferir respuesta del localStorage si tiene algo y el servidor no tiene
+        if (lsQ && lsQ.user_answer && !sq.user_answer) return { ...sq, user_answer: lsQ.user_answer, flagged: lsQ.flagged };
+        return sq;
+      });
+    } catch (_) { return serverQuestions; }
+  }, []);
+
   const loadSession = async () => {
     setPhase('loading');
     try {
@@ -49,7 +77,9 @@ export default function FinalExamOnline() {
       }
       if (data.expired) { setErrorMsg(data.error); setPhase('error'); return; }
       setSession({ id: data.session_id, subject_name: data.subject_name, attempt_number: data.attempt_number });
-      setQuestions(data.questions);
+      // Fusionar con backup de localStorage (maneja offline, laptop suspend, mobile background)
+      const mergedQuestions = mergeWithLocalStorage(data.questions, data.session_id);
+      setQuestions(mergedQuestions);
       setExpiresAt(data.expires_at);
       setPhase(data.recovered ? 'exam' : 'ready');
     } catch (e) {
@@ -75,20 +105,49 @@ export default function FinalExamOnline() {
   useEffect(() => {
     if (phase !== 'exam') return;
     const interval = setInterval(() => doSave(), AUTOSAVE_INTERVAL_MS);
+    const sess = sessionRef.current;
     const onBlur = () => doSave();
-    const onBeforeUnload = (e) => { doSave(); e.preventDefault(); e.returnValue = ''; };
+
+    // sendBeacon + localStorage para máxima fiabilidad al cerrar pestaña
+    const onBeforeUnload = () => {
+      const qs = questionsRef.current;
+      const s = sessionRef.current;
+      if (!s) return;
+      // Guardar en localStorage como respaldo instantáneo
+      saveToLocalStorage(qs, s.id);
+    };
+
+    // visibilitychange: cubre mobile background + laptop suspend
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        const qs = questionsRef.current;
+        const s = sessionRef.current;
+        if (s) saveToLocalStorage(qs, s.id);
+        doSave();
+      }
+    };
+
     window.addEventListener('blur', onBlur);
     window.addEventListener('beforeunload', onBeforeUnload);
-    return () => { clearInterval(interval); window.removeEventListener('blur', onBlur); window.removeEventListener('beforeunload', onBeforeUnload); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [phase, doSave]);
 
   const handleAnswer = useCallback((index, value) => {
     setQuestions(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], user_answer: value };
+      // Guardar en localStorage en cada respuesta (previene pérdida en offline/suspend)
+      const s = sessionRef.current;
+      if (s) saveToLocalStorage(updated, s.id);
       return updated;
     });
-  }, []);
+  }, [saveToLocalStorage]);
 
   const handleFlag = useCallback((index) => {
     setQuestions(prev => {
@@ -106,7 +165,11 @@ export default function FinalExamOnline() {
       const final_answers = qs.map(q => ({ activity_id: q.activity_id, user_answer: q.user_answer }));
       const res = await base44.functions.invoke('submitFinalExamOnline', { session_id: session.id, final_answers });
       setResults(res.data);
+      setResults(res.data);
       setPhase('results');
+      // Limpiar backup de localStorage al completar exitosamente
+      const s = sessionRef.current;
+      if (s) { try { localStorage.removeItem(LS_KEY(s.id)); } catch (_) {} }
     } catch (e) {
       setErrorMsg(e.response?.data?.error || 'Error al enviar el examen.');
       setPhase('error');

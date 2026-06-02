@@ -7,7 +7,6 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'No autenticado' }, { status: 401 });
 
     const { session_id, updates } = await req.json();
-    // updates: [{ activity_id: string, user_answer: string, flagged?: boolean }]
     if (!session_id) return Response.json({ error: 'session_id requerido' }, { status: 400 });
 
     // ── Cargar sesión ──
@@ -29,22 +28,28 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'El examen expiró.', expired: true }, { status: 410 });
     }
 
-    // ── Aplicar updates ──
+    // ── Aplicar updates con validación de ownership ──
+    // Solo aceptar activity_ids que pertenezcan a ESTA sesión — nunca confiar en índices del cliente
     if (Array.isArray(updates) && updates.length > 0) {
+      const sessionActivityIds = new Set(session.questions.map(q => q.activity_id));
       const updatesMap = {};
       for (const u of updates) {
-        if (u.activity_id) updatesMap[u.activity_id] = u;
+        if (u.activity_id && sessionActivityIds.has(u.activity_id)) {
+          updatesMap[u.activity_id] = u;
+        }
       }
 
-      session.questions = session.questions.map(q => {
-        const upd = updatesMap[q.activity_id];
-        if (!upd) return q;
-        return {
-          ...q,
-          user_answer: upd.user_answer !== undefined ? upd.user_answer : q.user_answer,
-          flagged: upd.flagged !== undefined ? upd.flagged : q.flagged,
-        };
-      });
+      if (Object.keys(updatesMap).length > 0) {
+        session.questions = session.questions.map(q => {
+          const upd = updatesMap[q.activity_id];
+          if (!upd) return q;
+          return {
+            ...q,
+            user_answer: upd.user_answer !== undefined ? upd.user_answer : q.user_answer,
+            flagged: upd.flagged !== undefined ? upd.flagged : q.flagged,
+          };
+        });
+      }
     }
 
     await base44.asServiceRole.entities.FinalExamSession.update(session_id, {
