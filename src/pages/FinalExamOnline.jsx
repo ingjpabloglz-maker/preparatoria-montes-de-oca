@@ -46,19 +46,23 @@ export default function FinalExamOnline() {
     } catch (_) {}
   }, []);
 
-  // Fusionar respuestas del localStorage con las del servidor (gana el más reciente)
-  const mergeWithLocalStorage = useCallback((serverQuestions, sessId) => {
+  // Fusionar respuestas del localStorage con las del servidor
+  // Regla: latest timestamp wins — nunca sobrescribir datos más recientes del servidor
+  const mergeWithLocalStorage = useCallback((serverQuestions, sessId, serverLastActivityAt) => {
     try {
       const raw = localStorage.getItem(LS_KEY(sessId));
       if (!raw) return serverQuestions;
       const backup = JSON.parse(raw);
-      // Solo usar backup si es reciente (últimas 2h)
+      // Descartar backup antiguo (más de 2h)
       if (Date.now() - backup.saved_at > 2 * 60 * 60 * 1000) return serverQuestions;
+      // Si el servidor tiene datos más recientes que el localStorage, el servidor gana
+      const serverTs = serverLastActivityAt ? new Date(serverLastActivityAt).getTime() : 0;
+      if (serverTs >= backup.saved_at) return serverQuestions;
+      // localStorage es más reciente: fusionar respuestas donde el servidor no tiene nada
       const lsMap = {};
       for (const q of backup.questions) lsMap[q.activity_id] = q;
       return serverQuestions.map(sq => {
         const lsQ = lsMap[sq.activity_id];
-        // Preferir respuesta del localStorage si tiene algo y el servidor no tiene
         if (lsQ && lsQ.user_answer && !sq.user_answer) return { ...sq, user_answer: lsQ.user_answer, flagged: lsQ.flagged };
         return sq;
       });
@@ -78,7 +82,7 @@ export default function FinalExamOnline() {
       if (data.expired) { setErrorMsg(data.error); setPhase('error'); return; }
       setSession({ id: data.session_id, subject_name: data.subject_name, attempt_number: data.attempt_number });
       // Fusionar con backup de localStorage (maneja offline, laptop suspend, mobile background)
-      const mergedQuestions = mergeWithLocalStorage(data.questions, data.session_id);
+      const mergedQuestions = mergeWithLocalStorage(data.questions, data.session_id, data.last_activity_at);
       setQuestions(mergedQuestions);
       setExpiresAt(data.expires_at);
       setPhase(data.recovered ? 'exam' : 'ready');

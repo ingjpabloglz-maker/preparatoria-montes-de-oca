@@ -1,6 +1,11 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const PASSING_SCORE = 70;
+const GRADING_VERSION = '1.0';
+
+function logEvent(event, data = {}) {
+  console.log(JSON.stringify({ event, timestamp: new Date().toISOString(), ...data }));
+}
 
 function normalizeAnswer(str = '') {
   return String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -15,16 +20,18 @@ Deno.serve(async (req) => {
     const { session_id, final_answers } = await req.json();
     if (!session_id) return Response.json({ error: 'session_id requerido' }, { status: 400 });
 
-    // ── Cargar sesión ──
     const sessions = await base44.asServiceRole.entities.FinalExamSession.filter({ id: session_id });
     const session = sessions[0];
     if (!session) return Response.json({ error: 'Sesión no encontrada' }, { status: 404 });
 
-    // ── Validaciones de seguridad ──
     if (session.user_email !== user.email) return Response.json({ error: 'Acceso denegado' }, { status: 403 });
 
-    // Protección contra doble submit — idempotente
+    // ── Protección contra doble submit — idempotente ──
     if (session.is_locked) {
+      logEvent('EXAM_DOUBLE_SUBMIT', {
+        session_id, user_email: user.email, subject_id: session.subject_id,
+        existing_status: session.status, existing_score: session.score,
+      });
       return Response.json({
         session_id,
         already_submitted: true,
@@ -46,7 +53,6 @@ Deno.serve(async (req) => {
       const sessionActivityIds = new Set(session.questions.map(q => q.activity_id));
       const map = {};
       for (const fa of final_answers) {
-        // Solo aceptar IDs que pertenezcan a esta sesión — nunca confiar en el cliente
         if (fa.activity_id && sessionActivityIds.has(fa.activity_id)) {
           map[fa.activity_id] = fa;
         }
@@ -58,26 +64,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── BACKEND AUTHORITY: determinar si fue a tiempo ──
+    // ── BACKEND AUTHORITY: tiempo ──
     const isLate = now > new Date(session.expires_at);
     const duration_seconds = Math.floor((now - new Date(session.exam_started_at)) / 1000);
 
-    // ── Calificación — 100% backend ──
+    // ── Calificación 100% backend ──
     const points_per_question = 100 / session.questions.length;
-    let total_score = 0;
-    let correct_count = 0;
-    let incorrect_count = 0;
+    let total_score = 0, correct_count = 0, incorrect_count = 0, unanswered_count = 0;
 
     session.questions = session.questions.map(q => {
       const answered = q.user_answer !== null && q.user_answer !== undefined && q.user_answer !== '';
-      let is_correct = false;
-      if (answered) {
-        if (q.type === 'fill_blank') {
-          is_correct = normalizeAnswer(q.user_answer) === normalizeAnswer(q.correct_answer);
-        } else {
-          is_correct = q.user_answer === q.correct_answer;
-        }
-      }
+      if (!answered) { unanswered_count++; return { ...q, is_correct: false, score_points: 0 }; }
+      const is_correct = q.type === 'fill_blank'
+        ? normalizeAnswer(q.user_answer) === normalizeAnswer(q.correct_answer)
+        : q.user_answer === q.correct_answer;
       const score_points = is_correct ? points_per_question : 0;
       total_score += score_points;
       if (is_correct) correct_count++; else incorrect_count++;
@@ -88,7 +88,6 @@ Deno.serve(async (req) => {
     const passed = score >= PASSING_SCORE;
     const status = isLate ? 'submitted_late' : 'completed';
 
-    // ── Guardar sesión finalizada y bloqueada ──
     await base44.asServiceRole.entities.FinalExamSession.update(session_id, {
       questions: session.questions,
       status,
@@ -118,7 +117,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Respuesta al frontend: ahora SÍ incluir correct_answer y explanation ──
+    logEvent('EXAM_SUBMITTED', {
+      session_id, user_email: user.email, subject_id: session.subject_id,
+      score, passed, status, correct_count, incorrect_count, unanswered_count,
+      duration_seconds, is_late: isLate,
+      autosave_count: session.autosave_count || 0,
+      recovery_count: session.recovery_count || 0,
+      grading_version: GRADING_VERSION,
+    });
+
     const questions_with_results = session.questions.map(q => ({
       index: q.index,
       activity_id: q.activity_id,
@@ -133,14 +140,9 @@ Deno.serve(async (req) => {
     }));
 
     return Response.json({
-      session_id,
-      score,
-      passed,
-      status,
-      correct_count,
-      incorrect_count,
-      duration_seconds,
-      is_late: isLate,
+      session_id, score, passed, status,
+      correct_count, incorrect_count, unanswered_count,
+      duration_seconds, is_late: isLate,
       questions_with_results,
     });
 

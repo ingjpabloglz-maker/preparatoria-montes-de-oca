@@ -17,7 +17,12 @@
     "exam_version": {
       "type": "string",
       "default": "2.0",
-      "description": "Versi\u00f3n del sistema de examen (para debugging y migraciones)"
+      "description": "Versi\u00f3n del sistema de examen"
+    },
+    "grading_version": {
+      "type": "string",
+      "default": "1.0",
+      "description": "Versi\u00f3n del algoritmo de calificaci\u00f3n para trazabilidad futura"
     },
     "status": {
       "type": "string",
@@ -33,7 +38,7 @@
     "is_locked": {
       "type": "boolean",
       "default": false,
-      "description": "Bloqueado tras submit, timeout o auto-grade \u2014 sin m\u00e1s modificaciones"
+      "description": "Bloqueado tras submit, timeout o auto-grade"
     },
     "exam_started_at": {
       "type": "string",
@@ -62,11 +67,21 @@
     "auto_graded": {
       "type": "boolean",
       "default": false,
-      "description": "true si fue calificado autom\u00e1ticamente por el backend por timeout"
+      "description": "true si fue calificado autom\u00e1ticamente por timeout"
+    },
+    "recovery_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Veces que el alumno recuper\u00f3 la sesi\u00f3n (refresh/reconexi\u00f3n)"
+    },
+    "autosave_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de autosaves realizados"
     },
     "questions": {
       "type": "array",
-      "description": "Copia inmutable de preguntas. correct_answer NUNCA se env\u00eda al frontend hasta despu\u00e9s del submit.",
+      "description": "Copia inmutable de preguntas. correct_answer NUNCA se env\u00eda al frontend antes del submit.",
       "items": {
         "type": "object",
         "properties": {
