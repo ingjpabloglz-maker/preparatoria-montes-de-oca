@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     if (!subject_id) return Response.json({ error: 'subject_id requerido' }, { status: 400 });
 
     // ── 1. Buscar sesión activa existente ──
-    const existing = await base44.entities.FinalExamSession.filter({ user_email: user.email, subject_id });
+    const existing = await base44.asServiceRole.entities.FinalExamSession.filter({ user_email: user.email, subject_id });
     const active = existing.find(s => s.status === 'in_progress' && !s.is_locked);
 
     if (active) {
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
         last_activity_at: new Date().toISOString(),
       });
 
-      logEvent('EXAM_RECOVERED', {
+      logEvent('EXAM_ACTIVE_SESSION_RECOVERED', {
         session_id: active.id, user_email: user.email, subject_id,
         recovery_count, time_remaining_seconds: Math.floor((expiresAt - now) / 1000),
       });
@@ -103,16 +103,46 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── 2. Verificar si ya completó el examen ──
-    const completed = existing.find(s => ['completed', 'submitted_late', 'auto_graded'].includes(s.status));
-    if (completed) {
-      return Response.json({
-        error: 'Ya presentaste este examen.',
-        already_completed: true,
-        score: completed.score,
-        passed: completed.passed,
-        session_id: completed.id,
-      }, { status: 409 });
+    // ── 2. Validar intentos usando SubjectProgress (fuente de verdad académica) ──
+    const spArr = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email: user.email, subject_id });
+    const sp = spArr[0];
+
+    if (sp) {
+      // Si ya aprobó, bloqueo definitivo
+      if (sp.test_passed) {
+        logEvent('EXAM_ALREADY_PASSED', {
+          user_email: user.email, subject_id,
+          test_attempts: sp.test_attempts, final_grade: sp.final_grade,
+        });
+        return Response.json({
+          error: 'Ya aprobaste esta materia. No puedes presentar el examen nuevamente.',
+          already_completed: true,
+          passed: true,
+          score: sp.final_grade || null,
+        }, { status: 409 });
+      }
+
+      const test_attempts = sp.test_attempts || 0;
+      const final_exam_unlocked = sp.final_exam_unlocked || false;
+
+      // Si agotó los 3 intentos y no tiene folio extraordinario activo
+      if (test_attempts >= 3 && !final_exam_unlocked) {
+        logEvent('EXAM_ATTEMPT_BLOCKED', {
+          user_email: user.email, subject_id,
+          test_attempts, final_exam_unlocked, is_blocked: true,
+        });
+        return Response.json({
+          error: 'Has agotado los 3 intentos permitidos. Necesitas un folio de prueba extraordinaria.',
+          is_blocked: true,
+          attempts_exhausted: true,
+        }, { status: 403 });
+      }
+
+      logEvent('EXAM_ATTEMPT_ALLOWED', {
+        user_email: user.email, subject_id,
+        test_attempts, final_exam_unlocked,
+        attempt_to_start: test_attempts + 1,
+      });
     }
 
     // ── 3. Verificar materia ──
