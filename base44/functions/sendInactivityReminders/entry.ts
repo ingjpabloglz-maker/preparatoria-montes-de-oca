@@ -64,8 +64,9 @@ Deno.serve(async (req) => {
     let template = templates.find(t => t.template_id === templateKey);
     if (!template) { skipped++; continue; }
 
-    // Obtener nombre del usuario
+    // Obtener usuario y verificar que sea alumno (role === 'user')
     const users = await base44.asServiceRole.entities.User.filter({ email: user_email });
+    if (!users[0] || users[0].role !== 'user') { skipped++; continue; }
     const userName = users[0]?.full_name?.split(' ')[0] || 'Estudiante';
 
     // Sustituir placeholders
