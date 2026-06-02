@@ -22,6 +22,7 @@ import TeacherDashboard from './pages/TeacherDashboard';
 import WelcomeGate from './pages/WelcomeGate';
 import ManageActivities from './pages/ManageActivities';
 import FinalExamOnline from './pages/FinalExamOnline';
+import Subject from './pages/Subject';
 import LegalPage from './pages/LegalPage';
 
 const { Pages, Layout, mainPage } = pagesConfig;
@@ -116,6 +117,7 @@ const AuthenticatedApp = () => {
       <Route path="/TeacherDashboard" element={<LayoutWrapper currentPageName="TeacherDashboard"><TeacherDashboard /></LayoutWrapper>} />
       <Route path="/ManageActivities" element={<LayoutWrapper currentPageName="ManageActivities"><ManageActivities /></LayoutWrapper>} />
       <Route path="/FinalExamOnline" element={<FinalExamOnline />} />
+      <Route path="/Subject/:id" element={<LayoutWrapper currentPageName="Subject"><Subject /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
     </>
