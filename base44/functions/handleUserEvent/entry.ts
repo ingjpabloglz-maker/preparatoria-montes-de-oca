@@ -482,8 +482,9 @@ Deno.serve(async (req) => {
     // ─── 5. OBTENER GamificationProfile ──────────────────────────────────────
     const gamArr = await base44.asServiceRole.entities.GamificationProfile.filter({ user_email });
     const gam = gamArr[0] || null;
-    const matamorosNow = getMatamorosDateObject();
-    const todayString = getLocalDateString(matamorosNow); // YYYY-MM-DD timezone-safe
+    // Usar new Date() real (UTC) con Intl.DateTimeFormat para evitar doble conversión de zona horaria
+    const matamorosNow = new Date();
+    const todayString = getLocalDateString(matamorosNow); // YYYY-MM-DD en zona horaria Matamoros (correcto)
     const isSurpriseExam = event_type === 'surprise_exam_completed';
 
     // ─── 6. CALCULAR TODOS LOS VALORES DE GAMIFICACIÓN ───────────────────────
