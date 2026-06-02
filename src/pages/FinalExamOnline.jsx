@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
 import ExamTimer from '@/components/exam/ExamTimer';
 import ExamQuestion from '@/components/exam/ExamQuestion';
-import { CheckCircle, XCircle, AlertTriangle, BookOpen, Send, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, ClipboardList, Send, Loader2, Clock, HelpCircle, ShieldAlert, Info, Play } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const AUTOSAVE_INTERVAL_MS = 75000; // 75 segundos
 const LS_KEY = (sessionId) => `feo_backup_${sessionId}`;
@@ -24,6 +25,8 @@ export default function FinalExamOnline() {
   const [errorMsg, setErrorMsg] = useState('');
   const [pendingSave, setPendingSave] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [readyChecked, setReadyChecked] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
 
   const questionsRef = useRef(questions);
@@ -206,28 +209,115 @@ export default function FinalExamOnline() {
     </div>
   );
 
+  const handleStart = async () => {
+    if (!readyChecked || starting) return;
+    setStarting(true);
+    setPhase('exam');
+  };
+
   if (phase === 'ready') return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50">
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8 max-w-lg w-full space-y-6">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <BookOpen className="w-8 h-8 text-blue-600" />
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-lg w-full max-w-2xl overflow-hidden">
+        {/* Banner de recuperación */}
+        {session?.recovered && (
+          <div className="bg-blue-50 border-b border-blue-200 px-6 py-3 flex items-center gap-3">
+            <Info className="w-5 h-5 text-blue-600 shrink-0" />
+            <p className="text-sm text-blue-800 font-medium">Tienes un examen en progreso. Puedes continuar donde lo dejaste.</p>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Examen Final</h1>
-          <p className="text-gray-500 mt-1">{session?.subject_name}</p>
+        )}
+
+        <div className="p-6 md:p-8 space-y-6">
+          {/* Encabezado */}
+          <div className="text-center">
+            <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <ClipboardList className="w-8 h-8 text-blue-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Examen Final en Línea</h1>
+            <p className="text-gray-500 mt-1 text-sm">{session?.subject_name}</p>
+            <p className="text-gray-600 mt-2 text-sm max-w-md mx-auto">Lee cuidadosamente las instrucciones antes de comenzar.</p>
+          </div>
+
+          {/* Instrucciones */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="w-4 h-4 text-blue-600 shrink-0" />
+              <span className="font-semibold text-blue-800 text-sm">Instrucciones importantes</span>
+            </div>
+            <ul className="space-y-1.5 text-sm text-blue-900">
+              <li>• El examen consta de <strong>{questions.length} preguntas</strong> de opción múltiple, verdadero/falso y completar.</li>
+              <li>• Dispondrás de <strong>1 hora (60 minutos)</strong> para completar el examen.</li>
+              <li>• El tiempo comenzará a contar desde que hagas clic en <strong>"Iniciar examen"</strong>.</li>
+              <li>• Tus respuestas se <strong>guardarán automáticamente</strong> mientras avanzas.</li>
+              <li>• <strong>Solo tienes un intento.</strong> Planifica tu tiempo con calma.</li>
+              <li>• El tiempo continuará avanzando incluso si sales de la página.</li>
+              <li>• Al finalizar, el examen se <strong>enviará automáticamente</strong> o puedes enviarlo manualmente.</li>
+            </ul>
+          </div>
+
+          {/* Resumen visual */}
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Resumen del examen</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="border border-gray-200 rounded-xl p-3 text-center">
+                <HelpCircle className="w-5 h-5 text-blue-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-gray-900">{questions.length}</p>
+                <p className="text-xs text-gray-500">Preguntas</p>
+              </div>
+              <div className="border-2 border-blue-300 bg-blue-50 rounded-xl p-3 text-center">
+                <Clock className="w-5 h-5 text-blue-600 mx-auto mb-1" />
+                <p className="text-2xl font-extrabold text-blue-700">60 min</p>
+                <p className="text-xs text-blue-600 font-medium">Tiempo límite</p>
+              </div>
+              <div className="border border-gray-200 rounded-xl p-3 text-center col-span-2 md:col-span-1">
+                <ShieldAlert className="w-5 h-5 text-amber-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-gray-900">Un solo</p>
+                <p className="text-xs text-gray-500">intento disponible</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Alerta importante */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <p className="text-sm font-semibold text-amber-800 mb-2">⚠️ Una vez iniciado:</p>
+            <ul className="text-sm text-amber-700 space-y-1">
+              <li>• El temporizador no puede pausarse.</li>
+              <li>• Cerrar el navegador no detiene el tiempo.</li>
+              <li>• El examen se enviará automáticamente al finalizar el tiempo.</li>
+            </ul>
+          </div>
+
+          {/* Checkbox confirmación */}
+          <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <Checkbox
+              id="ready-check"
+              checked={readyChecked}
+              onCheckedChange={(v) => setReadyChecked(!!v)}
+              className="mt-0.5"
+            />
+            <label htmlFor="ready-check" className="text-sm text-gray-700 cursor-pointer select-none">
+              He leído las instrucciones y estoy listo para comenzar el examen.
+            </label>
+          </div>
+
+          {/* Botón iniciar */}
+          <div className="space-y-2">
+            <button
+              onClick={handleStart}
+              disabled={!readyChecked || starting}
+              aria-label="Iniciar examen final"
+              className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-semibold text-white text-base transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
+                ${readyChecked && !starting ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : 'bg-gray-300 cursor-not-allowed'}`}
+            >
+              {starting
+                ? <><Loader2 className="w-5 h-5 animate-spin" />Preparando examen…</>
+                : <><Play className="w-5 h-5" />Iniciar examen</>}
+            </button>
+            <p className="text-center text-xs text-gray-400 flex items-center justify-center gap-1">
+              <ShieldAlert className="w-3 h-3" />
+              Una vez que inicies, el temporizador comenzará y no podrás pausarlo.
+            </p>
+          </div>
         </div>
-        <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm text-gray-700">
-          <div className="flex justify-between"><span>Preguntas</span><span className="font-bold">{questions.length}</span></div>
-          <div className="flex justify-between"><span>Tiempo disponible</span><span className="font-bold">60 minutos</span></div>
-          <div className="flex justify-between"><span>Calificación mínima</span><span className="font-bold">70 / 100</span></div>
-          <div className="flex justify-between"><span>Autocalificable</span><span className="font-bold text-green-600">Sí</span></div>
-        </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
-          ⚠️ Una vez iniciado el examen el temporizador no se detiene. Asegúrate de tener una conexión estable.
-        </div>
-        <Button className="w-full" onClick={() => setPhase('exam')}>
-          Iniciar Examen
-        </Button>
       </div>
     </div>
   );
