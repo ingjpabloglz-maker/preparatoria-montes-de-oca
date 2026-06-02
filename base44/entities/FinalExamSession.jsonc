@@ -1,0 +1,150 @@
+{
+  "name": "FinalExamSession",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del alumno"
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "ID de la materia"
+    },
+    "subject_name": {
+      "type": "string",
+      "description": "Nombre de la materia"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "in_progress",
+        "completed",
+        "submitted_late",
+        "expired"
+      ],
+      "default": "in_progress"
+    },
+    "is_locked": {
+      "type": "boolean",
+      "default": false,
+      "description": "Bloqueado tras submit o timeout \u2014 sin m\u00e1s modificaciones"
+    },
+    "exam_started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "exam_started_at + 1 hora (autoridad backend)"
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_activity_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duration_seconds": {
+      "type": "number"
+    },
+    "attempt_number": {
+      "type": "number",
+      "default": 1
+    },
+    "questions": {
+      "type": "array",
+      "description": "Copia completa e inmutable de las preguntas seleccionadas. correct_answer NUNCA se env\u00eda al frontend.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "number"
+          },
+          "activity_id": {
+            "type": "string"
+          },
+          "question_text": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "multiple_choice",
+              "true_false",
+              "fill_blank"
+            ]
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "easy",
+              "medium",
+              "hard"
+            ]
+          },
+          "correct_answer": {
+            "type": "string",
+            "description": "Almacenado en DB. JAM\u00c1S enviado al frontend."
+          },
+          "explanation": {
+            "type": "string",
+            "description": "Solo se env\u00eda al frontend despu\u00e9s del submit."
+          },
+          "user_answer": {
+            "type": "string",
+            "description": "Respuesta del alumno (null = sin responder)"
+          },
+          "is_correct": {
+            "type": "boolean",
+            "description": "Calculado solo en submit."
+          },
+          "score_points": {
+            "type": "number",
+            "description": "Calculado solo en submit."
+          },
+          "flagged": {
+            "type": "boolean",
+            "default": false,
+            "description": "Marcada para revisar por el alumno."
+          }
+        }
+      }
+    },
+    "score": {
+      "type": "number",
+      "description": "0-100, calculado en submit"
+    },
+    "passed": {
+      "type": "boolean",
+      "description": "score >= 70"
+    },
+    "correct_count": {
+      "type": "number"
+    },
+    "incorrect_count": {
+      "type": "number"
+    },
+    "ip_address": {
+      "type": "string"
+    },
+    "device_info": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "user_email",
+    "subject_id",
+    "exam_started_at",
+    "expires_at",
+    "questions",
+    "attempt_number"
+  ]
+}
