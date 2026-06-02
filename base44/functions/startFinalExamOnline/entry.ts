@@ -1,12 +1,32 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-const EXAM_CONFIG = { total: 50, easy: 15, medium: 25, hard: 10, duration_minutes: 60 };
+const EXAM_CONFIG = { total: 50, duration_minutes: 60 };
+const ALLOWED_TYPES = ['multiple_choice', 'true_false', 'fill_blank'];
 const EXAM_VERSION = '2.0';
 const GRADING_VERSION = '1.0';
 
 // ── Logging estructurado ──────────────────────────────────────────────────────
 function logEvent(event, data = {}) {
   console.log(JSON.stringify({ event, timestamp: new Date().toISOString(), ...data }));
+}
+
+// ── Normalizar actividad legacy/fallback ──────────────────────────────────────
+function normalizeActivity(a) {
+  const out = { ...a };
+
+  // 1. Normalizar correct_answer desde correct_answers si es array
+  if (!out.correct_answer && Array.isArray(out.correct_answers) && out.correct_answers.length > 0) {
+    out.correct_answer = out.correct_answers[0];
+    out._normalized_from_correct_answers = true;
+  }
+
+  // 2. NO forzar type — si no tiene type, se excluye más adelante
+  // 3. Asegurar options sea array
+  if (!Array.isArray(out.options)) out.options = [];
+  // 4. Asegurar explanation sea string
+  if (typeof out.explanation !== 'string') out.explanation = '';
+
+  return out;
 }
 
 function shuffle(arr) {
@@ -99,37 +119,43 @@ Deno.serve(async (req) => {
     const subject = (await base44.asServiceRole.entities.Subject.filter({ id: subject_id }))[0];
     if (!subject) return Response.json({ error: 'Materia no encontrada' }, { status: 404 });
 
-    // ── 4. Banco de preguntas con balance de dificultad ──
+    // ── 4. Banco de preguntas con normalización flexible ──
     const allActivities = await base44.asServiceRole.entities.CourseActivity.filter({ subject_id });
-    const valid = allActivities.filter(a =>
-      a.question && a.correct_answer && a.type &&
-      ['multiple_choice', 'true_false', 'fill_blank'].includes(a.type)
-    );
 
-    const byDiff = { easy: [], medium: [], hard: [] };
-    for (const a of valid) {
-      const d = a.difficulty || 'medium';
-      if (byDiff[d]) byDiff[d].push(a);
+    let normalized_from_correct_answers = 0;
+    let rejected_missing_question = 0;
+    let rejected_missing_answer = 0;
+    let rejected_unknown_type = 0;
+
+    const valid = [];
+    for (const raw of allActivities) {
+      const a = normalizeActivity(raw);
+
+      if (a._normalized_from_correct_answers) normalized_from_correct_answers++;
+
+      if (!a.question) { rejected_missing_question++; continue; }
+      if (!a.correct_answer) { rejected_missing_answer++; continue; }
+      if (!a.type || !ALLOWED_TYPES.includes(a.type)) { rejected_unknown_type++; continue; }
+
+      valid.push(a);
     }
 
-    const pick = (arr, n) => shuffle(arr).slice(0, n);
-    let selected = [
-      ...pick(byDiff.easy, EXAM_CONFIG.easy),
-      ...pick(byDiff.medium, EXAM_CONFIG.medium),
-      ...pick(byDiff.hard, EXAM_CONFIG.hard),
-    ];
+    console.log(JSON.stringify({
+      event: 'EXAM_QUESTION_SELECTION_DIAGNOSTIC',
+      subject_id,
+      total_activities: allActivities.length,
+      total_valid: valid.length,
+      normalized_from_correct_answers,
+      rejected_missing_question,
+      rejected_missing_answer,
+      rejected_unknown_type,
+    }));
 
-    if (selected.length < EXAM_CONFIG.total) {
-      const selectedIds = new Set(selected.map(a => a.id));
-      const remaining = valid.filter(a => !selectedIds.has(a.id));
-      selected = [...selected, ...pick(remaining, EXAM_CONFIG.total - selected.length)];
-    }
-
-    if (selected.length < 10) {
+    if (valid.length < 10) {
       return Response.json({ error: 'No hay suficientes preguntas en el banco. Mínimo 10 requeridas.' }, { status: 422 });
     }
 
-    selected = shuffle(selected);
+    let selected = shuffle(valid).slice(0, EXAM_CONFIG.total);
 
     // ── 5. Construir preguntas con correct_answer en DB ──
     const questions = selected.map((a, idx) => ({
@@ -179,7 +205,6 @@ Deno.serve(async (req) => {
       subject_name: subject.name, attempt_number,
       question_count: questions.length,
       bank_size: valid.length,
-      difficulty_distribution: { easy: byDiff.easy.length, medium: byDiff.medium.length, hard: byDiff.hard.length },
       exam_version: EXAM_VERSION, grading_version: GRADING_VERSION,
     });
 
