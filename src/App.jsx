@@ -22,6 +22,7 @@ import TeacherDashboard from './pages/TeacherDashboard';
 import WelcomeGate from './pages/WelcomeGate';
 import ManageActivities from './pages/ManageActivities';
 import FinalExamOnline from './pages/FinalExamOnline';
+import LegalPage from './pages/LegalPage';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -129,7 +130,10 @@ function App() {
       <SoundProvider>
         <QueryClientProvider client={queryClientInstance}>
           <Router>
-            <AuthenticatedApp />
+            <Routes>
+              <Route path="/legal" element={<LegalPage />} />
+              <Route path="*" element={<AuthenticatedApp />} />
+            </Routes>
           </Router>
           <Toaster />
           <SonnerToaster position="top-right" />
