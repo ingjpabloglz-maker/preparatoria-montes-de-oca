@@ -251,7 +251,7 @@ export default function Subject() {
                 <p className="text-sm text-gray-500">
                   Intentos restantes: <span className="font-semibold">{attemptsLeft}</span>
                 </p>
-                <Button className="w-full" onClick={() => setTakingTest(true)}>
+                <Button className="w-full" onClick={() => window.location.href = `/FinalExamOnline?subject_id=${subjectId}`}>
                   Iniciar Prueba
                 </Button>
               </div>
