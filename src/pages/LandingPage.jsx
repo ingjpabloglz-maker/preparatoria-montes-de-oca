@@ -189,7 +189,7 @@ export default function LandingPage() {
 
             {/* Logo derecha */}
             <div className="hidden lg:flex justify-center items-center">
-              <img src={LOGO_URL} alt="Preparatoria Montes de Oca" className="w-72 h-72 rounded-full object-cover shadow-2xl border-4 border-white/10" loading="lazy" />
+              <img src="https://media.base44.com/images/public/69a88a8bf5baf0edfc4ac0c5/43d9d88f6_logo_actualizado_-_Copy.jpg" alt="Preparatoria Montes de Oca" className="w-72 h-72 rounded-full object-cover shadow-2xl border-4 border-white/10" loading="lazy" />
             </div>
           </div>
         </div>
