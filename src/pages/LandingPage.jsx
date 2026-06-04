@@ -325,7 +325,7 @@ export default function LandingPage() {
               </div>
             )}
           </div>
-          <p className="text-center text-xs text-slate-400 mt-6">Y muchas materias más a lo largo de los 6 ndel plan de estudios oficial.</p>
+          <p className="text-center text-xs text-slate-400 mt-6">Y muchas materias más a lo largo de los 6 niveles del plan de estudios oficial.</p>
         </div>
       </section>
 
