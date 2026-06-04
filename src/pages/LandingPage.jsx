@@ -305,7 +305,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── MATERIAS ─── */}
-      <section id="materias" className="py-20 bg-slate-50">
+      <section id="materias" className="bg-slate-50 py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
             <p className="text-blue-600 text-sm font-semibold uppercase tracking-widest mb-3">Plan de estudios</p>
