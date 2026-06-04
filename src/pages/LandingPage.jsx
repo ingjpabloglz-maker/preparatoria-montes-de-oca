@@ -280,7 +280,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── CÓMO FUNCIONA ─── */}
-      <section id="como-funciona" className="py-20 bg-white">
+      <section id="como-funciona" className="bg-white py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
             <p className="text-blue-600 text-sm font-semibold uppercase tracking-widest mb-3">Proceso simple</p>
