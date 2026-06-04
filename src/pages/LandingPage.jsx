@@ -260,14 +260,14 @@ export default function LandingPage() {
       </section>
 
       {/* ─── VALIDEZ SEP ─── */}
-      <section className="py-8 bg-white">
+      <section className="bg-white py-1">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 bg-gradient-to-r from-blue-50 to-slate-50 border border-blue-100 rounded-2xl px-8 py-6 text-center sm:text-left">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 bg-gradient-to-r from-blue-50 to-slate-50 border border-blue-100 rounded-2xl px-8 text-center sm:text-left py-3">
             <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/20">
               <ShieldCheck className="w-7 h-7 text-white" />
             </div>
             <div>
-              <p className="font-bold text-slate-900 text-lg">Bachillerato con Reconocimiento Oficial SEP</p>
+              <p className="font-bold text-slate-900 text-lg">Bachillerato con Reconocimiento Oficial SE</p>
               <p className="text-sm text-slate-500 mt-0.5">
                 RVOE: <span className="font-semibold text-blue-600">28PBH0301U</span> · Secretaría de Educación de Tamaulipas
               </p>
