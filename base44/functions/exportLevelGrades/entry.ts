@@ -17,6 +17,7 @@ Deno.serve(async (req) => {
   const body = await req.json();
   const level = parseInt(body.level);
   const include_exported = body.include_exported === true;
+  const student_email = body.student_email || null; // Exportación individual opcional
 
   if (!level || level < 1 || level > 6) {
     return Response.json({ error: 'Nivel inválido (1-6)' }, { status: 400 });
@@ -45,9 +46,15 @@ Deno.serve(async (req) => {
 
   // Filtrar alumnos elegibles
   const eligibleProgress = allProgress.filter(prog => {
-    const levelCompleted = prog.current_level > level ||
-      prog.graduation_status === 'completed' ||
-      prog.graduation_status === 'certified';
+    // Si es exportación individual, filtrar solo ese alumno
+    if (student_email && prog.user_email !== student_email) return false;
+
+    // Exportación INDIVIDUAL admin: permite nivel actual en curso (>=)
+    // Exportación GLOBAL batch: exige nivel oficialmente cerrado (>)
+    const levelCompleted = student_email
+      ? prog.current_level >= level
+      : (prog.current_level > level || prog.graduation_status === 'completed' || prog.graduation_status === 'certified');
+
     if (!levelCompleted) return false;
     if (!include_exported && prog[exportedKey] === true) return false;
     return true;

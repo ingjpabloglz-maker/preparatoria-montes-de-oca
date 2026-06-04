@@ -63,7 +63,8 @@ export default function ReportCardExportModal({ open, onClose, studentEmail, stu
       // exportLevelGrades genera Excel + snapshot de auditoría para el nivel
       const res = await base44.functions.invoke('exportLevelGrades', {
         level: selectedLevel,
-        include_exported: true
+        include_exported: true,
+        student_email: studentEmail,
       });
       const data = res.data;
       if (data?.xlsx_base64) {
