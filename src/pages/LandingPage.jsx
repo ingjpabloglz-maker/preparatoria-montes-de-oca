@@ -182,8 +182,8 @@ export default function LandingPage() {
                 </Link>
               </div>
 
-              <p className="text-xs text-slate-500">
-                ✓ Sin costo inicial · ✓ Acceso inmediato · ✓ Soporte académico incluido
+              <p className="text-xs text-slate-500">✓  · ✓ Acceso inmediato · ✓ Soporte académico incluido
+
               </p>
             </div>
 
