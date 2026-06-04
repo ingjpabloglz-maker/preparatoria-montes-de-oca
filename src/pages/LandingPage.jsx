@@ -36,8 +36,8 @@ export default function LandingPage() {
           <h1 className="text-4xl sm:text-6xl font-extrabold text-gray-900 tracking-tight leading-none">Tu Preparatoria, a tu propio ritmo!
 
           </h1>
-          <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            Accede a un plan de estudios completo, actividades dinámicas y evaluaciones oficiales validadas por docentes certificados.
+          <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">Accede a un plan de estudios completo, actividades dinámicas y evaluaciones oficiales validadas por docentes certificados.Funcionamos con el reconocimiento de la SEP, bajo el Registro de validez oficial 28PBH0301U
+
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link to="/login">
