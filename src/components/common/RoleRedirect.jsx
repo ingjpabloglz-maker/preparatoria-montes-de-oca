@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { createPageUrl } from "@/utils";
 
 export default function RoleRedirect() {
   const { user, isLoadingAuth } = useAuth();
@@ -9,9 +8,9 @@ export default function RoleRedirect() {
     if (isLoadingAuth || !user) return;
 
     if (user.role === "admin") {
-      window.location.replace(createPageUrl("AdminDashboard"));
+      window.location.replace("/app/AdminDashboard");
     } else {
-      window.location.replace(createPageUrl("Dashboard"));
+      window.location.replace("/app/Dashboard");
     }
   }, [user, isLoadingAuth]);
 
