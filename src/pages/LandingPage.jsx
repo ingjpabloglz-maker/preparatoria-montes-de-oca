@@ -155,7 +155,7 @@ export default function LandingPage() {
 
             {/* Texto izquierda */}
             <div className="space-y-7">
-              <Badge className="bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/20 px-3 py-1 text-xs font-medium">
+              <Badge className="bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/20 px-3 py-1 text-xs font-medium hidden">
                 🎓 Bachillerato con validez oficial SEP
               </Badge>
 
@@ -165,8 +165,8 @@ export default function LandingPage() {
                 <span className="text-amber-400">ritmo</span>
               </h1>
 
-              <p className="text-slate-300 text-lg leading-relaxed max-w-lg">
-                Plataforma educativa oficial con más de 15 años formando estudiantes en Tamaulipas. Estudia en línea con reconocimiento SEP y acompañamiento docente real.
+              <p className="text-slate-300 text-lg leading-relaxed max-w-lg">Plataforma educativa oficial. Estudia en línea con reconocimiento y acompañamiento docente real.
+
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4">
