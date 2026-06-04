@@ -247,7 +247,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {STATS.map((s) =>
-            <div key={s.label} className="flex flex-col items-center text-center p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow bg-[hsl(var(--card))]">
+            <div key={s.label} className="flex flex-col items-center text-center rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow bg-[hsl(var(--card))] px-4 py-3">
                 <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-3">
                   <s.icon className="w-5 h-5" />
                 </div>
@@ -267,7 +267,7 @@ export default function LandingPage() {
               <ShieldCheck className="w-7 h-7 text-white" />
             </div>
             <div>
-              <p className="font-bold text-slate-900 text-lg">Bachillerato con Reconocimiento Oficial SE</p>
+              <p className="font-bold text-slate-900 text-lg">Bachillerato con Reconocimiento Oficial</p>
               <p className="text-sm text-slate-500 mt-0.5">
                 RVOE: <span className="font-semibold text-blue-600">28PBH0301U</span> · Secretaría de Educación de Tamaulipas
               </p>
