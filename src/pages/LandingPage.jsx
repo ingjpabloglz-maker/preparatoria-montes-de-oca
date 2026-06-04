@@ -438,7 +438,7 @@ export default function LandingPage() {
                 <div className="flex items-center gap-2.5">
                   <Phone className="w-4 h-4 text-blue-400 flex-shrink-0" />
                   <div className="space-y-1">
-                    <a href="tel:+18999224365" className="hover:text-white transition-colors block">(899) 922 43 65</a>
+                    <a href="tel:+18999224365" className="hover:text-white transition-colors block">(899) 211 52 6</a>
                     <a href="tel:+18994549288" className="hover:text-white transition-colors block">(899) 454 92 88</a>
                   </div>
                 </div>
