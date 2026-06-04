@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ export default function Subject() {
   const subjectId = urlParams.get('id');
   console.log('[Subject.jsx]', window.location.pathname, window.location.search, '→ subjectId:', subjectId);
 
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [takingTest, setTakingTest] = useState(false);
   const queryClient = useQueryClient();
@@ -252,7 +254,7 @@ export default function Subject() {
                 <p className="text-sm text-gray-500">
                   Intentos restantes: <span className="font-semibold">{attemptsLeft}</span>
                 </p>
-                <Button className="w-full" onClick={() => window.location.href = `/FinalExamOnline?subject_id=${subjectId}`}>
+                <Button className="w-full" onClick={() => navigate(createPageUrl(`FinalExamOnline?subject_id=${subjectId}`))}>
                   Iniciar Prueba
                 </Button>
               </div>

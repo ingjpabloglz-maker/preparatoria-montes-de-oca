@@ -170,7 +170,7 @@ function App() {
               <Route path="/AuditDashboard" element={<Navigate to="/app/AuditDashboard" replace />} />
               <Route path="/TeacherDashboard" element={<Navigate to="/app/TeacherDashboard" replace />} />
               <Route path="/ManageActivities" element={<Navigate to="/app/ManageActivities" replace />} />
-              <Route path="/FinalExamOnline" element={<Navigate to="/app/FinalExamOnline" replace />} />
+              <Route path="/FinalExamOnline" element={<LegacyQueryRedirect to="/app/FinalExamOnline" />} />
               <Route path="/Subject" element={<LegacyQueryRedirect to="/app/Subject" />} />
               <Route path="/Subject/:id" element={<SubjectParamRedirect />} />
               <Route path="/StudentRecord/:user_email" element={<Navigate to="/app/StudentRecord/:user_email" replace />} />

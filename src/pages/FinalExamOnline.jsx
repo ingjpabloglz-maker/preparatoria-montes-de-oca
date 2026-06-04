@@ -17,6 +17,11 @@ export default function FinalExamOnline() {
   const navigate = useNavigate();
   const subjectId = searchParams.get('subject_id');
 
+  // Logs temporales para verificar query params
+  console.log('[FinalExamOnline] URL:', window.location.href);
+  console.log('[FinalExamOnline] search:', window.location.search);
+  console.log('[FinalExamOnline] subject_id:', subjectId);
+
   const [phase, setPhase] = useState('loading'); // loading | ready | exam | submitting | results | error
   const [session, setSession] = useState(null);
   const [questions, setQuestions] = useState([]);
