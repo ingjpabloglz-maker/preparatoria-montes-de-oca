@@ -6,71 +6,71 @@ import {
   GraduationCap, BookOpen, ShieldCheck, Award, ChevronRight,
   MapPin, Mail, Phone, Clock, Users, CheckCircle2, Star,
   Laptop, TrendingUp, Calendar, FlaskConical, Globe, Cpu,
-  BookMarked, Leaf, Calculator, Menu, X, Facebook
-} from "lucide-react";
+  BookMarked, Leaf, Calculator, Menu, X, Facebook } from
+"lucide-react";
 
 const LOGO_URL = "https://media.base44.com/images/public/69a88a8bf5baf0edfc4ac0c5/e80acaed0_logoactualizado.jpg";
 
 const SUBJECTS = [
-  { name: "Álgebra", icon: Calculator, color: "bg-blue-50 text-blue-600 border-blue-100" },
-  { name: "Física", icon: FlaskConical, color: "bg-purple-50 text-purple-600 border-purple-100" },
-  { name: "Literatura", icon: BookMarked, color: "bg-amber-50 text-amber-600 border-amber-100" },
-  { name: "Biología", icon: Leaf, color: "bg-green-50 text-green-600 border-green-100" },
-  { name: "Ecología", icon: Globe, color: "bg-teal-50 text-teal-600 border-teal-100" },
-  { name: "Informática", icon: Cpu, color: "bg-slate-50 text-slate-600 border-slate-200" },
-];
+{ name: "Álgebra", icon: Calculator, color: "bg-blue-50 text-blue-600 border-blue-100" },
+{ name: "Física", icon: FlaskConical, color: "bg-purple-50 text-purple-600 border-purple-100" },
+{ name: "Literatura", icon: BookMarked, color: "bg-amber-50 text-amber-600 border-amber-100" },
+{ name: "Biología", icon: Leaf, color: "bg-green-50 text-green-600 border-green-100" },
+{ name: "Ecología", icon: Globe, color: "bg-teal-50 text-teal-600 border-teal-100" },
+{ name: "Informática", icon: Cpu, color: "bg-slate-50 text-slate-600 border-slate-200" }];
+
 
 const STATS = [
-  { value: "+15", label: "Años de experiencia", icon: Star },
-  { value: "RVOE", label: "Reconocimiento SEP", icon: ShieldCheck },
-  { value: "+500", label: "Estudiantes activos", icon: Users },
-  { value: "24/7", label: "Acceso a la plataforma", icon: Clock },
-];
+{ value: "+15", label: "Años de experiencia", icon: Star },
+{ value: "RVOE", label: "Reconocimiento SEP", icon: ShieldCheck },
+{ value: "+500", label: "Estudiantes activos", icon: Users },
+{ value: "24/7", label: "Acceso a la plataforma", icon: Clock }];
+
 
 const STEPS = [
-  {
-    num: "01",
-    title: "Crea tu cuenta",
-    desc: "Regístrate con tu correo electrónico y completa tu perfil académico en minutos.",
-    icon: Users,
-    color: "bg-blue-500",
-  },
-  {
-    num: "02",
-    title: "Completa lecciones interactivas",
-    desc: "Aprende a tu ritmo con contenido estructurado por módulos y actividades dinámicas.",
-    icon: BookOpen,
-    color: "bg-purple-500",
-  },
-  {
-    num: "03",
-    title: "Presenta evaluaciones",
-    desc: "Acredita cada materia con exámenes en línea validados por docentes certificados.",
-    icon: CheckCircle2,
-    color: "bg-green-500",
-  },
-];
+{
+  num: "01",
+  title: "Crea tu cuenta",
+  desc: "Regístrate con tu correo electrónico y completa tu perfil académico en minutos.",
+  icon: Users,
+  color: "bg-blue-500"
+},
+{
+  num: "02",
+  title: "Completa lecciones interactivas",
+  desc: "Aprende a tu ritmo con contenido estructurado por módulos y actividades dinámicas.",
+  icon: BookOpen,
+  color: "bg-purple-500"
+},
+{
+  num: "03",
+  title: "Presenta evaluaciones",
+  desc: "Acredita cada materia con exámenes en línea validados por docentes certificados.",
+  icon: CheckCircle2,
+  color: "bg-green-500"
+}];
+
 
 const WHY_US = [
-  {
-    icon: Calendar,
-    title: "Flexibilidad total",
-    desc: "Estudia cuando y donde quieras. Diseñado para adaptarse a tu horario y ritmo de vida.",
-    color: "bg-blue-100 text-blue-600",
-  },
-  {
-    icon: Laptop,
-    title: "Plataforma moderna",
-    desc: "Tecnología educativa actualizada con seguimiento de progreso, foro académico y más.",
-    color: "bg-purple-100 text-purple-600",
-  },
-  {
-    icon: TrendingUp,
-    title: "Seguimiento académico",
-    desc: "Reportes de avance, estadísticas de estudio y comunicación directa con docentes.",
-    color: "bg-green-100 text-green-600",
-  },
-];
+{
+  icon: Calendar,
+  title: "Flexibilidad total",
+  desc: "Estudia cuando y donde quieras. Diseñado para adaptarse a tu horario y ritmo de vida.",
+  color: "bg-blue-100 text-blue-600"
+},
+{
+  icon: Laptop,
+  title: "Plataforma moderna",
+  desc: "Tecnología educativa actualizada con seguimiento de progreso, foro académico y más.",
+  color: "bg-purple-100 text-purple-600"
+},
+{
+  icon: TrendingUp,
+  title: "Seguimiento académico",
+  desc: "Reportes de avance, estadísticas de estudio y comunicación directa con docentes.",
+  color: "bg-green-100 text-green-600"
+}];
+
 
 export default function LandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -87,8 +87,8 @@ export default function LandingPage() {
               src={LOGO_URL}
               alt="Preparatoria Montes de Oca"
               className="h-10 w-10 rounded-full object-cover border-2 border-slate-100"
-              loading="lazy"
-            />
+              loading="lazy" />
+            
             <span className="font-bold text-gray-900 text-sm sm:text-base leading-tight">
               Preparatoria<br className="hidden sm:block" />
               <span className="text-blue-600">Montes de Oca</span>
@@ -118,15 +118,15 @@ export default function LandingPage() {
           {/* Mobile toggle */}
           <button
             className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
+            onClick={() => setMobileOpen(!mobileOpen)}>
+            
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
 
         {/* Mobile menu */}
-        {mobileOpen && (
-          <div className="md:hidden bg-white border-t border-slate-100 px-4 py-4 space-y-3">
+        {mobileOpen &&
+        <div className="md:hidden bg-white border-t border-slate-100 px-4 py-4 space-y-3">
             <a href="#como-funciona" onClick={() => setMobileOpen(false)} className="block text-sm text-slate-600 py-2 hover:text-blue-600">¿Cómo funciona?</a>
             <a href="#materias" onClick={() => setMobileOpen(false)} className="block text-sm text-slate-600 py-2 hover:text-blue-600">Materias</a>
             <a href="#nosotros" onClick={() => setMobileOpen(false)} className="block text-sm text-slate-600 py-2 hover:text-blue-600">Por qué elegirnos</a>
@@ -139,7 +139,7 @@ export default function LandingPage() {
               </Link>
             </div>
           </div>
-        )}
+        }
       </header>
 
       {/* ─── HERO ─── */}
@@ -206,11 +206,11 @@ export default function LandingPage() {
                   </div>
                   {/* Progreso materias */}
                   {[
-                    { name: "Álgebra", pct: 82, color: "bg-blue-500" },
-                    { name: "Literatura", pct: 65, color: "bg-purple-500" },
-                    { name: "Física", pct: 45, color: "bg-amber-500" },
-                  ].map((s) => (
-                    <div key={s.name} className="space-y-1">
+                  { name: "Álgebra", pct: 82, color: "bg-blue-500" },
+                  { name: "Literatura", pct: 65, color: "bg-purple-500" },
+                  { name: "Física", pct: 45, color: "bg-amber-500" }].
+                  map((s) =>
+                  <div key={s.name} className="space-y-1">
                       <div className="flex justify-between text-xs text-slate-300">
                         <span>{s.name}</span>
                         <span>{s.pct}%</span>
@@ -219,7 +219,7 @@ export default function LandingPage() {
                         <div className={`h-full ${s.color} rounded-full`} style={{ width: `${s.pct}%` }} />
                       </div>
                     </div>
-                  ))}
+                  )}
                   {/* Stats mini */}
                   <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-700">
                     <div className="text-center">
@@ -246,15 +246,15 @@ export default function LandingPage() {
       <section className="bg-slate-50 border-b border-slate-100 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            {STATS.map((s) => (
-              <div key={s.label} className="flex flex-col items-center text-center p-4 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            {STATS.map((s) =>
+            <div key={s.label} className="flex flex-col items-center text-center p-4 rounded-xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                 <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-3">
                   <s.icon className="w-5 h-5" />
                 </div>
                 <p className="text-2xl font-extrabold text-slate-900">{s.value}</p>
                 <p className="text-xs text-slate-500 mt-1 leading-snug">{s.label}</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </section>
@@ -290,8 +290,8 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
             {/* Línea conectora (solo desktop) */}
             <div className="hidden md:block absolute top-10 left-1/4 right-1/4 h-0.5 bg-gradient-to-r from-blue-200 via-purple-200 to-green-200 z-0" />
-            {STEPS.map((step, i) => (
-              <div key={i} className="relative z-10 flex flex-col items-center text-center p-8 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            {STEPS.map((step, i) =>
+            <div key={i} className="relative z-10 flex flex-col items-center text-center p-8 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                 <div className={`w-16 h-16 ${step.color} rounded-2xl flex items-center justify-center mb-5 shadow-lg`}>
                   <step.icon className="w-8 h-8 text-white" />
                 </div>
@@ -299,7 +299,7 @@ export default function LandingPage() {
                 <h3 className="font-bold text-lg text-slate-900 mb-2">{step.title}</h3>
                 <p className="text-sm text-slate-500 leading-relaxed">{step.desc}</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </section>
@@ -313,17 +313,17 @@ export default function LandingPage() {
             <p className="text-slate-500 mt-3 max-w-xl mx-auto">Contenido académico actualizado, estructurado en 6 semestres con evaluaciones oficiales.</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            {SUBJECTS.map((subject) => (
-              <div
-                key={subject.name}
-                className={`flex flex-col items-center text-center p-5 rounded-2xl border ${subject.color} bg-white hover:shadow-md transition-all hover:-translate-y-1`}
-              >
+            {SUBJECTS.map((subject) =>
+            <div
+              key={subject.name}
+              className={`flex flex-col items-center text-center p-5 rounded-2xl border ${subject.color} bg-white hover:shadow-md transition-all hover:-translate-y-1`}>
+              
                 <div className={`w-12 h-12 ${subject.color} rounded-xl flex items-center justify-center mb-3`}>
                   <subject.icon className="w-6 h-6" />
                 </div>
                 <p className="text-sm font-semibold text-slate-700">{subject.name}</p>
               </div>
-            ))}
+            )}
           </div>
           <p className="text-center text-xs text-slate-400 mt-6">Y muchas materias más a lo largo de los 6 semestres del plan de estudios oficial.</p>
         </div>
@@ -337,15 +337,15 @@ export default function LandingPage() {
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">¿Por qué elegirnos?</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {WHY_US.map((item, i) => (
-              <div key={i} className="p-8 rounded-2xl border border-slate-100 bg-slate-50 hover:shadow-md transition-all hover:-translate-y-1">
+            {WHY_US.map((item, i) =>
+            <div key={i} className="p-8 rounded-2xl border border-slate-100 bg-slate-50 hover:shadow-md transition-all hover:-translate-y-1">
                 <div className={`w-12 h-12 ${item.color} rounded-xl flex items-center justify-center mb-5`}>
                   <item.icon className="w-6 h-6" />
                 </div>
                 <h3 className="font-bold text-lg text-slate-900 mb-2">{item.title}</h3>
                 <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </section>
@@ -380,7 +380,7 @@ export default function LandingPage() {
             {/* Marca */}
             <div className="space-y-4 lg:col-span-1">
               <div className="flex items-center gap-3">
-                <img src={LOGO_URL} alt="Logo" className="w-12 h-12 rounded-full object-cover border-2 border-slate-700" loading="lazy" />
+                <img src="https://media.base44.com/images/public/69a88a8bf5baf0edfc4ac0c5/471edcf30_logo_actualizado_-_Copy.jpg" alt="Logo" className="w-12 h-12 rounded-full object-cover border-2 border-slate-700" loading="lazy" />
                 <div>
                   <p className="font-bold text-white text-sm leading-tight">Preparatoria</p>
                   <p className="font-bold text-white text-sm leading-tight">Montes de Oca</p>
@@ -394,8 +394,8 @@ export default function LandingPage() {
                   href="https://www.facebook.com/profile.php?id=61563803096106"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-9 h-9 bg-slate-800 hover:bg-blue-600 border border-slate-700 rounded-lg flex items-center justify-center transition-colors"
-                >
+                  className="w-9 h-9 bg-slate-800 hover:bg-blue-600 border border-slate-700 rounded-lg flex items-center justify-center transition-colors">
+                  
                   <Facebook className="w-4 h-4 text-slate-300" />
                 </a>
               </div>
@@ -465,6 +465,6 @@ export default function LandingPage() {
         </div>
       </footer>
 
-    </div>
-  );
+    </div>);
+
 }
