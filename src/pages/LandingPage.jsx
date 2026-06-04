@@ -21,7 +21,7 @@ export default function LandingPage() {
               <Button variant="ghost" size="sm">Iniciar Sesión</Button>
             </Link>
             <Link to="/register">
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white hidden">Registrarse</Button>
+              
             </Link>
           </div>
         </div>
