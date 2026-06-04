@@ -155,7 +155,7 @@ export default function LandingPage() {
 
             {/* Texto izquierda */}
             <div className="space-y-7">
-              <Badge className="bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/20 px-3 py-1 text-xs font-medium">
+              <Badge className="bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/20 px-3 py-1 text-xs font-medium hidden">
                 🎓 Bachillerato con validez oficial SEP
               </Badge>
 
@@ -176,7 +176,7 @@ export default function LandingPage() {
                   </Button>
                 </Link>
                 <Link to="/login">
-                  <Button variant="outline" className="h-12 px-8 border-slate-600 text-slate-200 hover:bg-slate-800 rounded-xl transition-all">
+                  <Button variant="outline" className="h-12 px-8 border-slate-600 text-slate-200 hover:bg-slate-800 rounded-xl transition-all hidden">
                     Ya tengo cuenta
                   </Button>
                 </Link>
