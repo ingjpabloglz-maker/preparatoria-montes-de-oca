@@ -333,7 +333,7 @@ export default function LandingPage() {
             {/* Marca */}
             <div className="space-y-4 lg:col-span-1">
               <div className="flex items-center gap-3">
-                <img src={LOGO_URL} alt="Logo" className="w-12 h-12 rounded-full object-cover border-2 border-slate-700" loading="lazy" />
+                <img src="https://media.base44.com/images/public/69a88a8bf5baf0edfc4ac0c5/43d9d88f6_logo_actualizado_-_Copy.jpg" alt="Logo" className="w-12 h-12 rounded-full object-cover border-2 border-slate-700" loading="lazy" />
                 <div>
                   <p className="font-bold text-white text-sm leading-tight">Preparatoria</p>
                   <p className="font-bold text-white text-sm leading-tight">Montes de Oca</p>
