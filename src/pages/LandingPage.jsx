@@ -91,7 +91,7 @@ Funcionamos con el reconocimiento de la SEP, bajo el Registro de validez oficial
                 <GraduationCap className="w-6 h-6 text-white" />
                 <span className="font-bold text-white text-lg">Preparatoria Montes de Oca</span>
               </div>
-              <p className="text-sm leading-relaxed px-3">Desde hace más de 16 años nuestra finalidad como es impartir a los alumnos enseñanza a nivel Medio Superior para contribuir al desarrollo de México por medio de la preparación integral de sus estudiantes, capacitándolos a continuar con estudios profesionales y de calidad, orientados a su vocación.</p>
+              <p className="text-sm leading-relaxed px-3">Desde hace más de 16 años nuestra finalidad como es impartir a los alumnos enseñanza de alto nivel para contribuir al desarrollo de México por medio de la preparación integral de sus estudiantes, capacitándolos a continuar con estudios profesionales y de calidad, orientados a su vocación.</p>
             </div>
 
             {/* Contacto */}
