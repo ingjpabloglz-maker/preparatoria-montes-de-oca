@@ -280,7 +280,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── CÓMO FUNCIONA ─── */}
-      <section id="como-funciona" className="py-20 bg-white">
+      <section id="como-funciona" className="bg-white py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
             <p className="text-blue-600 text-sm font-semibold uppercase tracking-widest mb-3">Proceso simple</p>
@@ -291,7 +291,7 @@ export default function LandingPage() {
             {/* Línea conectora (solo desktop) */}
             <div className="hidden md:block absolute top-10 left-1/4 right-1/4 h-0.5 bg-gradient-to-r from-blue-200 via-purple-200 to-green-200 z-0" />
             {STEPS.map((step, i) =>
-            <div key={i} className="relative z-10 flex flex-col items-center text-center p-8 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <div key={i} className="relative z-10 flex flex-col items-center text-center p-8 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow bg-[hsl(var(--input))]">
                 <div className={`w-16 h-16 ${step.color} rounded-2xl flex items-center justify-center mb-5 shadow-lg`}>
                   <step.icon className="w-8 h-8 text-white" />
                 </div>
