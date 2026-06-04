@@ -30,11 +30,11 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="flex-1 flex items-center py-20 bg-gradient-to-br from-blue-50 via-white to-slate-50">
         <div className="max-w-5xl mx-auto px-4 text-center space-y-8">
-          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 px-3 py-1 text-xs border-0">
+          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 px-3 py-1 text-xs border-0 hidden">
             Plataforma Educativa Oficial
           </Badge>
-          <h1 className="text-4xl sm:text-6xl font-extrabold text-gray-900 tracking-tight leading-none">
-            Tu Bachillerato a tu propio ritmo
+          <h1 className="text-4xl sm:text-6xl font-extrabold text-gray-900 tracking-tight leading-none">Tu Preparatoria, a tu propio ritmo
+
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
             Accede a un plan de estudios completo, actividades dinámicas y evaluaciones oficiales validadas por docentes certificados.
@@ -46,7 +46,7 @@ export default function LandingPage() {
               </Button>
             </Link>
             <Link to="/register">
-              <Button variant="outline" className="w-full sm:w-auto h-12 px-8 font-medium rounded-xl">
+              <Button variant="outline" className="w-full sm:w-auto h-12 px-8 font-medium rounded-xl hidden">
                 Crear Cuenta Nueva
               </Button>
             </Link>
@@ -133,6 +133,6 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
-    </div>
-  );
+    </div>);
+
 }
