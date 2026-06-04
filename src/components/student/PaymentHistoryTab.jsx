@@ -171,7 +171,7 @@ export default function PaymentHistoryTab({ studentEmail }) {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Nivel</TableHead>
                 <TableHead>Detalle</TableHead>
-                <TableHead className="hidden">Monto</TableHead>
+                
                 <TableHead>Estado</TableHead>
                 <TableHead>Fecha</TableHead>
               </TableRow>
@@ -199,9 +199,9 @@ export default function PaymentHistoryTab({ studentEmail }) {
                     `Mensualidad ${p._installment_number}` :
                     '—'}
                     </TableCell>
-                    <TableCell className="text-sm font-medium text-gray-800 hidden">
-                      {p.amount != null ? `$${p.amount.toFixed(2)}` : '—'}
-                    </TableCell>
+                    
+
+                  
                     <TableCell>
                       <Badge className={`text-xs border-0 ${statusInfo.cls}`}>{statusInfo.label}</Badge>
                     </TableCell>
