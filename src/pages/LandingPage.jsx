@@ -305,12 +305,12 @@ export default function LandingPage() {
       </section>
 
       {/* ─── MATERIAS ─── */}
-      <section id="materias" className="bg-slate-50 py-4">
+      <section id="materias" className="bg-slate-50 py-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
             <p className="text-blue-600 text-sm font-semibold uppercase tracking-widest mb-3">Plan de estudios</p>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Materias del bachillerato</h2>
-            <p className="text-slate-500 mt-3 max-w-xl mx-auto">Contenido académico actualizado, estructurado en 6 semestres con evaluaciones oficiales.</p>
+            <p className="text-slate-500 mt-3 max-w-xl mx-auto">Contenido académico actualizado, estructurado en 6 niveles con evaluaciones oficiales.</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {SUBJECTS.map((subject) =>
