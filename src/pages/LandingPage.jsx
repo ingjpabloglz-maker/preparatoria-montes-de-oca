@@ -21,14 +21,14 @@ export default function LandingPage() {
               <Button variant="ghost" size="sm">Iniciar Sesión</Button>
             </Link>
             <Link to="/register">
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">Registrarse</Button>
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white hidden">Registrarse</Button>
             </Link>
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="flex-1 flex items-center py-20 bg-gradient-to-br from-blue-50 via-white to-slate-50">
+      <section className="flex-1 flex items-center py-20 bg-gradient-to-br from-blue-50 via-white to-slate-50 mt-2">
         <div className="max-w-5xl mx-auto px-4 text-center space-y-8">
           <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 px-3 py-1 text-xs border-0 hidden">
             Plataforma Educativa Oficial
