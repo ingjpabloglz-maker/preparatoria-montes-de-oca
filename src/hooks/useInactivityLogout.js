@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
-const INACTIVITY_LIMIT_MS = 4 * 60 * 60 * 1000;       // 4 horas
-const WARNING_BEFORE_MS = 2 * 60 * 1000;               // advertir 2 min antes
+const INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000;       // 2 horas
+const WARNING_BEFORE_MS = 5 * 60 * 1000;               // advertir 5 min antes
 const CHECK_INTERVAL_MS = 60 * 1000;                   // revisar cada 60s
 const STORAGE_KEY = 'lastActivityAt';
 
