@@ -83,11 +83,11 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3">
-            <img
-              src={LOGO_URL}
-              alt="Preparatoria Montes de Oca"
-              className="h-10 w-10 rounded-full object-cover border-2 border-slate-100"
-              loading="lazy" />
+            <img src="https://media.base44.com/images/public/69a88a8bf5baf0edfc4ac0c5/43d9d88f6_logo_actualizado_-_Copy.jpg"
+
+            alt="Preparatoria Montes de Oca"
+            className="h-10 w-10 rounded-full object-cover border-2 border-slate-100"
+            loading="lazy" />
             
             <span className="font-bold text-gray-900 text-sm sm:text-base leading-tight">
               Preparatoria<br className="hidden sm:block" />
