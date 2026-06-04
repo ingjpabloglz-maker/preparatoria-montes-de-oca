@@ -439,7 +439,7 @@ export default function LandingPage() {
                   <Phone className="w-4 h-4 text-blue-400 flex-shrink-0" />
                   <div className="space-y-1">
                     <a href="tel:+18999224365" className="hover:text-white transition-colors block">(899) 211 5222</a>
-                    <a href="tel:+18994549288" className="hover:text-white transition-colors block hidden">(899) 454 92 88</a>
+                    
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5">
