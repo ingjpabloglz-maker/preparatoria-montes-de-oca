@@ -23,7 +23,7 @@ const SUBJECTS = [
 const STATS = [
 { value: "+15", label: "Años de experiencia", icon: Star },
 { value: "RVOE", label: "Reconocimiento SEP", icon: ShieldCheck },
-{ value: "", label: "Estudiantes activos", icon: Users },
+{ value: "Comunidad", label: "Estudiantes activos", icon: Users },
 { value: "24/7", label: "Acceso a la plataforma", icon: Clock }];
 
 
