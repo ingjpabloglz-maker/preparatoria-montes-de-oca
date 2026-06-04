@@ -150,7 +150,7 @@ export default function LandingPage() {
           <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:py-28 py-2">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:py-28 py-1">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
             {/* Texto izquierda */}
@@ -291,7 +291,7 @@ export default function LandingPage() {
             {/* Línea conectora (solo desktop) */}
             <div className="hidden md:block absolute top-10 left-1/4 right-1/4 h-0.5 bg-gradient-to-r from-blue-200 via-purple-200 to-green-200 z-0" />
             {STEPS.map((step, i) =>
-            <div key={i} className="relative z-10 flex flex-col items-center text-center p-8 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow bg-[hsl(var(--input))]">
+            <div key={i} className="relative z-10 flex flex-col items-center text-center rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow bg-[hsl(var(--input))] px-8 py-3">
                 <div className={`w-16 h-16 ${step.color} rounded-2xl flex items-center justify-center mb-5 shadow-lg`}>
                   <step.icon className="w-8 h-8 text-white" />
                 </div>
