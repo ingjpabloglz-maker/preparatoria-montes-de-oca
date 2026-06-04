@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
   const xpEarned = Math.round(score * 0.5);   // se informa al frontend para mostrar en UI
 
   // Guardar intento del día
-  await base44.asServiceRole.entities.SurpriseExamAttempt.create({
+  const attempt = await base44.asServiceRole.entities.SurpriseExamAttempt.create({
     user_email: user.email,
     date: today,
     score,
@@ -69,6 +69,9 @@ Deno.serve(async (req) => {
   }
 
   return Response.json({
+    success: true,
+    attempt_id: attempt.id,
+    calculated_score: score,
     score,
     correct_count: correctCount,
     total: question_ids.length,

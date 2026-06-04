@@ -117,9 +117,7 @@ export default function SurpriseExam() {
 
         if (user?.email) {
           const result = await dispatchUserEvent('surprise_exam_completed', {
-            score: data.score,
-            question_ids,
-            correct_answers: data.correct_count,
+            attempt_id: data.attempt_id,
             activity_duration_seconds: 60,
           });
           if (result?.leveled_up) {

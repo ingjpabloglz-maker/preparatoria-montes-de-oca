@@ -476,6 +476,28 @@ Deno.serve(async (req) => {
     delete event_data.score;
     delete event_data.correct_answers;
 
+    // ─── SURPRISE EXAM: Lookup seguro por attempt_id ──────────────────────────
+    // El score NUNCA viene del frontend. Se obtiene del registro guardado por submitSurpriseExam.
+    if (event_type === 'surprise_exam_completed') {
+      const attempt_id = event_data.attempt_id;
+      if (!attempt_id) {
+        return Response.json({ error: 'attempt_id is required for surprise_exam_completed' }, { status: 400 });
+      }
+      const attempts = await base44.asServiceRole.entities.SurpriseExamAttempt.filter({ id: attempt_id });
+      const attempt = attempts[0];
+      if (!attempt) {
+        return Response.json({ error: 'Attempt not found' }, { status: 404 });
+      }
+      if (attempt.user_email !== user_email) {
+        return Response.json({ error: 'Forbidden: attempt does not belong to this user' }, { status: 403 });
+      }
+      if (typeof attempt.score !== 'number') {
+        return Response.json({ error: 'Invalid attempt score' }, { status: 400 });
+      }
+      // Inyectar el score verificado como calculated_score para que calculateBaseAwards lo use
+      event_data.calculated_score = attempt.score;
+    }
+
     // ─── 4. CREAR/OBTENER UserProgress ───────────────────────────────────────
     await initializeUserProgress(base44, user_email, nowIso);
 
