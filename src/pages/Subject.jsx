@@ -16,6 +16,7 @@ import ExtraordinaryFolioValidator from '../components/payment/ExtraordinaryFoli
 export default function Subject() {
   const urlParams = new URLSearchParams(window.location.search);
   const subjectId = urlParams.get('id');
+  console.log('[Subject.jsx]', window.location.pathname, window.location.search, '→ subjectId:', subjectId);
 
   const [user, setUser] = useState(null);
   const [takingTest, setTakingTest] = useState(false);

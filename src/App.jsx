@@ -5,7 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { base44 } from '@/api/base44Client';
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, useParams } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -32,6 +32,20 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ProtectedRoute from './components/ProtectedRoute';
+
+// Redirige preservando query string: /Subject?id=abc → /app/Subject?id=abc
+const LegacyQueryRedirect = ({ to }) => {
+  const location = useLocation();
+  console.log('[LegacyQueryRedirect]', location.pathname, location.search, '→', to + location.search);
+  return <Navigate to={`${to}${location.search}`} replace />;
+};
+
+// Traduce /Subject/:id → /app/Subject?id=:id
+const SubjectParamRedirect = () => {
+  const { id } = useParams();
+  console.log('[SubjectParamRedirect] /Subject/:id →', `/app/Subject?id=${id}`);
+  return <Navigate to={`/app/Subject?id=${id}`} replace />;
+};
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -157,7 +171,8 @@ function App() {
               <Route path="/TeacherDashboard" element={<Navigate to="/app/TeacherDashboard" replace />} />
               <Route path="/ManageActivities" element={<Navigate to="/app/ManageActivities" replace />} />
               <Route path="/FinalExamOnline" element={<Navigate to="/app/FinalExamOnline" replace />} />
-              <Route path="/Subject/:id" element={<Navigate to="/app/Subject/:id" replace />} />
+              <Route path="/Subject" element={<LegacyQueryRedirect to="/app/Subject" />} />
+              <Route path="/Subject/:id" element={<SubjectParamRedirect />} />
               <Route path="/StudentRecord/:user_email" element={<Navigate to="/app/StudentRecord/:user_email" replace />} />
               <Route path="/AdminDashboard" element={<Navigate to="/app/AdminDashboard" replace />} />
               <Route path="/ManageFolios" element={<Navigate to="/app/ManageFolios" replace />} />
