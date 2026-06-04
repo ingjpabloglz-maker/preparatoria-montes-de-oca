@@ -316,7 +316,7 @@ export default function LandingPage() {
             {SUBJECTS.map((subject) =>
             <div
               key={subject.name}
-              className={`flex flex-col items-center text-center rounded-2xl border px-5 py-4 ${subject.color} bg-white hover:shadow-md transition-all hover:-translate-y-1`}>
+              className={`flex flex-col items-center text-center rounded-2xl border px-5 py-3 ${subject.color} bg-white hover:shadow-md transition-all hover:-translate-y-1`}>
               
                 <div className={`w-12 h-12 ${subject.color} rounded-xl flex items-center justify-center mb-3`}>
                   <subject.icon className="w-6 h-6" />
