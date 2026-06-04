@@ -150,7 +150,7 @@ export default function LandingPage() {
           <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:py-28 py-6">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:py-28 py-2">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
             {/* Texto izquierda */}
@@ -243,7 +243,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── STATS ─── */}
-      <section className="bg-slate-50 border-b border-slate-100 py-5">
+      <section className="bg-slate-50 border-b border-slate-100 py-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {STATS.map((s) =>
@@ -280,7 +280,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── CÓMO FUNCIONA ─── */}
-      <section id="como-funciona" className="bg-white py-5">
+      <section id="como-funciona" className="bg-white py-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
             <p className="text-blue-600 text-sm font-semibold uppercase tracking-widest mb-3">Proceso simple</p>
