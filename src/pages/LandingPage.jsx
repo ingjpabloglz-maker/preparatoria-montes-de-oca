@@ -155,9 +155,9 @@ export default function LandingPage() {
 
             {/* Texto izquierda */}
             <div className="space-y-7">
-              <Badge className="bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/20 px-3 py-1 text-xs font-medium hidden">
-                🎓 Bachillerato con validez oficial SEP
-              </Badge>
+              
+
+              
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight">
                 Tu bachillerato,<br />
