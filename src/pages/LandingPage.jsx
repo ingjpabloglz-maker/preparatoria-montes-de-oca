@@ -310,13 +310,13 @@ export default function LandingPage() {
           <div className="text-center mb-14">
             <p className="text-blue-600 text-sm font-semibold uppercase tracking-widest mb-3">Plan de estudios</p>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Materias del bachillerato</h2>
-            <p className="text-slate-500 mt-3 max-w-xl mx-auto">Contenido académico actualizado, estructurado en 6 niveles con evaluaciones oficiales.</p>
+            <p className="text-slate-500 mt-3 max-w-xl mx-auto">Contenido académico actualizado, estructurado en 6 semestres con evaluaciones oficiales.</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {SUBJECTS.map((subject) =>
             <div
               key={subject.name}
-              className={`flex flex-col items-center text-center rounded-2xl border px-5 py-3 bg-[hsl(var(--background))] ${subject.color} hover:shadow-md transition-all hover:-translate-y-1`}>
+              className={`flex flex-col items-center text-center rounded-2xl border px-5 py-3 ${subject.color} bg-white hover:shadow-md transition-all hover:-translate-y-1`}>
               
                 <div className={`w-12 h-12 ${subject.color} rounded-xl flex items-center justify-center mb-3`}>
                   <subject.icon className="w-6 h-6" />
@@ -325,7 +325,7 @@ export default function LandingPage() {
               </div>
             )}
           </div>
-          <p className="text-center text-xs text-slate-400 mt-6">Y muchas materias más a lo largo de los 6 semestres del plan de estudios oficial.</p>
+          <p className="text-center text-xs text-slate-400 mt-6">Y muchas materias más a lo largo de los 6 niveles del plan de estudios oficial.</p>
         </div>
       </section>
 
