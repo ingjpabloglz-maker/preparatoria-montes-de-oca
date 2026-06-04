@@ -338,7 +338,7 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {WHY_US.map((item, i) =>
-            <div key={i} className="p-8 rounded-2xl border border-slate-100 bg-slate-50 hover:shadow-md transition-all hover:-translate-y-1">
+            <div key={i} className="rounded-2xl border border-slate-100 hover:shadow-md transition-all hover:-translate-y-1 px-8 py-1 bg-[hsl(var(--background))]">
                 <div className={`w-12 h-12 ${item.color} rounded-xl flex items-center justify-center mb-5`}>
                   <item.icon className="w-6 h-6" />
                 </div>
