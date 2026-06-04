@@ -354,8 +354,8 @@ export default function LandingPage() {
       <section className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-center py-4">
         <div className="max-w-3xl mx-auto px-4 space-y-6">
           <h2 className="text-3xl sm:text-4xl font-extrabold">¿Listo para comenzar?</h2>
-          <p className="text-blue-100 text-lg leading-relaxed">
-            Únete a cientos de estudiantes que ya obtienen su bachillerato con validez oficial SEP desde cualquier lugar de Tamaulipas.
+          <p className="text-blue-100 text-lg leading-relaxed">Únete a cientos de estudiantes que ya obtienen su bachillerato con validez oficial SEP desde cualquier lugar de Tamaulipas y lleva tu conocimiento a tu propio rit,.
+
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link to="/register">
