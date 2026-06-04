@@ -9,6 +9,8 @@ export default function RoleRedirect() {
 
     if (user.role === "admin") {
       window.location.replace("/app/AdminDashboard");
+    } else if (user.role === "docente") {
+      window.location.replace("/app/TeacherDashboard");
     } else {
       window.location.replace("/app/Dashboard");
     }

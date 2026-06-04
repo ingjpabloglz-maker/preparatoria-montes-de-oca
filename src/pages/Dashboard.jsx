@@ -366,9 +366,9 @@ export default function Dashboard() {
     return () => clearTimeout(t);
   }, [user?.email, gamProfile?.user_email]);
 
-  // Toast de racha: mostrar una vez por sesión
+  // Toast de racha: mostrar una vez por sesión (solo estudiantes)
   useEffect(() => {
-    if (!gamProfile) return;
+    if (!gamProfile || !user || user.role !== 'user') return;
     const status = getStreakStatus(gamProfile.last_study_date_normalized);
     const streakDays = gamProfile.streak_days || 0;
     const toastKey = `streak_toast_${new Date().toDateString()}`;
@@ -468,9 +468,14 @@ export default function Dashboard() {
   };
   const nextSubject = getNextSubject();
 
-  // Vista de administrador
+  // Redirigir admins y docentes a sus dashboards correspondientes
   if (user?.role === 'admin') {
-    return <AdminDashboardView user={user} />;
+    window.location.replace('/app/AdminDashboard');
+    return null;
+  }
+  if (user?.role === 'docente') {
+    window.location.replace('/app/TeacherDashboard');
+    return null;
   }
 
   if (loadingUser || loadingLevels || loadingSubjects || loadingProgress || loadingSubjectProgress || loadingPayments) {
