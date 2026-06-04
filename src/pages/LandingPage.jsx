@@ -291,7 +291,7 @@ export default function LandingPage() {
             {/* Línea conectora (solo desktop) */}
             <div className="hidden md:block absolute top-10 left-1/4 right-1/4 h-0.5 bg-gradient-to-r from-blue-200 via-purple-200 to-green-200 z-0" />
             {STEPS.map((step, i) =>
-            <div key={i} className="relative z-10 flex flex-col items-center text-center rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow bg-[hsl(var(--input))] px-8 py-3">
+            <div key={i} className="relative z-10 flex flex-col items-center text-center rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow bg-[hsl(var(--input))] px-8 py-2">
                 <div className={`w-16 h-16 ${step.color} rounded-2xl flex items-center justify-center mb-5 shadow-lg`}>
                   <step.icon className="w-8 h-8 text-white" />
                 </div>
@@ -305,7 +305,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── MATERIAS ─── */}
-      <section id="materias" className="bg-slate-50 py-5">
+      <section id="materias" className="bg-slate-50 py-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
             <p className="text-blue-600 text-sm font-semibold uppercase tracking-widest mb-3">Plan de estudios</p>
