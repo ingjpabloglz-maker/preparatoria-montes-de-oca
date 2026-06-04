@@ -12,12 +12,12 @@ import {
 const LOGO_URL = "https://media.base44.com/images/public/69a88a8bf5baf0edfc4ac0c5/e80acaed0_logoactualizado.jpg";
 
 const SUBJECTS = [
-{ name: "Álgebra", icon: Calculator, color: "bg-blue-50 text-blue-600 border-blue-100" },
-{ name: "Física", icon: FlaskConical, color: "bg-purple-50 text-purple-600 border-purple-100" },
-{ name: "Literatura", icon: BookMarked, color: "bg-amber-50 text-amber-600 border-amber-100" },
-{ name: "Biología", icon: Leaf, color: "bg-green-50 text-green-600 border-green-100" },
-{ name: "Ecología", icon: Globe, color: "bg-teal-50 text-teal-600 border-teal-100" },
-{ name: "Informática", icon: Cpu, color: "bg-slate-50 text-slate-600 border-slate-200" }];
+{ name: "Álgebra", icon: Calculator, color: "text-blue-600 border-blue-100 bg-[hsl(var(--card))]" },
+{ name: "Física", icon: FlaskConical, color: "text-purple-600 border-purple-100 bg-[hsl(var(--card))]" },
+{ name: "Literatura", icon: BookMarked, color: "text-amber-600 border-amber-100 bg-[hsl(var(--card))]" },
+{ name: "Biología", icon: Leaf, color: "text-green-600 border-green-100 bg-[hsl(var(--card))]" },
+{ name: "Ecología", icon: Globe, color: "text-teal-600 border-teal-100 bg-[hsl(var(--card))]" },
+{ name: "Informática", icon: Cpu, color: "text-slate-600 border-slate-200 bg-[hsl(var(--card))]" }];
 
 
 const STATS = [
@@ -316,7 +316,7 @@ export default function LandingPage() {
             {SUBJECTS.map((subject) =>
             <div
               key={subject.name}
-              className={`flex flex-col items-center text-center p-5 rounded-2xl border ${subject.color} bg-white hover:shadow-md transition-all hover:-translate-y-1`}>
+              className={`flex flex-col items-center text-center rounded-2xl border px-5 py-2 ${subject.color} hover:shadow-md transition-all hover:-translate-y-1`}>
               
                 <div className={`w-12 h-12 ${subject.color} rounded-xl flex items-center justify-center mb-3`}>
                   <subject.icon className="w-6 h-6" />
@@ -325,7 +325,7 @@ export default function LandingPage() {
               </div>
             )}
           </div>
-          <p className="text-center text-xs text-slate-400 mt-6">Y muchas materias más a lo largo de los 6 semestres del plan de estudios oficial.</p>
+          <p className="text-center text-xs text-slate-400 mt-6">Y muchas materias más a lo largo de los 6 ndel plan de estudios oficial.</p>
         </div>
       </section>
 
