@@ -23,7 +23,7 @@ const SUBJECTS = [
 const STATS = [
 { value: "+15", label: "Años de experiencia", icon: Star },
 { value: "RVOE", label: "Reconocimiento SEP", icon: ShieldCheck },
-{ value: "+500", label: "Estudiantes activos", icon: Users },
+{ value: "", label: "Estudiantes activos", icon: Users },
 { value: "24/7", label: "Acceso a la plataforma", icon: Clock }];
 
 
@@ -247,7 +247,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {STATS.map((s) =>
-            <div key={s.label} className="flex flex-col items-center text-center rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow px-1 py-1 bg-fuchsia-50">
+            <div key={s.label} className="flex flex-col items-center text-center rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow px-1 py-1 bg-[hsl(var(--background))]">
                 <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-3">
                   <s.icon className="w-5 h-5" />
                 </div>
