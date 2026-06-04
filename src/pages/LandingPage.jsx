@@ -150,7 +150,7 @@ export default function LandingPage() {
           <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 lg:py-28">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:py-28 py-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
             {/* Texto izquierda */}
@@ -162,7 +162,7 @@ export default function LandingPage() {
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight">
                 Tu bachillerato,<br />
                 <span className="text-blue-400">a tu propio</span>{" "}
-                <span className="text-amber-400">ritmo</span>
+                <span className="text-amber-400">ritmo!</span>
               </h1>
 
               <p className="text-slate-300 text-lg leading-relaxed max-w-lg">
