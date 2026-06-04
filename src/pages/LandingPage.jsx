@@ -187,56 +187,9 @@ export default function LandingPage() {
               </p>
             </div>
 
-            {/* Mockup derecha */}
+            {/* Logo derecha */}
             <div className="hidden lg:flex justify-center items-center">
-              <div className="relative">
-                {/* Glow */}
-                <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-3xl" />
-                <div className="relative bg-slate-800/80 border border-slate-700/60 rounded-2xl p-6 shadow-2xl w-80 space-y-4">
-                  {/* Top bar */}
-                  <div className="flex items-center gap-2 border-b border-slate-700 pb-4">
-                    <img src={LOGO_URL} alt="Logo" className="w-8 h-8 rounded-full object-cover" loading="lazy" />
-                    <div>
-                      <p className="text-xs font-semibold text-white">Mi Progreso</p>
-                      <p className="text-xs text-slate-400">Nivel 2 · Semestre activo</p>
-                    </div>
-                    <div className="ml-auto">
-                      <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded-full">Activo</span>
-                    </div>
-                  </div>
-                  {/* Progreso materias */}
-                  {[
-                  { name: "Álgebra", pct: 82, color: "bg-blue-500" },
-                  { name: "Literatura", pct: 65, color: "bg-purple-500" },
-                  { name: "Física", pct: 45, color: "bg-amber-500" }].
-                  map((s) =>
-                  <div key={s.name} className="space-y-1">
-                      <div className="flex justify-between text-xs text-slate-300">
-                        <span>{s.name}</span>
-                        <span>{s.pct}%</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                        <div className={`h-full ${s.color} rounded-full`} style={{ width: `${s.pct}%` }} />
-                      </div>
-                    </div>
-                  )}
-                  {/* Stats mini */}
-                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-700">
-                    <div className="text-center">
-                      <p className="text-base font-bold text-amber-400">12🔥</p>
-                      <p className="text-xs text-slate-400">Racha</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-base font-bold text-blue-400">340</p>
-                      <p className="text-xs text-slate-400">XP</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-base font-bold text-green-400">3/6</p>
-                      <p className="text-xs text-slate-400">Niveles</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <img src={LOGO_URL} alt="Preparatoria Montes de Oca" className="w-72 h-72 rounded-full object-cover shadow-2xl border-4 border-white/10" loading="lazy" />
             </div>
           </div>
         </div>
