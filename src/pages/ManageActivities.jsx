@@ -15,7 +15,55 @@ import CurriculumGeneratorPanel from '../components/admin/CurriculumGeneratorPan
 import SyllabusEditor from '../components/admin/SyllabusEditor';
 import LessonEditor from '../components/admin/LessonEditor';
 
+const ACCESS_CODE = '160714';
+
+function ActivitiesAccessGate({ onVerified }) {
+  const [input, setInput] = useState('');
+  const [error, setError] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (input === ACCESS_CODE) {
+      onVerified();
+    } else {
+      setError(true);
+      setInput('');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl shadow-md p-8 max-w-sm w-full text-center space-y-5">
+        <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto">
+          <Sparkles className="w-8 h-8 text-violet-600" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Verificación de Acceso</h2>
+          <p className="text-sm text-gray-500 mt-1">Ingresa el código de acceso para continuar</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <Input
+            type="password"
+            placeholder="Código de acceso"
+            value={input}
+            onChange={(e) => { setInput(e.target.value); setError(false); }}
+            className="text-center tracking-widest text-lg"
+            autoFocus
+          />
+          {error && (
+            <p className="text-sm text-red-500">Código incorrecto. Intenta de nuevo.</p>
+          )}
+          <Button type="submit" className="w-full">
+            Acceder
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function ManageActivities() {
+  const [isVerified, setIsVerified] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [generatingId, setGeneratingId] = useState(null);
   const [generatingAll, setGeneratingAll] = useState(false);
@@ -128,6 +176,14 @@ export default function ManageActivities() {
     }
     setGeneratingNew(false);
   };
+
+  if (!isVerified) {
+    return (
+      <AdminGuard>
+        <ActivitiesAccessGate onVerified={() => setIsVerified(true)} />
+      </AdminGuard>
+    );
+  }
 
   return (
     <AdminGuard>
