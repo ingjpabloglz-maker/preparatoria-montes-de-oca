@@ -351,7 +351,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── CTA FINAL ─── */}
-      <section className="py-20 bg-gradient-to-br from-blue-600 to-blue-700 text-white text-center">
+      <section className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-center py-4">
         <div className="max-w-3xl mx-auto px-4 space-y-6">
           <h2 className="text-3xl sm:text-4xl font-extrabold">¿Listo para comenzar?</h2>
           <p className="text-blue-100 text-lg leading-relaxed">
@@ -364,7 +364,7 @@ export default function LandingPage() {
               </Button>
             </Link>
             <Link to="/login">
-              <Button variant="outline" className="h-12 px-10 border-blue-300 text-white hover:bg-blue-500 rounded-xl transition-all">
+              <Button variant="outline" className="h-12 px-10 border-blue-300 text-white hover:bg-blue-500 rounded-xl transition-all hidden">
                 Ya tengo cuenta
               </Button>
             </Link>
