@@ -7,8 +7,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  DialogDescription } from
+"@/components/ui/dialog";
 import { FileText, Download, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,7 +35,7 @@ export default function ReportCardExportModal({ open, onClose, studentEmail, stu
       student_email: studentEmail,
       action,
       timestamp: new Date().toISOString(),
-      metadata: JSON.stringify(metadata),
+      metadata: JSON.stringify(metadata)
     }).catch(() => {});
   };
 
@@ -63,7 +63,7 @@ export default function ReportCardExportModal({ open, onClose, studentEmail, stu
       // exportLevelGrades genera Excel + snapshot de auditoría para el nivel
       const res = await base44.functions.invoke('exportLevelGrades', {
         level: selectedLevel,
-        include_exported: true,
+        include_exported: true
       });
       const data = res.data;
       if (data?.xlsx_base64) {
@@ -125,11 +125,11 @@ export default function ReportCardExportModal({ open, onClose, studentEmail, stu
             <Button
               className="w-full"
               onClick={handleFullExport}
-              disabled={loading !== null}
-            >
-              {loading === 'full'
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando PDF...</>
-                : <><Download className="w-4 h-4 mr-2" />Descargar Expediente PDF</>}
+              disabled={loading !== null}>
+              
+              {loading === 'full' ?
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando PDF...</> :
+              <><Download className="w-4 h-4 mr-2" />Descargar Expediente PDF</>}
             </Button>
           </div>
 
@@ -140,7 +140,7 @@ export default function ReportCardExportModal({ open, onClose, studentEmail, stu
                 <Download className="w-5 h-5 text-green-600" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-gray-900 text-sm">Boleta por Nivel (Excel SEP)</p>
+                <p className="font-semibold text-gray-900 text-sm">Boleta por Nivel (Excel)</p>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Exportación de calificaciones en formato Excel para registro SEP. Genera snapshot de auditoría.
                 </p>
@@ -155,34 +155,34 @@ export default function ReportCardExportModal({ open, onClose, studentEmail, stu
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500 flex-shrink-0">Nivel:</span>
               <div className="flex gap-1 flex-wrap">
-                {[1, 2, 3, 4, 5, 6].map(n => (
-                  <button
-                    key={n}
-                    onClick={() => setSelectedLevel(n)}
-                    className={`w-8 h-8 rounded-lg text-xs font-semibold border transition-colors ${
-                      selectedLevel === n
-                        ? 'bg-green-600 text-white border-green-600'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-green-400'
-                    }`}
-                  >
+                {[1, 2, 3, 4, 5, 6].map((n) =>
+                <button
+                  key={n}
+                  onClick={() => setSelectedLevel(n)}
+                  className={`w-8 h-8 rounded-lg text-xs font-semibold border transition-colors ${
+                  selectedLevel === n ?
+                  'bg-green-600 text-white border-green-600' :
+                  'bg-white text-gray-600 border-gray-200 hover:border-green-400'}`
+                  }>
+                  
                     {n}
                   </button>
-                ))}
+                )}
               </div>
             </div>
 
             <Button
               className="w-full bg-green-600 hover:bg-green-700"
               onClick={handleLevelExport}
-              disabled={loading !== null}
-            >
-              {loading === 'level'
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando Excel...</>
-                : <><Download className="w-4 h-4 mr-2" />Exportar Nivel {selectedLevel}</>}
+              disabled={loading !== null}>
+              
+              {loading === 'level' ?
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando Excel...</> :
+              <><Download className="w-4 h-4 mr-2" />Exportar Nivel {selectedLevel}</>}
             </Button>
           </div>
         </div>
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>);
+
 }
