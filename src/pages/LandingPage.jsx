@@ -33,7 +33,7 @@ export default function LandingPage() {
           <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 px-3 py-1 text-xs border-0 hidden">
             Plataforma Educativa Oficial
           </Badge>
-          <h1 className="text-4xl sm:text-6xl font-extrabold text-gray-900 tracking-tight leading-none">Tu Preparatoria, a tu propio ritmo
+          <h1 className="text-4xl sm:text-6xl font-extrabold text-gray-900 tracking-tight leading-none">Tu Preparatoria, a tu propio ritmo!
 
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
