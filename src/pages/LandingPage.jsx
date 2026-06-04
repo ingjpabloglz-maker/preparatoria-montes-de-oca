@@ -189,7 +189,7 @@ export default function LandingPage() {
 
             {/* Logo derecha */}
             <div className="hidden lg:flex justify-center items-center">
-              <img src="https://media.base44.com/images/public/69a88a8bf5baf0edfc4ac0c5/89f028337_logo_actualizado_imgupscalerai_Desenfocar_Pro_2K__1_.png" alt="Preparatoria Montes de Oca" className="w-72 h-72 object-cover shadow-2xl border-4 border-white/10 rounded-[48px]" loading="lazy" />
+              <img src="https://media.base44.com/images/public/69a88a8bf5baf0edfc4ac0c5/89f028337_logo_actualizado_imgupscalerai_Desenfocar_Pro_2K__1_.png" alt="Preparatoria Montes de Oca" className="w-72 h-72 object-cover shadow-2xl border-4 border-white/10 rounded-md opacity-95" loading="lazy" />
             </div>
           </div>
         </div>
