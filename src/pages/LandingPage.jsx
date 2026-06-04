@@ -291,11 +291,11 @@ export default function LandingPage() {
             {/* Línea conectora (solo desktop) */}
             <div className="hidden md:block absolute top-10 left-1/4 right-1/4 h-0.5 bg-gradient-to-r from-blue-200 via-purple-200 to-green-200 z-0" />
             {STEPS.map((step, i) =>
-            <div key={i} className="relative z-10 flex flex-col items-center text-center p-8 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <div key={i} className="relative z-10 flex flex-col items-center text-center rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow bg-[hsl(var(--card))] px-8 py-1">
                 <div className={`w-16 h-16 ${step.color} rounded-2xl flex items-center justify-center mb-5 shadow-lg`}>
                   <step.icon className="w-8 h-8 text-white" />
                 </div>
-                <span className="text-4xl font-black text-slate-100 absolute top-4 right-6 select-none">{step.num}</span>
+                <span className="text-4xl font-black absolute top-4 right-6 select-none text-yellow-300">{step.num}</span>
                 <h3 className="font-bold text-lg text-slate-900 mb-2">{step.title}</h3>
                 <p className="text-sm text-slate-500 leading-relaxed">{step.desc}</p>
               </div>
