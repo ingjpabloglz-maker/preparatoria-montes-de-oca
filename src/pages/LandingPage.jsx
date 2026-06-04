@@ -182,7 +182,7 @@ export default function LandingPage() {
                 </Link>
               </div>
 
-              <p className="text-xs text-slate-500">✓ 100% en línea · ✓ Acceso inmediato · ✓ Soporte académico incluido
+              <p className="text-xs text-slate-500">✓ En línea · ✓ Acceso inmediato 24/7 · ✓ Soporte académico incluido
 
               </p>
             </div>
@@ -243,7 +243,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── STATS ─── */}
-      <section className="bg-slate-50 border-b border-slate-100 py-12">
+      <section className="bg-slate-50 border-b border-slate-100 py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {STATS.map((s) =>
