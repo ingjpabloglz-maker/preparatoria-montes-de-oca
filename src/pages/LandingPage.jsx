@@ -295,7 +295,7 @@ export default function LandingPage() {
                 <div className={`w-16 h-16 ${step.color} rounded-2xl flex items-center justify-center mb-5 shadow-lg`}>
                   <step.icon className="w-8 h-8 text-white" />
                 </div>
-                <span className="text-4xl font-black text-slate-100 absolute top-4 right-6 select-none">{step.num}</span>
+                <span className="text-4xl font-black absolute top-4 right-6 select-none text-[hsl(var(--foreground))]">{step.num}</span>
                 <h3 className="font-bold text-lg text-slate-900 mb-2">{step.title}</h3>
                 <p className="text-sm text-slate-500 leading-relaxed">{step.desc}</p>
               </div>
