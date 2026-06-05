@@ -251,13 +251,16 @@ Deno.serve(async (req) => {
     // ══ 2. RESUMEN ACADEMICO ══
     sectionHeader('2. RESUMEN ACADEMICO');
 
-    const completadas   = subjectProgressList.filter(s => s.completed).length;
-    const promedioFinal = subjectProgressList.length > 0
-      ? (subjectProgressList.reduce((s, sp) => s + (sp.final_grade || 0), 0) / subjectProgressList.length).toFixed(1)
+    const totalMaterias = subjects.length;
+    const completadas   = subjectProgressList.filter(s => s.test_passed === true).length;
+    const aprobadas     = subjectProgressList.filter(s => s.test_passed === true && s.final_grade != null);
+    const promedioFinal = aprobadas.length > 0
+      ? (aprobadas.reduce((s, sp) => s + sp.final_grade, 0) / aprobadas.length).toFixed(1)
       : '-';
+    const progresoPct  = totalMaterias > 0 ? Math.round((completadas / totalMaterias) * 100) : 0;
 
-    row('Progreso general',         `${userProgress?.total_progress_percent || 0}%`);
-    row('Materias completadas',     `${completadas} de ${subjectProgressList.length}`);
+    row('Progreso general',         `${progresoPct}%`);
+    row('Materias completadas',     `${completadas} de ${totalMaterias}`);
     row('Promedio general',         promedioFinal !== '-' ? promedioFinal : '\u2014');
     row('Duracion total del programa', INSTITUCION.duracion_programa);
     row('Total de evaluaciones',    `${evaluationAttempts.length}`);
