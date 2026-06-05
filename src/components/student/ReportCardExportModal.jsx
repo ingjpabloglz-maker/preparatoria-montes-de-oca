@@ -42,10 +42,13 @@ export default function ReportCardExportModal({ open, onClose, studentEmail, stu
   const handleFullExport = async () => {
     setLoading('full');
     try {
+      const safeName = (studentName || studentEmail || 'alumno')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_') || 'alumno';
       await downloadPDFFromFunction(
         'generateAuditableStudentRecordPDF',
         { user_email: studentEmail },
-        `expediente_${(studentEmail || 'alumno').replace(/[^a-z0-9]/gi, '_')}.pdf`
+        `Expediente_Academico_${safeName}.pdf`
       );
       logAudit('ADMIN_EXPORTED_REPORT_CARD', { type: 'full', student_email: studentEmail });
       toast.success('Expediente académico descargado');
