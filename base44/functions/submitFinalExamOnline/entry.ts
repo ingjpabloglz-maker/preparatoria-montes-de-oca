@@ -117,6 +117,33 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── Segunda revisión de auditoría: crear EvaluationAttempt solo si aprobó ──
+    if (passed) {
+      const answersForAttempt = session.questions.map(q => ({
+        question_id: q.activity_id,
+        user_answer: q.user_answer || '',
+        correct: q.is_correct,
+        points_obtained: q.score_points || 0,
+      }));
+      await base44.asServiceRole.entities.EvaluationAttempt.create({
+        user_email: user.email,
+        subject_id: session.subject_id,
+        lesson_id: session.subject_id, // referencia a la materia como lección proxy
+        type: 'final_exam',
+        answers: answersForAttempt,
+        score,
+        passed: true,
+        started_at: session.exam_started_at || submitted_at,
+        submitted_at,
+        attempt_number: session.attempt_number || 1,
+        requires_manual_review: true,
+        is_second_review: true,
+      });
+      logEvent('SECOND_REVIEW_CREATED', {
+        session_id, user_email: user.email, subject_id: session.subject_id, score,
+      });
+    }
+
     logEvent('EXAM_SUBMITTED', {
       session_id, user_email: user.email, subject_id: session.subject_id,
       score, passed, status, correct_count, incorrect_count, unanswered_count,

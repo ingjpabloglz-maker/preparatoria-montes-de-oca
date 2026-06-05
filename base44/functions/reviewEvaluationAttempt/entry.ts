@@ -97,6 +97,19 @@ Deno.serve(async (req) => {
     review_locked_at: null,
   });
 
+  // ─── Si es segunda revisión de auditoría: NO modificar progreso del alumno ──
+  if (attempt.is_second_review === true) {
+    console.log('reviewEvaluationAttempt [SECOND_REVIEW]', { attempt_id, decision, reviewer: user.email });
+    return Response.json({
+      status: 'ok',
+      attempt_id, score, passed, decision,
+      reviewed_by: user.email, reviewer_id: user.id,
+      reviewer_name: user.full_name || user.email,
+      reviewer_role: user.role, reviewed_at, review_duration_seconds,
+      is_second_review: true,
+    });
+  }
+
   // ─── Actualizar LessonProgress ─────────────────────────────────────────────
   const existingLP = await base44.asServiceRole.entities.LessonProgress.filter({
     user_email: attempt.user_email,
