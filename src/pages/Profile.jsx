@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Volume2, Bell, User, CreditCard, Volume1 } from "lucide-react";
+import { ArrowLeft, Volume2, Bell, User, CreditCard, Volume1, Play } from "lucide-react";
 import ProfileForm from '../components/profile/ProfileForm';
 import InstallmentsTab from '../components/profile/InstallmentsTab';
 import { useSound } from '@/contexts/SoundContext';
@@ -14,7 +14,7 @@ import { useSound } from '@/contexts/SoundContext';
 export default function Profile() {
   const [user, setUser] = useState(null);
   const [gamProfile, setGamProfile] = useState(null);
-  const { isSoundEnabled, volume, toggleSound, setVolume } = useSound();
+  const { isSoundEnabled, volume, toggleSound, setVolume, playSound } = useSound();
 
   useEffect(() => {
     base44.auth.me().then(setUser);
@@ -79,11 +79,22 @@ export default function Profile() {
                     <div className="flex items-center gap-2">
                       <Volume2 className="w-4 h-4 text-gray-500" />
                       <div>
-                        <Label className="text-sm font-medium">Sonidos del juego</Label>
+                        <Label className="text-sm font-medium">Sonidos de actividades</Label>
                         <p className="text-xs text-gray-400">Retroalimentación auditiva al responder</p>
                       </div>
                     </div>
-                    <Switch checked={isSoundEnabled} onCheckedChange={toggleSound} />
+                    <div className="flex items-center gap-2">
+                      {isSoundEnabled && (
+                        <button
+                          onClick={() => playSound('correct_answer')}
+                          title="Probar sonido"
+                          className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                        >
+                          <Play className="w-3 h-3" /> Probar
+                        </button>
+                      )}
+                      <Switch checked={isSoundEnabled} onCheckedChange={toggleSound} />
+                    </div>
                   </div>
 
                   {isSoundEnabled && (
