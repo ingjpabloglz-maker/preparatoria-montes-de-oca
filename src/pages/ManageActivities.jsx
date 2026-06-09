@@ -15,7 +15,7 @@ import CurriculumGeneratorPanel from '../components/admin/CurriculumGeneratorPan
 import SyllabusEditor from '../components/admin/SyllabusEditor';
 import LessonEditor from '../components/admin/LessonEditor';
 
-const ACCESS_CODE = '160714';
+const ACCESS_CODE = '140716';
 
 function ActivitiesAccessGate({ onVerified }) {
   const [input, setInput] = useState('');
