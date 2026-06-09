@@ -1,14 +1,11 @@
 // Calcula el estado visual de la racha basado en last_study_date_normalized
-// Zona horaria: America/Matamoros (UTC-6)
-const MATAMOROS_OFFSET_HOURS = -6;
+// Zona horaria: America/Matamoros — usa Intl.DateTimeFormat (DST-safe, nunca offset fijo)
 
 function getMatamorosTodayStr() {
-  const nowUtc = new Date();
-  const local = new Date(nowUtc.getTime() + MATAMOROS_OFFSET_HOURS * 60 * 60 * 1000);
-  const y = local.getUTCFullYear();
-  const m = (local.getUTCMonth() + 1).toString().padStart(2, '0');
-  const d = local.getUTCDate().toString().padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Matamoros',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
 }
 
 /**

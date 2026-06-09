@@ -107,37 +107,47 @@ function calculateBaseAwards(event_type, event_data) {
 }
 
 // ─── BLOQUE 3: Calcular racha ─────────────────────────────────────────────────
-// Los escudos ya fueron consumidos día a día por decayTreeState.
-// Aquí solo determinamos si la racha sigue viva (streak_days > 0) o se perdió,
-// y continuamos/reiniciamos en consecuencia.
-function calculateStreak(gam, matamorosNow, todayString) {
-  let newStreakDays = gam?.streak_days || 0;
-  let streakBroke = false;
+// decayTreeState ya consumió escudos día a día y puso streak_days = 0 si se agotaron.
+// Aquí solo leemos el estado autoritativo del backend y continuamos/reiniciamos.
+//
+// REGLA OFICIAL (edge case 3):
+//   - streak_days === 0 → racha muerta. El usuario reinicia desde 1.
+//     Los shields NO pueden revivir una racha muerta; solo protegen futuras ausencias.
+//   - streak_days > 0   → racha viva; seguir incrementando.
+function calculateStreak(gam, todayString) {
+  const currentStreak = gam?.streak_days ?? 0;
+  const lastDate      = gam?.last_study_date_normalized ?? null;
 
-  if (gam) {
-    const lastDate = gam.last_study_date_normalized;
-    if (lastDate) {
-      // Evento duplicado en el mismo día: no modificar racha
-      if (lastDate === todayString) {
-        return { newStreakDays: gam.streak_days || 1, streakBroke: false };
-      }
-
-      if (newStreakDays > 0) {
-        // Racha sigue viva (el decay ya consumió escudos o no habían días suficientes para romperla)
-        newStreakDays = newStreakDays + 1;
-      } else {
-        // Racha rota por el decay → iniciar de 1
-        newStreakDays = 1;
-        streakBroke = true;
-      }
-    } else {
-      newStreakDays = 1;
-    }
-  } else {
-    newStreakDays = 1;
+  // Evento duplicado el mismo día → no modificar racha
+  if (lastDate === todayString) {
+    return { newStreakDays: Math.max(1, currentStreak), streakBroke: false };
   }
 
-  return { newStreakDays, streakBroke };
+  if (currentStreak > 0) {
+    // Racha viva → continuar
+    console.log(JSON.stringify({
+      event:         'STREAK_PROTECTED',
+      user:          gam.user_email,
+      streak_before: currentStreak,
+      streak_after:  currentStreak + 1,
+      last_study:    lastDate,
+      today:         todayString,
+      timestamp:     new Date().toISOString(),
+    }));
+    return { newStreakDays: currentStreak + 1, streakBroke: false };
+  }
+
+  // Racha muerta (puesta a 0 por decay) → reiniciar desde 1
+  console.log(JSON.stringify({
+    event:         'STREAK_RESET',
+    user:          gam?.user_email,
+    streak_before: currentStreak,
+    streak_after:  1,
+    last_study:    lastDate,
+    today:         todayString,
+    timestamp:     new Date().toISOString(),
+  }));
+  return { newStreakDays: 1, streakBroke: currentStreak > 0 };
 }
 
 // ─── BLOQUE 4: Calcular puntos de gamificación ───────────────────────────────
@@ -514,7 +524,7 @@ Deno.serve(async (req) => {
 
     // ─── 6. CALCULAR TODOS LOS VALORES DE GAMIFICACIÓN ───────────────────────
     const { baseXP, baseStars, baseWater }                               = calculateBaseAwards(event_type, event_data);
-    const { newStreakDays, streakBroke }                                  = calculateStreak(gam, matamorosNow, todayString);
+    const { newStreakDays, streakBroke }                                  = calculateStreak(gam, todayString);
     const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays);
     const newGrowthPoints = (gam?.tree_growth_points ?? 0) + baseWater;
     const { newTreeStage, newGrowthStreak, newTreeEnergy, newVitality, newGrowthFlow } = updateTreeGrowth(newGrowthPoints, newStreakDays, gam, event_type, nowIso);
@@ -606,7 +616,7 @@ Deno.serve(async (req) => {
       status: 'ok',
       streak_days: newStreakDays,
       streak_broke: streakBroke,
-      streak_saved_by_shield: shieldUsed,
+      streak_saved_by_shield: false, // shields are managed by decayTreeState, not here
       xp_earned: earnedXP + weeklyBonusXP,
       total_xp: finalXP,
       total_stars: finalStars,
