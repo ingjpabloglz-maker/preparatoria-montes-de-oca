@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPageUrl } from '@/utils';
@@ -11,16 +11,11 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from
 "@/components/ui/table";
 import {
-  Users, GraduationCap, CreditCard, Search, TrendingUp,
+  Users, CreditCard, Search, TrendingUp,
   AlertTriangle, RefreshCw, Eye, BarChart2, CheckCircle2, BookOpen } from
 "lucide-react";
 import AdminGuard from '../components/auth/AdminGuard';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-
-const formatName = (u) => {
-  const parts = [u.apellido_paterno, u.apellido_materno, u.nombres].filter(Boolean);
-  return parts.length > 0 ? parts.join(' ') : u.full_name || 'Sin nombre';
-};
 
 const LEVEL_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'];
 
@@ -40,19 +35,20 @@ export default function AdminDashboard() {
   });
   const stats = statsArr[0] || null;
 
-  // Usuarios para tabla (solo lista, no se usa para calcular métricas)
-  const { data: allUsers = [], isLoading: loadingUsers } = useQuery({
-    queryKey: ['allUsers'],
-    queryFn: () => base44.entities.User.list(),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false
-  });
-
-  const { data: allProgress = [] } = useQuery({
-    queryKey: ['allProgress'],
-    queryFn: () => base44.entities.UserProgress.list(),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false
+  // Usuarios para tabla — via adminListUsers (asServiceRole, multi-admin safe)
+  const [adminSearch, setAdminSearchState] = useState('');
+  const { data: usersData, isLoading: loadingUsers } = useQuery({
+    queryKey: ['admin-users', 'user', adminSearch, page],
+    queryFn: () =>
+      base44.functions.invoke('adminListUsers', {
+        role: 'user',
+        search: adminSearch,
+        page,
+        limit: PAGE_SIZE,
+      }).then(r => r.data),
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    keepPreviousData: true,
   });
 
   const handleRecalculate = async () => {
@@ -60,22 +56,14 @@ export default function AdminDashboard() {
     await base44.functions.invoke('cleanOrphanRecords', {});
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['platformStats'] }),
-      queryClient.invalidateQueries({ queryKey: ['allUsers'] }),
-      queryClient.invalidateQueries({ queryKey: ['allProgress'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
     ]);
     setRecalculating(false);
   };
 
-  // Tabla de alumnos — solo role === 'user' (nunca docentes ni admins)
-  const students = allUsers.filter((u) => u.role === 'user');
-  const filtered = students.filter((u) =>
-  u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const getUserProgress = (email) => allProgress.find((p) => p.user_email === email);
+  const students = usersData?.users || [];
+  const totalPages = usersData?.total_pages || 1;
+  const totalStudentsInSearch = usersData?.total || 0;
 
   // Gráfica distribución por nivel
   const levelChartData = [1, 2, 3, 4, 5, 6].map((lvl) => ({
@@ -286,16 +274,22 @@ export default function AdminDashboard() {
           <Card className="border-0 shadow-sm">
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <CardTitle className="text-base">Alumnos ({filtered.length})</CardTitle>
+                <CardTitle className="text-base">Alumnos ({totalStudentsInSearch})</CardTitle>
                 <div className="flex gap-2 items-center">
                   <div className="relative w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <Input
                       placeholder="Buscar alumno..."
                       value={searchTerm}
-                      onChange={(e) => {setSearchTerm(e.target.value);setPage(1);}}
-                      className="pl-9" />
-                    
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setSearchTerm(v);
+                        setPage(1);
+                        clearTimeout(window._adminSearchTimeout);
+                        window._adminSearchTimeout = setTimeout(() => setAdminSearchState(v), 350);
+                      }}
+                      className="pl-9"
+                    />
                   </div>
                   <Button variant="outline" size="sm" onClick={() => window.location.href = createPageUrl('ManageStudents')}>
                     Ver todos
@@ -314,14 +308,13 @@ export default function AdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginated.map((u) => {
-                    const prog = getUserProgress(u.email);
+                  {students.map((u) => {
                     return (
                       <TableRow key={u.id}>
-                        <TableCell className="font-medium">{formatName(u)}</TableCell>
+                        <TableCell className="font-medium">{u.full_name}</TableCell>
                         <TableCell className="text-gray-500 text-sm">{u.email}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">Nivel {prog?.current_level || 1}</Badge>
+                          <Badge variant="outline">Nivel {u.current_level || 1}</Badge>
                         </TableCell>
                         <TableCell>
                           <Button
@@ -336,7 +329,7 @@ export default function AdminDashboard() {
                       </TableRow>);
 
                   })}
-                  {paginated.length === 0 &&
+                  {students.length === 0 && !loadingUsers &&
                   <TableRow>
                       <TableCell colSpan={4} className="text-center text-gray-400 py-8">
                         No se encontraron alumnos.

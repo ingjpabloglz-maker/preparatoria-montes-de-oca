@@ -82,17 +82,19 @@ function MateriasTab({ studentEmail, subjects }) {
     setRecalcLoading(true);
     try {
       await base44.functions.invoke('recalculateSubjectProgress', {});
+      await queryClient.invalidateQueries({ queryKey: ['admin-student-detail', studentEmail] });
       await queryClient.invalidateQueries({ queryKey: ['studentSubjectProgress', studentEmail] });
-      await queryClient.invalidateQueries({ queryKey: ['studentProgress', studentEmail] });
       toast.success('Progreso recalculado y sincronizado');
       // Audit log
       base44.auth.me().then(admin => {
         if (admin) {
-          base44.entities.UserReport?.create({
-            admin_email: admin.email,
-            student_email: studentEmail,
-            action: 'ADMIN_RECALCULATED_PROGRESS',
-            timestamp: new Date().toISOString(),
+          base44.entities.UserReport.create({
+            reported_user_email: studentEmail,
+            reported_by: admin.email,
+            reported_by_role: 'admin',
+            reason: 'ADMIN_RECALCULATED_PROGRESS',
+            description: JSON.stringify({ admin_email: admin.email, student_email: studentEmail, timestamp: new Date().toISOString() }),
+            status: 'reviewed',
           }).catch(() => {});
         }
       });
@@ -261,81 +263,37 @@ export default function StudentDetail() {
   useEffect(() => {
     base44.auth.me().then(u => {
       setAdminUser(u);
-      // Audit log de vista
-      if (u && studentEmail) {
-        base44.entities.UserReport?.create({
-          admin_email: u.email,
-          student_email: studentEmail,
-          action: 'ADMIN_VIEWED_STUDENT_DETAIL',
-          timestamp: new Date().toISOString(),
-        }).catch(() => {});
-      }
     });
   }, [studentEmail]);
 
-  // AUDIT: Datos por alumno — staleTime=0 + gcTime corto para no acumular N entradas
-  // (una por cada alumno visitado). Se liberan al salir de la vista.
-  const { data: students = [], isLoading: loadingStudent } = useQuery({
-    queryKey: ['student', studentEmail],
-    queryFn: () => base44.entities.User.filter({ email: studentEmail }),
+  // Carga todos los datos del alumno via backend (asServiceRole — multi-admin safe)
+  const { data: detailData, isLoading: loadingStudent } = useQuery({
+    queryKey: ['admin-student-detail', studentEmail],
+    queryFn: () =>
+      base44.functions.invoke('adminGetStudentDetail', { user_email: studentEmail })
+        .then(r => r.data),
     enabled: !!studentEmail,
     staleTime: 0,
     gcTime: 3 * 60 * 1000,
     refetchOnMount: true,
-    refetchOnReconnect: true,
   });
 
-  const { data: progressData = [] } = useQuery({
-    queryKey: ['studentProgress', studentEmail],
-    queryFn: () => base44.entities.UserProgress.filter({ user_email: studentEmail }),
-    enabled: !!studentEmail,
-    staleTime: 0,
-    gcTime: 3 * 60 * 1000,
-    refetchOnMount: true,
-    refetchOnReconnect: true,
-  });
-
-  // Subjects — estático, reutiliza cache global.
-  const { data: subjects = [] } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: () => base44.entities.Subject.list('level'),
-    staleTime: 30 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-
-  // SubjectProgress — por alumno, gcTime corto.
-  const { data: subjectProgress = [] } = useQuery({
-    queryKey: ['studentSubjectProgress', studentEmail],
-    queryFn: () => base44.entities.SubjectProgress.filter({ user_email: studentEmail }),
-    enabled: !!studentEmail,
-    staleTime: 0,
-    gcTime: 3 * 60 * 1000,
-    refetchOnMount: true,
-    refetchOnReconnect: true,
-  });
-
-  // Colegiaturas del nivel actual — por alumno, gcTime corto.
-  const { data: paymentPlans = [] } = useQuery({
-    queryKey: ['studentPaymentPlans', studentEmail],
-    queryFn: () => base44.entities.LevelPaymentPlan.filter({ user_email: studentEmail }),
-    enabled: !!studentEmail,
-    staleTime: 0,
-    gcTime: 3 * 60 * 1000,
-    refetchOnMount: true,
-    refetchOnReconnect: true,
-  });
-
-  const student = students[0];
-  const progress = progressData[0];
+  const student = detailData?.student || null;
+  const progress = detailData?.progress || {};
+  const subjects = detailData?.subjects || [];
+  const subjectProgress = detailData?.subject_progress || [];
+  const paymentPlans = detailData?.payment_plans || [];
   const currentLevel = progress?.current_level || 1;
 
   const handleAdminUpdate = async () => {
-    queryClient.invalidateQueries({ queryKey: ['student', studentEmail] });
+    queryClient.invalidateQueries({ queryKey: ['admin-student-detail', studentEmail] });
   };
 
   const handleAdminClearField = async (field) => {
-    await base44.entities.User.update(student.id, { [field]: '' });
-    queryClient.invalidateQueries({ queryKey: ['student', studentEmail] });
+    if (student?.id) {
+      await base44.entities.User.update(student.id, { [field]: '' });
+    }
+    queryClient.invalidateQueries({ queryKey: ['admin-student-detail', studentEmail] });
   };
 
   const handleDeleteStudent = async () => {
@@ -344,7 +302,7 @@ export default function StudentDetail() {
     window.location.href = createPageUrl('ManageStudents');
   };
 
-  if (loadingStudent || !student) {
+  if (loadingStudent || !detailData || !student) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-gray-300" />

@@ -16,21 +16,27 @@ export default function ManageAdmins() {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: allUsers = [] } = useQuery({
-    queryKey: ['allUsers'],
-    queryFn: () => base44.entities.User.list(),
+  // Usa adminListUsers con role='admin' — sin dependencia de User RLS
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-users', 'admin'],
+    queryFn: () =>
+      base44.functions.invoke('adminListUsers', { role: 'admin', limit: 200 }).then(r => r.data),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (userId) => base44.entities.User.delete(userId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allUsers'] }),
+    mutationFn: (userEmail) =>
+      base44.functions.invoke('deleteUserCompletely', { user_email: userEmail }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-users', 'admin'] }),
   });
 
   const PROTECTED_EMAIL = 'inj.jpablo.glz@gmail.com';
 
-  const admins = allUsers.filter(u => u.role === 'admin' && u.email !== PROTECTED_EMAIL);
+  const allAdmins = (data?.users || []).filter(u => u.email !== PROTECTED_EMAIL);
 
-  const filteredAdmins = admins.filter(a =>
+  const filteredAdmins = allAdmins.filter(a =>
     a.full_name?.toLowerCase().includes(search.toLowerCase()) ||
     a.email?.toLowerCase().includes(search.toLowerCase())
   );
@@ -39,6 +45,7 @@ export default function ManageAdmins() {
     <AdminGuard>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="max-w-5xl mx-auto p-6 space-y-6">
+
           {/* Header */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
@@ -46,7 +53,7 @@ export default function ManageAdmins() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Gestión de Administradores</h1>
-              <p className="text-gray-500 text-sm">{admins.length} administradores registrados</p>
+              <p className="text-gray-500 text-sm">{allAdmins.length} administradores registrados</p>
             </div>
           </div>
 
@@ -67,68 +74,74 @@ export default function ManageAdmins() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Rol</TableHead>
-                    <TableHead>Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAdmins.map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell className="font-medium">{a.full_name || 'Sin nombre'}</TableCell>
-                      <TableCell className="text-gray-500">{a.email}</TableCell>
-                      <TableCell>
-                        <Badge className="bg-indigo-100 text-indigo-800">Administrador</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {currentUser?.id !== a.id && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                                <Trash2 className="w-4 h-4 mr-1" />
-                                Eliminar
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Eliminar administrador?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Se eliminará el acceso de <strong>{a.full_name || a.email}</strong>. Esta acción no se puede deshacer.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-red-600 hover:bg-red-700"
-                                  onClick={() => deleteMutation.mutate(a.id)}
-                                >
-                                  Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                        {currentUser?.id === a.id && (
-                          <span className="text-xs text-gray-400 px-2">Tu cuenta</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredAdmins.length === 0 && (
+              {isLoading ? (
+                <div className="flex justify-center py-12">
+                  <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-gray-400 py-8">
-                        No se encontraron administradores.
-                      </TableCell>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Rol</TableHead>
+                      <TableHead>Acciones</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAdmins.map((a) => (
+                      <TableRow key={a.id}>
+                        <TableCell className="font-medium">{a.full_name || 'Sin nombre'}</TableCell>
+                        <TableCell className="text-gray-500">{a.email}</TableCell>
+                        <TableCell>
+                          <Badge className="bg-indigo-100 text-indigo-800">Administrador</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {currentUser?.email !== a.email ? (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                                  <Trash2 className="w-4 h-4 mr-1" />
+                                  Eliminar
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar administrador?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Se eliminará el acceso de <strong>{a.full_name || a.email}</strong>. Esta acción no se puede deshacer.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-red-600 hover:bg-red-700"
+                                    onClick={() => deleteMutation.mutate(a.email)}
+                                  >
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          ) : (
+                            <span className="text-xs text-gray-400 px-2">Tu cuenta</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredAdmins.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-gray-400 py-8">
+                          No se encontraron administradores.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
+
         </div>
       </div>
     </AdminGuard>
