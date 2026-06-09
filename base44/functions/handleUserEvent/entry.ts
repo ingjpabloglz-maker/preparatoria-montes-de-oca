@@ -107,46 +107,28 @@ function calculateBaseAwards(event_type, event_data) {
 }
 
 // ─── BLOQUE 3: Calcular racha ─────────────────────────────────────────────────
+// Los escudos ya fueron consumidos día a día por decayTreeState.
+// Aquí solo determinamos si la racha sigue viva (streak_days > 0) o se perdió,
+// y continuamos/reiniciamos en consecuencia.
 function calculateStreak(gam, matamorosNow, todayString) {
   let newStreakDays = gam?.streak_days || 0;
   let streakBroke = false;
-  let shieldUsed = false;
-  let shieldsUsedCount = 0;
 
   if (gam) {
     const lastDate = gam.last_study_date_normalized;
     if (lastDate) {
       // Evento duplicado en el mismo día: no modificar racha
       if (lastDate === todayString) {
-        return { newStreakDays: gam.streak_days || 1, streakBroke: false, shieldUsed: false, shieldsUsedCount: 0 };
+        return { newStreakDays: gam.streak_days || 1, streakBroke: false };
       }
 
-      // Calcular diferencia exacta en días (timezone-agnostic)
-      const [ty, tm, td] = todayString.split('-').map(Number);
-      const [ly, lm, ld] = lastDate.split('-').map(Number);
-      const todayMs = Date.UTC(ty, tm - 1, td);
-      const lastMs  = Date.UTC(ly, lm - 1, ld);
-      const diffDays = Math.round((todayMs - lastMs) / (1000 * 60 * 60 * 24));
-
-      if (diffDays === 1) {
-        // Estudió ayer → continúa racha normalmente
-        newStreakDays = (gam.streak_days || 0) + 1;
-      } else if (diffDays > 1) {
-        // Faltó más de un día → necesita (diffDays - 1) escudos para cubrir la ausencia
-        const shieldsNeeded    = diffDays - 1;
-        const availableShields = gam.streak_shields || 0;
-
-        if (availableShields >= shieldsNeeded) {
-          // Tiene escudos suficientes → racha protegida, continúa al estudiar hoy
-          newStreakDays    = (gam.streak_days || 0) + 1;
-          shieldUsed       = true;
-          shieldsUsedCount = shieldsNeeded;
-        } else {
-          // Sin escudos suficientes → racha rota, no gastar escudos
-          newStreakDays = 1;
-          streakBroke   = (gam.streak_days || 0) > 1;
-          shieldsUsedCount = 0;
-        }
+      if (newStreakDays > 0) {
+        // Racha sigue viva (el decay ya consumió escudos o no habían días suficientes para romperla)
+        newStreakDays = newStreakDays + 1;
+      } else {
+        // Racha rota por el decay → iniciar de 1
+        newStreakDays = 1;
+        streakBroke = true;
       }
     } else {
       newStreakDays = 1;
@@ -155,7 +137,7 @@ function calculateStreak(gam, matamorosNow, todayString) {
     newStreakDays = 1;
   }
 
-  return { newStreakDays, streakBroke, shieldUsed, shieldsUsedCount };
+  return { newStreakDays, streakBroke };
 }
 
 // ─── BLOQUE 4: Calcular puntos de gamificación ───────────────────────────────
@@ -532,7 +514,7 @@ Deno.serve(async (req) => {
 
     // ─── 6. CALCULAR TODOS LOS VALORES DE GAMIFICACIÓN ───────────────────────
     const { baseXP, baseStars, baseWater }                               = calculateBaseAwards(event_type, event_data);
-    const { newStreakDays, streakBroke, shieldUsed, shieldsUsedCount }   = calculateStreak(gam, matamorosNow, todayString);
+    const { newStreakDays, streakBroke }                                  = calculateStreak(gam, matamorosNow, todayString);
     const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays);
     const newGrowthPoints = (gam?.tree_growth_points ?? 0) + baseWater;
     const { newTreeStage, newGrowthStreak, newTreeEnergy, newVitality, newGrowthFlow } = updateTreeGrowth(newGrowthPoints, newStreakDays, gam, event_type, nowIso);
@@ -574,7 +556,8 @@ Deno.serve(async (req) => {
       last_study_date_normalized: todayString,
       max_streak: newMaxStreak,
       total_stars: finalStars,
-      streak_shields: Math.max(0, (gam?.streak_shields || 0) - shieldsUsedCount),
+      streak_shields: gam?.streak_shields ?? 0,  // escudos ya gestionados por decayTreeState
+      streak_shields_paid_days: 0,               // reiniciar gap al estudiar
       water_tokens: newWater,
       xp_points: finalXP,
       level: finalLevel,

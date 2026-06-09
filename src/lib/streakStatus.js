@@ -13,26 +13,24 @@ function getMatamorosTodayStr() {
 
 /**
  * @param {string|null} lastStudyDateNormalized - "YYYY-MM-DD"
- * @param {number} streakShields - Escudos activos del usuario
+ * @param {number} streakDays - Días de racha actuales (0 = rota por decay)
  * @returns {"normal" | "at_risk" | "lost" | "none"}
  */
-export function getStreakStatus(lastStudyDateNormalized, streakShields = 0) {
+export function getStreakStatus(lastStudyDateNormalized, streakDays = 0) {
   if (!lastStudyDateNormalized) return 'none';
+
+  // Si el decay ya puso streak_days a 0, la racha está perdida
+  if (streakDays === 0) return 'lost';
 
   const today = getMatamorosTodayStr();
   const [ty, tm, td] = today.split('-').map(Number);
   const [ly, lm, ld] = lastStudyDateNormalized.split('-').map(Number);
 
   const todayMs = Date.UTC(ty, tm - 1, td);
-  const lastMs = Date.UTC(ly, lm - 1, ld);
+  const lastMs  = Date.UTC(ly, lm - 1, ld);
   const diffDays = Math.round((todayMs - lastMs) / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 0) return 'normal';   // estudió hoy
-  if (diffDays === 1) return 'at_risk';  // estudió ayer — siempre en riesgo (aún no ha estudiado hoy)
-
-  // Faltó más de 1 día: verificar si los escudos cubren los días de ausencia
-  const daysMissed = diffDays - 1;
-  if (streakShields >= daysMissed) return 'at_risk'; // escudos suficientes → sigue protegida
-
-  return 'lost'; // sin protección suficiente
+  if (diffDays === 0) return 'normal';  // estudió hoy
+  if (diffDays === 1) return 'at_risk'; // estudió ayer — aún no estudió hoy
+  return 'at_risk'; // >1 día pero streak_days > 0 → escudos lo están cubriendo
 }

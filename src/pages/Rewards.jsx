@@ -165,9 +165,7 @@ export default function Rewards() {
               <Flame className="w-8 h-8 text-orange-500" />
               <div>
                 <p className="text-2xl font-bold text-orange-700">
-                  {getStreakStatus(profile?.last_study_date_normalized, profile?.streak_shields || 0) === 'lost'
-                    ? 0
-                    : (profile?.streak_days || 0)}
+                  {profile?.streak_days || 0}
                 </p>
                 <p className="text-xs text-orange-500">Racha actual</p>
               </div>
