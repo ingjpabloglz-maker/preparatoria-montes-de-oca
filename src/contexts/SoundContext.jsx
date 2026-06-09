@@ -110,6 +110,25 @@ export function SoundProvider({ children }) {
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
         osc.start(t);
         osc.stop(t + 0.3);
+      } else if (soundName === 'lesson_completed') {
+        // Fanfarria de lección completada: acorde ascendente C5-E5-G5-C6
+        const freqs = [523.25, 659.25, 783.99, 1046.50];
+        const offsets = [0, 0.12, 0.24, 0.38];
+        osc.disconnect();
+        freqs.forEach((freq, i) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.connect(g);
+          g.connect(ctx.destination);
+          o.type = 'sine';
+          o.frequency.setValueAtTime(freq, t + offsets[i]);
+          g.gain.setValueAtTime(0, t + offsets[i]);
+          g.gain.linearRampToValueAtTime(gainValue, t + offsets[i] + 0.04);
+          g.gain.exponentialRampToValueAtTime(0.001, t + offsets[i] + 0.3);
+          o.start(t + offsets[i]);
+          o.stop(t + offsets[i] + 0.35);
+        });
+        return; // ya no necesitamos osc ni gain originales
       } else {
         // Sonido genérico de notificación
         osc.type = 'sine';

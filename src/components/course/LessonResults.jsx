@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircle2, XCircle, Trophy, RotateCcw, ArrowRight, Flame, Clock } from "lucide-react";
+import { useSound } from '@/contexts/SoundContext';
 
 export default function LessonResults({
   lesson, correctCount, totalCount, score, passed,
@@ -33,6 +34,14 @@ export default function LessonResults({
     }
     return { title: 'No aprobado 📚', sub: 'Necesitas al menos 60% para avanzar. Puedes repetir la lección.' };
   };
+
+  const { playSound } = useSound();
+
+  useEffect(() => {
+    if (passed) {
+      playSound('lesson_completed');
+    }
+  }, []);
 
   const { title, sub } = getMessage();
   const isRepeat = gamificationResult?.is_repeat === true;
