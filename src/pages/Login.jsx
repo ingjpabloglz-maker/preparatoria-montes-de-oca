@@ -17,7 +17,7 @@ export default function Login() {
 
   useEffect(() => {
     base44.auth.isAuthenticated().then((authed) => {
-      if (authed) navigate("/app/Dashboard", { replace: true });
+      if (authed) navigate("/app/RoleRedirect", { replace: true });
     });
   }, []);
 
@@ -27,7 +27,7 @@ export default function Login() {
     setLoading(true);
     try {
       await base44.auth.loginViaEmailPassword(email, password);
-      window.location.href = "/app/Dashboard";
+      window.location.href = "/app/RoleRedirect";
     } catch (err) {
       setError(err.message || "Invalid email or password");
     } finally {
@@ -36,7 +36,7 @@ export default function Login() {
   };
 
   const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", "/app/Dashboard");
+    base44.auth.loginWithProvider("google", "/app/RoleRedirect");
   };
 
   return (

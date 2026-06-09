@@ -105,7 +105,7 @@ const AuthenticatedApp = () => {
       {showWarning && <InactivityWarningModal onStayActive={updateActivity} />}
       <Routes>
         {/* Redirección por defecto: /app → /app/Dashboard */}
-        <Route path="/" element={<Navigate to="Dashboard" replace />} />
+        <Route path="/" element={<Navigate to="RoleRedirect" replace />} />
 
         {Object.entries(Pages).map(([path, Page]) => (
           <Route
