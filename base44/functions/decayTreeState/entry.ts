@@ -29,8 +29,12 @@ Deno.serve(async (req) => {
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
 
-  // Fetch all profiles
-  const profiles = await base44.asServiceRole.entities.GamificationProfile.list();
+  // Fetch only student profiles (role === 'user') — skip admins and teachers
+  const allUsers = await base44.asServiceRole.entities.User.list();
+  const studentEmails = new Set(allUsers.filter(u => u.role === 'user').map(u => u.email));
+
+  const allProfiles = await base44.asServiceRole.entities.GamificationProfile.list();
+  const profiles = allProfiles.filter(p => studentEmails.has(p.user_email));
 
   let updated = 0;
   let skipped = 0;

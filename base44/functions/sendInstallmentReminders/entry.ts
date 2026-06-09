@@ -50,8 +50,9 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Obtener nombre del usuario
+      // Obtener usuario y verificar que sea alumno (role === 'user')
       const users = await sa.entities.User.filter({ email: user_email });
+      if (!users[0] || users[0].role !== 'user') { skipped++; continue; }
       const userName = users[0]?.full_name?.split(' ')[0] || 'Estudiante';
 
       const dueDateFormatted = dueDate.toLocaleDateString('es-MX', {
