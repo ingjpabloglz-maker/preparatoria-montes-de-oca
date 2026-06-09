@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Volume2, Bell, User, CreditCard, Volume1, VolumeX } from "lucide-react";
+import { ArrowLeft, Volume2, Bell, User, CreditCard, Volume1 } from "lucide-react";
 import ProfileForm from '../components/profile/ProfileForm';
 import InstallmentsTab from '../components/profile/InstallmentsTab';
 import { useSound } from '@/contexts/SoundContext';
@@ -69,67 +69,69 @@ export default function Profile() {
           <TabsContent value="profile" className="mt-4 space-y-6">
             {user && <ProfileForm user={user} onSaved={handleSaved} />}
 
-            {/* Preferencias */}
-            <Card className="border-0 shadow-md">
-              <CardContent className="p-6 space-y-4">
-                <h2 className="font-semibold text-gray-800 text-base">Preferencias</h2>
+            {/* Preferencias — solo para alumnos */}
+            {isStudent && (
+              <Card className="border-0 shadow-md">
+                <CardContent className="p-6 space-y-4">
+                  <h2 className="font-semibold text-gray-800 text-base">Preferencias</h2>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Volume2 className="w-4 h-4 text-gray-500" />
-                    <div>
-                      <Label className="text-sm font-medium">Sonidos del juego</Label>
-                      <p className="text-xs text-gray-400">Retroalimentación auditiva al responder</p>
-                    </div>
-                  </div>
-                  <Switch checked={isSoundEnabled} onCheckedChange={toggleSound} />
-                </div>
-
-                {isSoundEnabled && (
-                  <div className="flex items-center justify-between pl-6">
-                    <div className="flex items-center gap-2">
-                      <Volume1 className="w-4 h-4 text-gray-400" />
-                      <Label className="text-sm text-gray-600">Volumen</Label>
-                    </div>
-                    <div className="flex gap-1">
-                      {['low', 'medium', 'high'].map((level) => (
-                        <button
-                          key={level}
-                          onClick={() => setVolume(level)}
-                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                            volume === level
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                          }`}
-                        >
-                          {level === 'low' ? 'Bajo' : level === 'medium' ? 'Medio' : 'Alto'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {gamProfile && (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Bell className="w-4 h-4 text-gray-500" />
+                      <Volume2 className="w-4 h-4 text-gray-500" />
                       <div>
-                        <Label className="text-sm font-medium">Notificaciones por email</Label>
-                        <p className="text-xs text-gray-400">Recordatorios de estudio y actividad</p>
+                        <Label className="text-sm font-medium">Sonidos del juego</Label>
+                        <p className="text-xs text-gray-400">Retroalimentación auditiva al responder</p>
                       </div>
                     </div>
-                    <Switch
-                      checked={gamProfile.email_notifications_enabled !== false}
-                      onCheckedChange={async (val) => {
-                        const updated = { ...gamProfile, email_notifications_enabled: val };
-                        setGamProfile(updated);
-                        await base44.entities.GamificationProfile.update(gamProfile.id, { email_notifications_enabled: val });
-                      }}
-                    />
+                    <Switch checked={isSoundEnabled} onCheckedChange={toggleSound} />
                   </div>
-                )}
-              </CardContent>
-            </Card>
+
+                  {isSoundEnabled && (
+                    <div className="flex items-center justify-between pl-6">
+                      <div className="flex items-center gap-2">
+                        <Volume1 className="w-4 h-4 text-gray-400" />
+                        <Label className="text-sm text-gray-600">Volumen</Label>
+                      </div>
+                      <div className="flex gap-1">
+                        {['low', 'medium', 'high'].map((level) => (
+                          <button
+                            key={level}
+                            onClick={() => setVolume(level)}
+                            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                              volume === level
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                          >
+                            {level === 'low' ? 'Bajo' : level === 'medium' ? 'Medio' : 'Alto'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {gamProfile && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Bell className="w-4 h-4 text-gray-500" />
+                        <div>
+                          <Label className="text-sm font-medium">Notificaciones por email</Label>
+                          <p className="text-xs text-gray-400">Recordatorios de estudio y actividad</p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={gamProfile.email_notifications_enabled !== false}
+                        onCheckedChange={async (val) => {
+                          const updated = { ...gamProfile, email_notifications_enabled: val };
+                          setGamProfile(updated);
+                          await base44.entities.GamificationProfile.update(gamProfile.id, { email_notifications_enabled: val });
+                        }}
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {isStudent && (
