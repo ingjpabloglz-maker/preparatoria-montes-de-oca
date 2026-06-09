@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
@@ -30,8 +30,10 @@ import {
 "lucide-react";
 import { hasPermission } from '@/lib/permissions';
 import { useAuth } from '@/lib/AuthContext';
-import GamificationHUD from "@/components/gamification/GamificationHUD";
 import { cn } from "@/lib/utils";
+
+// Lazy: admins/docentes no descargan el bundle de gamificación
+const GamificationHUD = React.lazy(() => import('@/components/gamification/GamificationHUD'));
 
 export default function Layout({ children, currentPageName }) {
   const { user } = useAuth();
@@ -170,8 +172,12 @@ export default function Layout({ children, currentPageName }) {
               }
             </nav>
 
-            {/* Gamification HUD (solo estudiantes) */}
-            {user?.role === 'user' && <GamificationHUD userEmail={user.email} />}
+            {/* Gamification HUD (solo estudiantes) — lazy: admins/docentes no descargan el bundle */}
+            {user?.role === 'user' && (
+              <Suspense fallback={null}>
+                <GamificationHUD userEmail={user.email} />
+              </Suspense>
+            )}
 
             {/* User Menu */}
             <div className="flex items-center gap-3">

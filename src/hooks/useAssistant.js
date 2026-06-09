@@ -146,6 +146,8 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
   const queueRef          = useRef([]);
   const isShowingRef      = useRef(false);
   const hideTimerRef      = useRef(null);
+  const postHideTimerRef  = useRef(null); // cleanup del setTimeout anidado en showNext
+  const queueTimersRef    = useRef([]);   // cleanup de los timers de cola procesada
   const behaviorRef       = useRef(null);
   const ctxRef            = useRef(null);
 
@@ -176,9 +178,10 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
     }
 
     clearTimeout(hideTimerRef.current);
+    clearTimeout(postHideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
       setVisible(false);
-      setTimeout(showNext, 500);
+      postHideTimerRef.current = setTimeout(showNext, 500);
     }, next.payload?.duration || PASSIVE_DURATION);
   }, [userEmail]);
 
@@ -189,9 +192,21 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
     if (!isShowingRef.current) showNext();
   }, [isAllowed, showNext]);
 
+  // ── Cleanup global al desmontar ────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      clearTimeout(hideTimerRef.current);
+      clearTimeout(postHideTimerRef.current);
+      queueTimersRef.current.forEach(t => clearTimeout(t));
+      queueTimersRef.current = [];
+      setAssistantActive(false);
+    };
+  }, []);
+
   // ── dismiss ───────────────────────────────────────────────────────────────
   const dismiss = useCallback(() => {
     clearTimeout(hideTimerRef.current);
+    clearTimeout(postHideTimerRef.current);
 
     // Log dismissed
     if (userEmail && message?.decision_instance_id) {
@@ -294,7 +309,10 @@ export function useAssistant({ userEmail, profile, allowedPages, currentPage }) 
     const grouped = groupQueuedDecisions(recent, ctxRef.current);
     grouped.forEach((decision, i) => {
       const mapped = mapDecisionToMessage(decision);
-      if (mapped) setTimeout(() => enqueue(mapped), 800 * i);
+      if (mapped) {
+        const t = setTimeout(() => enqueue(mapped), 800 * i);
+        queueTimersRef.current.push(t);
+      }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAllowed]);

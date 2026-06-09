@@ -20,23 +20,25 @@ export default function AchievementToast({ userEmail }) {
   useEffect(() => {
     if (!userEmail) return;
 
+    let mounted = true; // guard contra actualizaciones post-unmount
+
     const checkAchievements = async () => {
       const all = await base44.entities.UserAchievement.filter({ user_email: userEmail, is_unlocked: true });
+      if (!mounted) return; // componente ya desmontado — descartar resultado
 
       if (!initialized.current) {
-        // Primera carga: solo registrar los existentes sin mostrar toast
         all.forEach(ua => knownIds.current.add(ua.id));
         initialized.current = true;
         return;
       }
 
-      // Verificar nuevos
       const newOnes = all.filter(ua => !knownIds.current.has(ua.id));
       for (const ua of newOnes) {
+        if (!mounted) return;
         knownIds.current.add(ua.id);
 
-        // Obtener detalles del Achievement
         const achs = await base44.entities.Achievement.filter({ id: ua.achievement_id });
+        if (!mounted) return;
         const ach = achs[0];
         if (!ach) continue;
 
@@ -63,7 +65,10 @@ export default function AchievementToast({ userEmail }) {
       }
     }, 15000);
 
-    return () => clearInterval(interval);
+    return () => {
+      mounted = false;       // cancela cualquier async call en vuelo
+      clearInterval(interval);
+    };
   }, [userEmail]);
 
   return null;
