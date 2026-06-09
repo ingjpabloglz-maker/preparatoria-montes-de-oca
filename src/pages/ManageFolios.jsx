@@ -114,18 +114,18 @@ export default function ManageFolios() {
     queryFn: () => base44.entities.Payment.list('-created_date'),
   });
 
-  // Cargar todos los alumnos para el selector
+  // Cargar todos los alumnos para el selector (desde UserProfile para acceso sin restricciones)
   const { data: allUsers = [] } = useQuery({
     queryKey: ['allUsers'],
-    queryFn: () => base44.entities.User.list(),
+    queryFn: () => base44.entities.UserProfile.list(),
   });
 
-  const students = allUsers.filter(u => u.role !== 'admin');
+  const students = allUsers.filter(u => u.role !== 'admin' && u.role !== 'docente');
 
   const filteredStudents = studentSearchQuery.trim().length > 0
     ? students.filter(s =>
         formatName(s).toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
-        s.email?.toLowerCase().includes(studentSearchQuery.toLowerCase())
+        (s.user_email || s.email)?.toLowerCase().includes(studentSearchQuery.toLowerCase())
       )
     : students;
 
@@ -174,7 +174,7 @@ export default function ManageFolios() {
   };
 
   const handleSelectStudent = (user) => {
-    setBulkStudentEmail(user.email);
+    setBulkStudentEmail(user.user_email || user.email);
     setBulkStudentName(formatName(user));
     setStudentSearchQuery('');
   };
@@ -369,7 +369,7 @@ export default function ManageFolios() {
                               onClick={() => handleSelectStudent(s)}
                             >
                               <p className="text-sm font-medium">{formatName(s)}</p>
-                              <p className="text-xs text-gray-500">{s.email}</p>
+                              <p className="text-xs text-gray-500">{s.user_email || s.email}</p>
                             </button>
                           ))
                         )}
