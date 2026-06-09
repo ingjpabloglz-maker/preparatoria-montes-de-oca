@@ -303,51 +303,63 @@ export default function Dashboard() {
     loadUser();
   }, []);
 
+  // ─── Solo alumnos cargan datos LMS ────────────────────────────────────────
+  const isStudent = !loadingUser && user?.role === 'user';
+
+  // Redirect via useEffect para no romper el orden de hooks
+  useEffect(() => {
+    if (loadingUser) return;
+    if (user?.role === 'admin') window.location.replace('/app/AdminDashboard');
+    else if (user?.role === 'docente') window.location.replace('/app/TeacherDashboard');
+  }, [loadingUser, user?.role]);
+
   const { data: levels = [], isLoading: loadingLevels } = useQuery({
     queryKey: ['levels'],
     queryFn: () => base44.entities.LevelConfig.list('level_number'),
-    staleTime: 30 * 60 * 1000, // 30 min — datos casi estáticos
+    enabled: isStudent,
+    staleTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
   const { data: subjects = [], isLoading: loadingSubjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => base44.entities.Subject.list('level'),
-    staleTime: 30 * 60 * 1000, // 30 min — datos casi estáticos
+    enabled: isStudent,
+    staleTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
   const { data: userProgress, isLoading: loadingProgress } = useQuery({
     queryKey: ['userProgress', user?.email],
     queryFn: () => base44.entities.UserProgress.filter({ user_email: user?.email }),
-    enabled: !loadingUser && !!user?.email,
-    staleTime: 2 * 60 * 1000, // 2 min — progreso del usuario
+    enabled: isStudent && !!user?.email,
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
   const { data: subjectProgress = [], isLoading: loadingSubjectProgress } = useQuery({
     queryKey: ['subjectProgress', user?.email],
     queryFn: () => base44.entities.SubjectProgress.filter({ user_email: user?.email }),
-    enabled: !loadingUser && !!user?.email,
-    staleTime: 2 * 60 * 1000, // 2 min — progreso del usuario
+    enabled: isStudent && !!user?.email,
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
   const { data: userPayments = [], isLoading: loadingPayments } = useQuery({
     queryKey: ['userPayments', user?.email],
     queryFn: () => base44.entities.Payment.filter({ user_email: user?.email }),
-    enabled: !loadingUser && !!user?.email,
-    staleTime: 5 * 60 * 1000, // 5 min — pagos cambian poco
+    enabled: isStudent && !!user?.email,
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
   const progress = userProgress?.[0];
   const currentLevel = progress?.current_level || 1;
 
-  const { data: gamProfile, refetch: refetchGamProfile } = useGamificationProfile(user?.email);
+  const { data: gamProfile, refetch: refetchGamProfile } = useGamificationProfile(isStudent ? user?.email : null);
 
   const { message: assistantMsg, visible: assistantVisible, dismiss: dismissAssistant, handleCTA: assistantHandleCTA } = useAssistant({
-    userEmail: user?.email,
+    userEmail: isStudent ? user?.email : null,
     profile: gamProfile,
     allowedPages: ['Dashboard', 'Rewards'],
     currentPage: 'Dashboard',
@@ -467,16 +479,6 @@ export default function Dashboard() {
     return { ...levelSubjects[0], progress: sp0?.progress_percent || 0 };
   };
   const nextSubject = getNextSubject();
-
-  // Redirigir admins y docentes a sus dashboards correspondientes
-  if (user?.role === 'admin') {
-    window.location.replace('/app/AdminDashboard');
-    return null;
-  }
-  if (user?.role === 'docente') {
-    window.location.replace('/app/TeacherDashboard');
-    return null;
-  }
 
   if (loadingUser || loadingLevels || loadingSubjects || loadingProgress || loadingSubjectProgress || loadingPayments) {
     return (

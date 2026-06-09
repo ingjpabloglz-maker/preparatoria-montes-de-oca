@@ -58,14 +58,11 @@ export default function AdminDashboard() {
   const handleRecalculate = async () => {
     setRecalculating(true);
     await base44.functions.invoke('cleanOrphanRecords', {});
-    setRecalculating(true);
-    await base44.functions.invoke('cleanOrphanRecords', {});
-    await queryClient.invalidateQueries({ queryKey: ['platformStats'] });
-    await queryClient.invalidateQueries({ queryKey: ['allUsers'] });
-    await queryClient.invalidateQueries({ queryKey: ['allProgress'] });
-    await queryClient.invalidateQueries({ queryKey: ['platformStats'] });
-    await queryClient.invalidateQueries({ queryKey: ['allUsers'] });
-    await queryClient.invalidateQueries({ queryKey: ['allProgress'] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['platformStats'] }),
+      queryClient.invalidateQueries({ queryKey: ['allUsers'] }),
+      queryClient.invalidateQueries({ queryKey: ['allProgress'] }),
+    ]);
     setRecalculating(false);
   };
 

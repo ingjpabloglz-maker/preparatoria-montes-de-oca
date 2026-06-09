@@ -11,9 +11,9 @@ export function useHasCompletedSurpriseExam(userEmail) {
       return attempts.length > 0;
     },
     enabled: !!userEmail,
-    staleTime: 0,
+    staleTime: 60 * 1000,        // 1 min — el estado del examen diario no cambia en segundos
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   return data ?? false;

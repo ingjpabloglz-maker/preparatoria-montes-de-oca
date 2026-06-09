@@ -24,7 +24,7 @@ export function useSubjectRealProgress(userEmail, subjectId) {
     queryFn: () => base44.entities.LessonProgress.filter({ user_email: userEmail, subject_id: subjectId }),
     enabled: !!userEmail && !!subjectId,
     staleTime: 60 * 1000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   const totalLessons = lessons.filter(l => !l.is_mini_eval).length;
@@ -77,7 +77,7 @@ export function useMultiSubjectProgress(userEmail, subjectIds = []) {
     },
     enabled: !!userEmail && subjectIds.length > 0,
     staleTime: 60 * 1000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   // Construir el mapa de progreso por subjectId

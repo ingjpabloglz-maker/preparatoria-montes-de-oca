@@ -35,17 +35,26 @@ export default function Rewards() {
   const [buyingShield, setBuyingShield] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: profile } = useGamificationProfile(user?.email);
+  // Guard de rol: solo alumnos acceden a Rewards
+  const isStudent = user === null || user?.role === 'user'; // null = aún cargando
+
+  const { data: profile } = useGamificationProfile(isStudent && user?.email ? user.email : null);
 
   const { message: assistantMsg, visible: assistantVisible, dismiss: dismissAssistant } = useAssistant({
-    userEmail: user?.email,
+    userEmail: isStudent ? user?.email : null,
     profile,
     allowedPages: ['Dashboard', 'Rewards'],
     currentPage: 'Rewards',
   });
 
   useEffect(() => {
-    base44.auth.me().then(setUser);
+    base44.auth.me().then((u) => {
+      setUser(u);
+      // Redirect inmediato para no-alumnos
+      if (u && u.role !== 'user') {
+        window.location.replace(u.role === 'admin' ? '/app/AdminDashboard' : '/app/TeacherDashboard');
+      }
+    });
   }, []);
 
   const handleBuyShield = async () => {
@@ -69,9 +78,9 @@ export default function Rewards() {
   const { data: userAchievements = [] } = useQuery({
     queryKey: ['userAchievements', user?.email],
     queryFn: () => base44.entities.UserAchievement.filter({ user_email: user?.email }),
-    enabled: !!user?.email,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    enabled: !!user?.email && isStudent,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const unlockedMap = {};

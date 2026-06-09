@@ -12,8 +12,8 @@ export function useGamificationProfile(userEmail) {
       return result[0];
     },
     enabled: !!userEmail,
-    staleTime: 0,
+    staleTime: 30 * 1000,       // 30s — evita refetches en cada re-render
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false, // no refetch al cambiar de pestaña
   });
 }
