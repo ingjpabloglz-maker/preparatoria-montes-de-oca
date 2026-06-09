@@ -92,12 +92,12 @@ export default function StudentDashboard({ user }) {
 
   // Abrir modal automáticamente si no hay sesión activa válida y no fue descartado
   React.useEffect(() => {
-    if (!gamProfile || goalModalDismissed || goalModalPending) return;
+    if (!gamProfile || goalModalDismissed || goalModalPending || !activeGoalSessions) return;
     const now = new Date();
-    const hasValid = activeGoalSessions?.some(s => new Date(s.expires_at) > now);
+    const hasValid = activeGoalSessions.some(s => new Date(s.expires_at) > now);
     if (!hasValid) {
       // Calcular cuántas metas completadas en el ciclo actual para mostrar recompensas correctas
-      setGoalNumberInCycle((activeGoalSessions?.length ?? 0) + 1);
+      setGoalNumberInCycle((activeGoalSessions.length ?? 0) + 1);
       setShowGoalModal(true);
     }
   }, [gamProfile?.user_email, activeGoalSessions, goalModalDismissed, goalModalPending]);
