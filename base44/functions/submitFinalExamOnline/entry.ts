@@ -1,4 +1,15 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+const SERVICE_ACCOUNT_RE = /^service\+|@no-reply\.base44\.com$|^bot\+|^automation\+|^system\+/i;
+function requireStudentRole(user, fnName) {
+  const email = user?.email || 'anonymous';
+  const role = user?.role || 'none';
+  if (!user || user.role !== 'user' || SERVICE_ACCOUNT_RE.test(email)) {
+    console.log(JSON.stringify({ event: 'NON_STUDENT_OPERATION_BLOCKED', function: fnName, email, role, timestamp: new Date().toISOString() }));
+    return Response.json({ status: 'ignored', message: 'Operación exclusiva para alumnos.', blocked_role: role }, { status: 403 });
+  }
+  return null;
+}
 
 const PASSING_SCORE = 70;
 const GRADING_VERSION = '1.0';
@@ -16,6 +27,10 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'No autenticado' }, { status: 401 });
+
+    // Solo alumnos envían exámenes finales
+    const blocked = requireStudentRole(user, 'submitFinalExamOnline');
+    if (blocked) return blocked;
 
     const { session_id, final_answers } = await req.json();
     if (!session_id) return Response.json({ error: 'session_id requerido' }, { status: 400 });

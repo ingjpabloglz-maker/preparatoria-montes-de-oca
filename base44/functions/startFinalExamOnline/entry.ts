@@ -1,4 +1,15 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+const SERVICE_ACCOUNT_RE = /^service\+|@no-reply\.base44\.com$|^bot\+|^automation\+|^system\+/i;
+function requireStudentRole(user, fnName) {
+  const email = user?.email || 'anonymous';
+  const role = user?.role || 'none';
+  if (!user || user.role !== 'user' || SERVICE_ACCOUNT_RE.test(email)) {
+    console.log(JSON.stringify({ event: 'NON_STUDENT_OPERATION_BLOCKED', function: fnName, email, role, timestamp: new Date().toISOString() }));
+    return Response.json({ status: 'ignored', message: 'Operación exclusiva para alumnos.', blocked_role: role }, { status: 403 });
+  }
+  return null;
+}
 
 const EXAM_CONFIG = { total: 50, duration_minutes: 60 };
 const ALLOWED_TYPES = ['multiple_choice', 'true_false', 'fill_blank'];
@@ -57,6 +68,10 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'No autenticado' }, { status: 401 });
+
+    // Solo alumnos inician exámenes finales
+    const blocked = requireStudentRole(user, 'startFinalExamOnline');
+    if (blocked) return blocked;
 
     const { subject_id } = await req.json();
     if (!subject_id) return Response.json({ error: 'subject_id requerido' }, { status: 400 });

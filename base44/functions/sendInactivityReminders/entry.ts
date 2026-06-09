@@ -18,8 +18,19 @@ Deno.serve(async (req) => {
   let sent = 0;
   let skipped = 0;
 
+  // Pre-cargar mapa de usuarios estudiantes para evitar N queries
+  const allUsers = await base44.asServiceRole.entities.User.list();
+  const studentMap = new Map(allUsers.filter(u => u.role === 'user' && !(/^service\+|@no-reply\.base44\.com$|^bot\+/i.test(u.email))).map(u => [u.email, u]));
+
   for (const profile of activeProfiles) {
     const { user_email, last_study_date_normalized } = profile;
+
+    // Solo procesar alumnos reales
+    if (!studentMap.has(user_email)) {
+      console.log(JSON.stringify({ event: 'NON_STUDENT_OPERATION_BLOCKED', function: 'sendInactivityReminders', email: user_email, timestamp: new Date().toISOString() }));
+      skipped++; continue;
+    }
+
     if (!last_study_date_normalized) { skipped++; continue; }
 
     // Calcular días inactivo
@@ -64,10 +75,7 @@ Deno.serve(async (req) => {
     let template = templates.find(t => t.template_id === templateKey);
     if (!template) { skipped++; continue; }
 
-    // Obtener usuario y verificar que sea alumno (role === 'user')
-    const users = await base44.asServiceRole.entities.User.filter({ email: user_email });
-    if (!users[0] || users[0].role !== 'user') { skipped++; continue; }
-    const userName = users[0]?.full_name?.split(' ')[0] || 'Estudiante';
+    const userName = studentMap.get(user_email)?.full_name?.split(' ')[0] || 'Estudiante';
 
     // Sustituir placeholders
     const subject = template.subject.replace(/{nombre}/g, userName);

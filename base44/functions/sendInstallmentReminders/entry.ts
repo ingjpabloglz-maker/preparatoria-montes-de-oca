@@ -18,6 +18,10 @@ Deno.serve(async (req) => {
     // Buscar todas las colegiaturas pending/overdue con due_date <= 7 días
     const plans = await sa.entities.LevelPaymentPlan.filter({ status: 'pending' });
 
+    // Pre-cargar mapa de alumnos para evitar N queries por plan
+    const allUsers = await sa.entities.User.list();
+    const studentMap = new Map(allUsers.filter(u => u.role === 'user' && !(/^service\+|@no-reply\.base44\.com$|^bot\+/i.test(u.email))).map(u => [u.email, u]));
+
     let sent = 0;
     let skipped = 0;
 
@@ -50,10 +54,12 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Obtener usuario y verificar que sea alumno (role === 'user')
-      const users = await sa.entities.User.filter({ email: user_email });
-      if (!users[0] || users[0].role !== 'user') { skipped++; continue; }
-      const userName = users[0]?.full_name?.split(' ')[0] || 'Estudiante';
+      // Verificar que sea alumno real (sin query extra — ya cargado en studentMap)
+      if (!studentMap.has(user_email)) {
+        console.log(JSON.stringify({ event: 'NON_STUDENT_OPERATION_BLOCKED', function: 'sendInstallmentReminders', email: user_email, timestamp: new Date().toISOString() }));
+        skipped++; continue;
+      }
+      const userName = studentMap.get(user_email)?.full_name?.split(' ')[0] || 'Estudiante';
 
       const dueDateFormatted = dueDate.toLocaleDateString('es-MX', {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'

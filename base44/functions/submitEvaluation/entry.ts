@@ -1,4 +1,15 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+const SERVICE_ACCOUNT_RE = /^service\+|@no-reply\.base44\.com$|^bot\+|^automation\+|^system\+/i;
+function requireStudentRole(user, fnName) {
+  const email = user?.email || 'anonymous';
+  const role = user?.role || 'none';
+  if (!user || user.role !== 'user' || SERVICE_ACCOUNT_RE.test(email)) {
+    console.log(JSON.stringify({ event: 'NON_STUDENT_OPERATION_BLOCKED', function: fnName, email, role, timestamp: new Date().toISOString() }));
+    return Response.json({ status: 'ignored', message: 'Operación exclusiva para alumnos.', blocked_role: role }, { status: 403 });
+  }
+  return null;
+}
 
 // ─── NORMALIZACIÓN ────────────────────────────────────────────────────────────
 function normalizeAnswer(answer) {
@@ -61,6 +72,10 @@ Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Solo alumnos presentan evaluaciones
+  const blocked = requireStudentRole(user, 'submitEvaluation');
+  if (blocked) return blocked;
 
   const body = await req.json();
   const {

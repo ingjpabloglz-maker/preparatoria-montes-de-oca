@@ -1,4 +1,19 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+
+const SERVICE_ACCOUNT_RE = /^service\+|@no-reply\.base44\.com$|^bot\+|^automation\+|^system\+/i;
+function requireStudentRole(user, fnName) {
+  const email = user?.email || 'anonymous';
+  const role = user?.role || 'none';
+  if (!user || user.role !== 'user' || SERVICE_ACCOUNT_RE.test(email)) {
+    console.log(JSON.stringify({ event: 'NON_STUDENT_OPERATION_BLOCKED', function: fnName, email, role, timestamp: new Date().toISOString() }));
+    return Response.json({ status: 'ignored', message: 'Operación exclusiva para alumnos.', blocked_role: role }, { status: 403 });
+  }
+  return null;
+}
+
+// NOTE: generateInstallments can also be called server-side (from advanceToLevel/validateLevel1Folio)
+// passing a target user_email that may belong to a student. In that case, the CALLER is admin/system
+// so we validate the TARGET email instead of the caller role. See guard inside handler.
 
 /**
  * Genera las 4 colegiaturas de un nivel para un usuario.
@@ -20,9 +35,19 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { user_email, level, level_start_date, origin_folio = null, origin_payment_id = null } = body;
 
-    // Solo admin puede generar para otros usuarios
-    if (user_email !== user.email && user.role !== 'admin') {
-      return Response.json({ error: 'Forbidden' }, { status: 403 });
+    // Si el llamante ES el alumno mismo, bloquear si no es role=user
+    // Si el llamante es admin generando para otro, permitir pero validar target
+    if (user.role !== 'admin') {
+      const blocked = requireStudentRole(user, 'generateInstallments');
+      if (blocked) return blocked;
+    } else if (user_email !== user.email) {
+      // Admin generando para un target: validar que el target sea alumno
+      const targetList = await base44.asServiceRole.entities.User.filter({ email: user_email });
+      const targetUser = targetList[0];
+      if (!targetUser || targetUser.role !== 'user' || SERVICE_ACCOUNT_RE.test(user_email)) {
+        console.log(JSON.stringify({ event: 'NON_STUDENT_OPERATION_BLOCKED', function: 'generateInstallments', email: user_email, role: targetUser?.role || 'unknown', timestamp: new Date().toISOString() }));
+        return Response.json({ error: 'Las colegiaturas solo se pueden generar para alumnos.' }, { status: 400 });
+      }
     }
 
     if (!user_email || !level || !level_start_date) {
