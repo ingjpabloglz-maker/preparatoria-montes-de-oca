@@ -16,26 +16,26 @@ Deno.serve(async (req) => {
   const { user_email } = body;
   if (!user_email) return Response.json({ error: 'user_email required' }, { status: 400 });
 
-  // Fetch todo en paralelo usando asServiceRole
+  // Fetch todo en paralelo usando UserProfile (entidad personalizada, sin restricciones)
   const [
-    allUsers,
+    profiles,
     progressList,
     subjectProgressList,
     paymentPlans,
     subjects,
   ] = await Promise.all([
-    base44.asServiceRole.entities.User.list(),
+    base44.asServiceRole.entities.UserProfile.filter({ user_email }),
     base44.asServiceRole.entities.UserProgress.filter({ user_email }),
     base44.asServiceRole.entities.SubjectProgress.filter({ user_email }),
     base44.asServiceRole.entities.LevelPaymentPlan.filter({ user_email }),
     base44.asServiceRole.entities.Subject.list('level'),
   ]);
 
-  const studentUser = allUsers.find(u => u.email === user_email);
-  if (!studentUser) return Response.json({ error: 'Student not found' }, { status: 404 });
+  const studentProfile = profiles[0];
+  if (!studentProfile) return Response.json({ error: 'Student not found' }, { status: 404 });
 
-  const parts = [studentUser.apellido_paterno, studentUser.apellido_materno, studentUser.nombres].filter(Boolean);
-  const display_name = parts.length > 0 ? parts.join(' ') : (studentUser.full_name || studentUser.email);
+  const parts = [studentProfile.apellido_paterno, studentProfile.apellido_materno, studentProfile.nombres].filter(Boolean);
+  const display_name = parts.length > 0 ? parts.join(' ') : (studentProfile.full_name || studentProfile.user_email);
 
   const progress = progressList[0] || {};
 
@@ -54,19 +54,19 @@ Deno.serve(async (req) => {
   return Response.json({
     status: 'ok',
     student: {
-      id: studentUser.id,
+      id: studentProfile.user_id || studentProfile.id,
       email: user_email,
       full_name: display_name,
-      apellido_paterno: studentUser.apellido_paterno || '',
-      apellido_materno: studentUser.apellido_materno || '',
-      nombres: studentUser.nombres || '',
-      curp: studentUser.curp || '',
-      telefono: studentUser.telefono || '',
-      domicilio: studentUser.domicilio || '',
-      fecha_nacimiento: studentUser.fecha_nacimiento || '',
-      status: studentUser.status || 'active',
-      role: studentUser.role,
-      created_date: studentUser.created_date,
+      apellido_paterno: studentProfile.apellido_paterno || '',
+      apellido_materno: studentProfile.apellido_materno || '',
+      nombres: studentProfile.nombres || '',
+      curp: studentProfile.curp || '',
+      telefono: studentProfile.telefono_personal || '',
+      domicilio: studentProfile.domicilio || '',
+      fecha_nacimiento: studentProfile.fecha_nacimiento || '',
+      status: studentProfile.status || 'active',
+      role: studentProfile.role || 'user',
+      created_date: studentProfile.created_date,
     },
     progress: {
       current_level: progress.current_level || 1,

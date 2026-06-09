@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -12,9 +12,9 @@ Deno.serve(async (req) => {
   const { user_email } = body;
   if (!user_email) return Response.json({ error: 'user_email required' }, { status: 400 });
 
-  // Fetch all data in parallel
+  // Fetch all data in parallel — usando UserProfile en lugar de User
   const [
-    allUsers,
+    profiles,
     userProgressList,
     subjectProgressList,
     evaluationAttempts,
@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     modules,
     units,
   ] = await Promise.all([
-    base44.asServiceRole.entities.User.list(),
+    base44.asServiceRole.entities.UserProfile.filter({ user_email }),
     base44.asServiceRole.entities.UserProgress.filter({ user_email }),
     base44.asServiceRole.entities.SubjectProgress.filter({ user_email }),
     base44.asServiceRole.entities.EvaluationAttempt.filter({ user_email }, '-submitted_at', 1000),
@@ -33,15 +33,14 @@ Deno.serve(async (req) => {
     base44.asServiceRole.entities.CourseUnit.list(),
   ]);
 
-  // Student info
-  const studentUser = allUsers.find(u => u.email === user_email);
-  if (!studentUser) return Response.json({ error: 'Student not found' }, { status: 404 });
+  const studentProfile = profiles[0];
+  if (!studentProfile) return Response.json({ error: 'Student not found' }, { status: 404 });
 
-  const apellidoP = studentUser.apellido_paterno || '';
-  const apellidoM = studentUser.apellido_materno || '';
-  const nombres = studentUser.nombres || '';
+  const apellidoP = studentProfile.apellido_paterno || '';
+  const apellidoM = studentProfile.apellido_materno || '';
+  const nombres = studentProfile.nombres || '';
   const nameParts = [apellidoP, apellidoM, nombres].filter(Boolean);
-  const full_name = nameParts.length > 0 ? nameParts.join(' ') : (studentUser.full_name || studentUser.email);
+  const full_name = nameParts.length > 0 ? nameParts.join(' ') : (studentProfile.full_name || studentProfile.user_email);
 
   const userProgress = userProgressList[0] || {};
 
@@ -58,7 +57,6 @@ Deno.serve(async (req) => {
   const unitMap = {};
   for (const u of units) unitMap[u.id] = u;
 
-  // SubjectProgress map
   const subjectProgressMap = {};
   for (const sp of subjectProgressList) subjectProgressMap[sp.subject_id] = sp;
 
@@ -85,7 +83,6 @@ Deno.serve(async (req) => {
 
     const subAttempts = attemptsBySubject[sub.id] || [];
 
-    // Group by module
     const moduleGroups = {};
     for (const a of subAttempts) {
       const lesson = lessonMap[a.lesson_id] || {};
@@ -113,7 +110,6 @@ Deno.serve(async (req) => {
       moduleGroups[modId].lessons[lessonId].attempts.push(a);
     }
 
-    // Convert to arrays
     const modulesArr = Object.values(moduleGroups).map(m => ({
       ...m,
       lessons: Object.values(m.lessons),
@@ -134,7 +130,6 @@ Deno.serve(async (req) => {
     };
   }).filter(Boolean);
 
-  // Summary
   const completedSubjects = subjectsResult.filter(s => s.completed).length;
   const gradesWithValue = subjectsResult.filter(s => s.final_grade !== null).map(s => s.final_grade);
   const average_grade = gradesWithValue.length > 0
@@ -144,7 +139,6 @@ Deno.serve(async (req) => {
   const allDates = evaluationAttempts.map(a => a.submitted_at).filter(Boolean).sort().reverse();
   const last_activity = allDates[0] || null;
 
-  // Full evaluation history (enriched, for the history tab)
   const evaluation_history = evaluationAttempts.map(a => {
     const lesson = lessonMap[a.lesson_id] || {};
     const mod = moduleMap[lesson.module_id] || {};
@@ -163,10 +157,10 @@ Deno.serve(async (req) => {
     student: {
       full_name,
       email: user_email,
-      curp: studentUser.curp || null,
-      status: studentUser.status || 'active',
-      fecha_inscripcion: studentUser.created_date || null,
-      enrollment_date: studentUser.created_date || null, // backward compat
+      curp: studentProfile.curp || null,
+      status: studentProfile.status || 'active',
+      fecha_inscripcion: studentProfile.created_date || null,
+      enrollment_date: studentProfile.created_date || null,
       current_level: userProgress.current_level ?? null,
       course_completed_at: userProgress.course_completed_at || null,
       graduation_status: userProgress.graduation_status || 'enrolled',

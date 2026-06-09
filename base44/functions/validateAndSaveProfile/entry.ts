@@ -141,13 +141,48 @@ Deno.serve(async (req) => {
     curp_validated_at: new Date().toISOString(),
   };
 
+  const targetEmail = target_user_id
+    ? null // Se resolverá abajo
+    : user.email;
+
   if (target_user_id) {
-    // Admin actualizando a otro usuario
     await base44.asServiceRole.entities.User.update(target_user_id, updatePayload);
   } else {
-    // Alumno actualizando su propio perfil
     await base44.auth.updateMe(updatePayload);
   }
+
+  // Sincronizar UserProfile (entidad personalizada accesible para todos los admins)
+  try {
+    const emailToSync = targetEmail || user.email;
+    const parts = [updatePayload.apellido_paterno, updatePayload.apellido_materno, updatePayload.nombres].filter(Boolean);
+    const full_name = parts.length > 0 ? parts.join(' ') : emailToSync;
+    const profile_completed = !!(updatePayload.nombres && updatePayload.apellido_paterno && updatePayload.curp && updatePayload.telefono_personal && updatePayload.correo_contacto);
+
+    const profilePayload = {
+      user_email: emailToSync,
+      nombres: updatePayload.nombres || '',
+      apellido_paterno: updatePayload.apellido_paterno || '',
+      apellido_materno: updatePayload.apellido_materno || '',
+      full_name,
+      curp: updatePayload.curp || '',
+      curp_validated: true,
+      curp_validated_at: updatePayload.curp_validated_at,
+      telefono_personal: updatePayload.telefono_personal || '',
+      telefono_tutor: updatePayload.telefono_tutor || '',
+      correo_contacto: updatePayload.correo_contacto || '',
+      role: user.role || 'user',
+      status: 'active',
+      profile_completed,
+      last_synced_at: new Date().toISOString(),
+    };
+
+    const existing = await base44.asServiceRole.entities.UserProfile.filter({ user_email: emailToSync });
+    if (existing.length > 0) {
+      await base44.asServiceRole.entities.UserProfile.update(existing[0].id, profilePayload);
+    } else {
+      await base44.asServiceRole.entities.UserProfile.create(profilePayload);
+    }
+  } catch (_) { /* sync no-op: no bloquea el flujo principal */ }
 
   return Response.json({ success: true, curp_validated: true });
 });

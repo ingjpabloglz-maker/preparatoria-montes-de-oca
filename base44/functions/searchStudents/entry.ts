@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -12,17 +12,18 @@ Deno.serve(async (req) => {
   const { query = '' } = body;
   const q = query.trim().toLowerCase();
 
-  const users = await base44.asServiceRole.entities.User.list();
+  // Usar UserProfile (entidad personalizada) — funciona para todos los admins sin restricciones
+  const profiles = await base44.asServiceRole.entities.UserProfile.list();
 
-  const results = users
-    .filter(u => u.role !== 'admin' && u.role !== 'teacher')
+  const results = profiles
+    .filter(u => u.role !== 'admin' && u.role !== 'docente')
     .map(u => {
       const apellidoP = u.apellido_paterno || '';
       const apellidoM = u.apellido_materno || '';
       const nombres = u.nombres || '';
       const parts = [apellidoP, apellidoM, nombres].filter(Boolean);
-      const full_name = parts.length > 0 ? parts.join(' ') : (u.full_name || u.email);
-      return { user_email: u.email, full_name, apellido_paterno: apellidoP, apellido_materno: apellidoM, nombres };
+      const full_name = parts.length > 0 ? parts.join(' ') : (u.full_name || u.user_email);
+      return { user_email: u.user_email, full_name, apellido_paterno: apellidoP, apellido_materno: apellidoM, nombres };
     })
     .filter(u => {
       if (!q) return true;

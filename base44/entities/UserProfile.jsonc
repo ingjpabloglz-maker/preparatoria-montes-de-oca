@@ -1,0 +1,89 @@
+{
+  "name": "UserProfile",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario (clave de b\u00fasqueda principal)"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "ID del registro User de sistema (para referencia)"
+    },
+    "nombres": {
+      "type": "string",
+      "description": "Nombre(s) del alumno"
+    },
+    "apellido_paterno": {
+      "type": "string",
+      "description": "Apellido paterno"
+    },
+    "apellido_materno": {
+      "type": "string",
+      "description": "Apellido materno"
+    },
+    "full_name": {
+      "type": "string",
+      "description": "Nombre completo calculado (apellido_paterno + apellido_materno + nombres)"
+    },
+    "curp": {
+      "type": "string",
+      "description": "CURP validada del alumno"
+    },
+    "curp_validated": {
+      "type": "boolean",
+      "default": false
+    },
+    "curp_validated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "telefono_personal": {
+      "type": "string"
+    },
+    "telefono_tutor": {
+      "type": "string"
+    },
+    "correo_contacto": {
+      "type": "string"
+    },
+    "domicilio": {
+      "type": "string"
+    },
+    "fecha_nacimiento": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "user",
+        "admin",
+        "docente"
+      ],
+      "default": "user",
+      "description": "Rol del usuario en la aplicaci\u00f3n"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive",
+        "blocked"
+      ],
+      "default": "active"
+    },
+    "profile_completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si el perfil tiene todos los campos obligatorios"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima vez que se sincroniz\u00f3 desde la entidad User"
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}

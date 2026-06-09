@@ -1,6 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-// Helper centralizado de validación de admin
 async function requireAdmin(base44) {
   const user = await base44.auth.me();
   if (!user) return { error: 'Unauthorized', status: 401 };
@@ -15,18 +14,18 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({}));
   const {
-    role = 'user',         // 'user' | 'admin' | 'docente' | 'all'
-    search = '',           // búsqueda texto libre
-    level = null,          // filtro por nivel actual
+    role = 'user',
+    search = '',
+    level = null,
     page = 1,
     limit = 50,
   } = body;
 
   const q = search.trim().toLowerCase();
 
-  // Fetch en paralelo: usuarios + progreso
-  const [allUsers, allProgress] = await Promise.all([
-    base44.asServiceRole.entities.User.list(),
+  // Fetch en paralelo: UserProfile (entidad personalizada, sin restricciones) + UserProgress
+  const [allProfiles, allProgress] = await Promise.all([
+    base44.asServiceRole.entities.UserProfile.list(),
     base44.asServiceRole.entities.UserProgress.list(),
   ]);
 
@@ -37,21 +36,21 @@ Deno.serve(async (req) => {
   }
 
   // Filtrar por rol
-  let filtered = role === 'all' ? allUsers : allUsers.filter(u => u.role === role);
+  let filtered = role === 'all'
+    ? allProfiles
+    : allProfiles.filter(u => u.role === role);
 
-  // Construir nombre display
+  // Enriquecer con progreso académico
   filtered = filtered.map(u => {
-    const parts = [u.apellido_paterno, u.apellido_materno, u.nombres].filter(Boolean);
-    const display_name = parts.length > 0 ? parts.join(' ') : (u.full_name || u.email);
-    const prog = progressMap[u.email] || {};
+    const prog = progressMap[u.user_email] || {};
     return {
-      id: u.id,
-      email: u.email,
-      full_name: display_name,
+      id: u.user_id || u.id,
+      email: u.user_email,
+      full_name: u.full_name || u.user_email,
       apellido_paterno: u.apellido_paterno || '',
       apellido_materno: u.apellido_materno || '',
       nombres: u.nombres || '',
-      role: u.role,
+      role: u.role || 'user',
       status: u.status || 'active',
       current_level: prog.current_level || 1,
       graduation_status: prog.graduation_status || 'enrolled',

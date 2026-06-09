@@ -23,6 +23,9 @@ Deno.serve(async (req) => {
       }
     };
 
+    // 0. UserProfile (entidad personalizada espejo)
+    await deleteAll('UserProfile', { user_email });
+
     // 1. Gamificación
     await deleteAll('GamificationProfile', { user_email });
     await deleteAll('UserAchievement', { user_email });
