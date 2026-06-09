@@ -17,28 +17,34 @@ export default function AdminDashboardView({ user }) {
   const urlParams = new URLSearchParams(window.location.search);
   const defaultTab = urlParams.get('tab') || 'overview';
 
+  // gcTime corto en datos de admin: se liberan de cache al navegar fuera del panel.
+  // Datasets grandes (allUsers, allProgress, payments) no deben persistir innecesariamente.
   const { data: allUsers = [] } = useQuery({
     queryKey: ['allUsers'],
     queryFn: () => base44.entities.User.list(),
     staleTime: 5 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
   const { data: allProgress = [] } = useQuery({
     queryKey: ['allProgress'],
     queryFn: () => base44.entities.UserProgress.list(),
     staleTime: 5 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
   const { data: payments = [] } = useQuery({
     queryKey: ['payments'],
     queryFn: () => base44.entities.Payment.list(),
     staleTime: 5 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
   const { data: subjects = [] } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => base44.entities.Subject.list(),
     staleTime: 30 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 

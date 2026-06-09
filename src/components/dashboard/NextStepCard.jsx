@@ -19,7 +19,8 @@ function getIcon(name) {
   return subjectIcons.default;
 }
 
-export default function NextStepCard({ nextSubject, onGo }) {
+// React.memo: NextStepCard solo cambia cuando cambia nextSubject u onGo.
+const NextStepCard = React.memo(function NextStepCard({ nextSubject, onGo }) {
   if (!nextSubject) return null;
 
   const isInProgress = nextSubject.progress > 0 && nextSubject.progress < 100;
@@ -55,4 +56,6 @@ export default function NextStepCard({ nextSubject, onGo }) {
       </CardContent>
     </Card>
   );
-}
+});
+
+export default NextStepCard;

@@ -9,7 +9,8 @@ import {
   Clock
 } from "lucide-react";
 
-export default function StatsOverview({ 
+// React.memo: StatsOverview recibe 6 primitivos — si ninguno cambia no debe re-render.
+const StatsOverview = React.memo(function StatsOverview({ 
   currentLevel, 
   totalProgress, 
   completedSubjects, 
@@ -84,4 +85,6 @@ export default function StatsOverview({
       </CardContent>
     </Card>
   );
-}
+});
+
+export default StatsOverview;

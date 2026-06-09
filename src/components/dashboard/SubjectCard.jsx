@@ -80,7 +80,9 @@ const COLOR_PALETTE = [
   { bg: 'bg-cyan-50',    border: 'border-cyan-400',   iconBg: 'bg-cyan-100',   progressColor: '#06b6d4' },
 ];
 
-export default function SubjectCard({ subject, progress, isCompleted, testStatus, onClick, index = 0 }) {
+// React.memo: evita re-renders cuando las props no cambian.
+// SubjectCard está en una lista — sin memo, cada update del parent rerenderiza TODOS.
+const SubjectCard = React.memo(function SubjectCard({ subject, progress, isCompleted, testStatus, onClick, index = 0 }) {
   const state = getProgressState(progress, isCompleted);
   const cfg = stateConfig[state];
   const color = COLOR_PALETTE[index % COLOR_PALETTE.length];
@@ -153,5 +155,7 @@ export default function SubjectCard({ subject, progress, isCompleted, testStatus
         </Button>
       </CardContent>
     </Card>
-  );
-}
+    );
+    });
+
+    export default SubjectCard;

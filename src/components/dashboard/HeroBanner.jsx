@@ -8,7 +8,8 @@ function xpForLevel(level) {
   return Math.round(100 * Math.pow(level, 1.5));
 }
 
-export default function HeroBanner({ user, gamProfile, nextSubject, onContinue }) {
+// React.memo: HeroBanner solo cambia cuando cambian las métricas de gamificación o el nextSubject.
+const HeroBanner = React.memo(function HeroBanner({ user, gamProfile, nextSubject, onContinue }) {
   const firstName = user?.full_name?.split(' ')[0] || 'Estudiante';
   const streakDays = gamProfile?.streak_days || 0;
   const xp = gamProfile?.xp_points || 0;
@@ -122,4 +123,6 @@ export default function HeroBanner({ user, gamProfile, nextSubject, onContinue }
       </div>
     </div>
   );
-}
+});
+
+export default HeroBanner;

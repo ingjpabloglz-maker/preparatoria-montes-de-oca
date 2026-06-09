@@ -5,7 +5,9 @@ import { Progress } from "@/components/ui/progress";
 import { Lock, CheckCircle2, Clock, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function LevelCard({ 
+// React.memo: LevelCard está en una lista de 6 items — sin memo cada update del parent
+// rerenderiza los 6, aunque solo cambió el nivel actual.
+const LevelCard = React.memo(function LevelCard({ 
   level, 
   isUnlocked, 
   isCompleted, 
@@ -112,4 +114,6 @@ export default function LevelCard({
       </CardContent>
     </Card>
   );
-}
+});
+
+export default LevelCard;

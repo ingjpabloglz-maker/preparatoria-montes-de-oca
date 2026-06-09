@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPageUrl } from '@/utils';
@@ -101,69 +101,52 @@ export default function StudentDashboard({ user }) {
     }
   }, [gamProfile?.last_study_date_normalized]);
 
-  if (loadingLevels || loadingSubjects || loadingProgress || loadingSubjectProgress || loadingPayments) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <Skeleton className="h-10 w-64" />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1,2,3,4].map(i => <Skeleton key={i} className="h-24" />)}
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {[1,2,3].map(i => <Skeleton key={i} className="h-48" />)}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // ── Todos los hooks ANTES de cualquier early return (Rules of Hooks) ──────────
   const progress = userProgressArr?.[0];
   const currentLevel = progress?.current_level || 1;
 
-  const getDaysRemaining = () => {
+  const daysRemaining = useMemo(() => {
     if (!progress?.expires_at) return null;
-    const now = new Date();
     const expiresAt = new Date(progress.expires_at);
-    return Math.max(0, Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)));
-  };
+    return Math.max(0, Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24)));
+  }, [progress?.expires_at]);
 
-  const getDaysInLevel = () => {
+  const daysInLevel = useMemo(() => {
     if (!progress?.level_start_date) return 0;
-    const startDate = new Date(progress.level_start_date);
-    return Math.floor((new Date() - startDate) / (1000 * 60 * 60 * 24));
-  };
-
-  const daysRemaining = getDaysRemaining();
-  const isBlockedByTime = progress?.blocked_due_to_time === true || (daysRemaining !== null && daysRemaining === 0);
+    return Math.floor((new Date() - new Date(progress.level_start_date)) / (1000 * 60 * 60 * 24));
+  }, [progress?.level_start_date]);
 
   const profileComplete = user?.nombres && user?.apellido_paterno && user?.telefono_personal && user?.correo_contacto;
-  const hasLevel1Folio = userPayments.some(p => p.level === 1 && p.folio_type === 'level_advance' && p.status === 'used');
 
-  const subjectsByLevel = subjects.reduce((acc, subject) => {
+  const hasLevel1Folio = useMemo(
+    () => userPayments.some(p => p.level === 1 && p.folio_type === 'level_advance' && p.status === 'used'),
+    [userPayments]
+  );
+
+  const subjectsByLevel = useMemo(() => subjects.reduce((acc, subject) => {
     if (!acc[subject.level]) acc[subject.level] = [];
     acc[subject.level].push(subject);
     return acc;
-  }, {});
+  }, {}), [subjects]);
 
-  const getLevelProgress = (levelNum) => {
-    const levelSubjects = subjectsByLevel[levelNum] || [];
-    if (levelSubjects.length === 0) return 0;
-    if (levelNum < currentLevel) return 100;
-    const progressSum = levelSubjects.reduce((sum, subject) => {
-      const sp = subjectProgress.find(p => p.subject_id === subject.id);
-      return sum + (sp?.test_passed ? 100 : sp?.progress_percent || 0);
-    }, 0);
-    return progressSum / levelSubjects.length;
-  };
+  const currentLevelSubjects = useMemo(
+    () => subjectsByLevel[currentLevel] || [],
+    [subjectsByLevel, currentLevel]
+  );
 
-  const currentLevelSubjects = subjectsByLevel[currentLevel] || [];
-  const completedSubjectsCount = subjectProgress.filter(p => p.test_passed).length;
+  const completedSubjectsCount = useMemo(
+    () => subjectProgress.filter(p => p.test_passed).length,
+    [subjectProgress]
+  );
+
   const totalSubjectsCount = subjects.length;
-  const totalProgress = totalSubjectsCount > 0
-    ? Math.min(100, subjectProgress.reduce((sum, p) => sum + Math.min(100, p.progress_percent || 0), 0) / totalSubjectsCount)
-    : 0;
 
-  const getNextSubject = () => {
+  const totalProgress = useMemo(() => totalSubjectsCount > 0
+    ? Math.min(100, subjectProgress.reduce((sum, p) => sum + Math.min(100, p.progress_percent || 0), 0) / totalSubjectsCount)
+    : 0,
+  [subjectProgress, totalSubjectsCount]);
+
+  const nextSubject = useMemo(() => {
     if (!currentLevelSubjects.length) return null;
     const inProgress = currentLevelSubjects.find(s => {
       const sp = subjectProgress.find(p => p.subject_id === s.id);
@@ -181,10 +164,20 @@ export default function StudentDashboard({ user }) {
     if (pending) return { ...pending, progress: 0 };
     const sp0 = subjectProgress.find(p => p.subject_id === currentLevelSubjects[0].id);
     return { ...currentLevelSubjects[0], progress: sp0?.progress_percent || 0 };
-  };
-  const nextSubject = getNextSubject();
+  }, [currentLevelSubjects, subjectProgress]);
 
-  const handleTimeUnlockSuccess = async () => {
+  const getLevelProgress = useCallback((levelNum) => {
+    const levelSubjects = subjectsByLevel[levelNum] || [];
+    if (levelSubjects.length === 0) return 0;
+    if (levelNum < currentLevel) return 100;
+    const progressSum = levelSubjects.reduce((sum, subject) => {
+      const sp = subjectProgress.find(p => p.subject_id === subject.id);
+      return sum + (sp?.test_passed ? 100 : sp?.progress_percent || 0);
+    }, 0);
+    return progressSum / levelSubjects.length;
+  }, [subjectsByLevel, currentLevel, subjectProgress]);
+
+  const handleTimeUnlockSuccess = useCallback(async () => {
     if (progress) {
       const levelConfig = levels.find(l => l.level_number === currentLevel);
       if (!levelConfig?.time_limit_days) { window.location.reload(); return; }
@@ -196,9 +189,9 @@ export default function StudentDashboard({ user }) {
       });
     }
     window.location.reload();
-  };
+  }, [progress, levels, currentLevel]);
 
-  const goToNextSubject = () => {
+  const goToNextSubject = useCallback(() => {
     if (!profileComplete) { window.location.href = createPageUrl('Profile'); return; }
     if (currentLevel === 1 && !hasLevel1Folio) { window.location.href = createPageUrl('UnlockLevel?level=1'); return; }
     if (nextSubject) {
@@ -206,7 +199,27 @@ export default function StudentDashboard({ user }) {
     } else {
       window.location.href = createPageUrl(`Level?level=${currentLevel}`);
     }
-  };
+  }, [profileComplete, currentLevel, hasLevel1Folio, nextSubject]);
+
+  // ── Derived values (no hooks, pueden ir aquí) ─────────────────────────────
+  const isBlockedByTime = progress?.blocked_due_to_time === true || (daysRemaining !== null && daysRemaining === 0);
+
+  // ── Early returns DESPUÉS de todos los hooks ──────────────────────────────
+  if (loadingLevels || loadingSubjects || loadingProgress || loadingSubjectProgress || loadingPayments) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <Skeleton className="h-10 w-64" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => <Skeleton key={i} className="h-24" />)}
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[1,2,3].map(i => <Skeleton key={i} className="h-48" />)}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Pantalla de bloqueo: folio nivel 1
   if (profileComplete && currentLevel === 1 && !hasLevel1Folio) {
@@ -297,7 +310,7 @@ export default function StudentDashboard({ user }) {
           totalProgress={totalProgress}
           completedSubjects={completedSubjectsCount}
           totalSubjects={totalSubjectsCount}
-          daysInLevel={getDaysInLevel()}
+          daysInLevel={daysInLevel}
           daysRemaining={daysRemaining}
         />
 
@@ -322,7 +335,7 @@ export default function StudentDashboard({ user }) {
             </Button>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {currentLevelSubjects.map((subject) => {
+            {currentLevelSubjects.map((subject, idx) => {
               const sp = subjectProgress.find(p => p.subject_id === subject.id);
               const testStatus = sp?.test_passed ? 'aprobado' : sp?.test_attempts > 0 ? 'no_aprobado' : 'pendiente';
               return (
@@ -332,11 +345,8 @@ export default function StudentDashboard({ user }) {
                   progress={sp?.progress_percent || 0}
                   isCompleted={sp?.test_passed || false}
                   testStatus={testStatus}
-                  onClick={() => {
-                    if (!profileComplete) { window.location.href = createPageUrl('Profile'); return; }
-                    if (currentLevel === 1 && !hasLevel1Folio) { window.location.href = createPageUrl('UnlockLevel?level=1'); return; }
-                    window.location.href = createPageUrl(`Subject?id=${subject.id}`);
-                  }}
+                  index={idx}
+                  onClick={goToNextSubject}
                 />
               );
             })}
@@ -355,6 +365,15 @@ export default function StudentDashboard({ user }) {
               const isUnlocked = levelNum <= currentLevel;
               const isCompleted = levelNum < currentLevel;
               const isCurrent = levelNum === currentLevel;
+              // onClick estable por nivel: no se recrea si profileComplete/currentLevel/levelNum no cambian
+              const handleLevelClick = isUnlocked
+                ? () => {
+                    if (!profileComplete) { window.location.href = createPageUrl('Profile'); return; }
+                    window.location.href = createPageUrl(
+                      (isCurrent || isCompleted) ? `Level?level=${levelNum}` : `UnlockLevel?level=${levelNum}`
+                    );
+                  }
+                : undefined;
               return (
                 <LevelCard
                   key={levelNum}
@@ -365,14 +384,7 @@ export default function StudentDashboard({ user }) {
                   progress={getLevelProgress(levelNum)}
                   subjects={subjectsByLevel[levelNum] || []}
                   daysRemaining={isCurrent ? daysRemaining : undefined}
-                  onClick={() => {
-                    if (!profileComplete) { window.location.href = createPageUrl('Profile'); return; }
-                    if (isCurrent || isCompleted) {
-                      window.location.href = createPageUrl(`Level?level=${levelNum}`);
-                    } else {
-                      window.location.href = createPageUrl(`UnlockLevel?level=${levelNum}`);
-                    }
-                  }}
+                  onClick={handleLevelClick}
                 />
               );
             })}
