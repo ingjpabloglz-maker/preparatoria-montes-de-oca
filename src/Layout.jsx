@@ -31,7 +31,6 @@ import {
 import { hasPermission } from '@/lib/permissions';
 import { useAuth } from '@/lib/AuthContext';
 import GamificationHUD from "@/components/gamification/GamificationHUD";
-import AchievementToast from "@/components/gamification/AchievementToast";
 import { cn } from "@/lib/utils";
 
 export default function Layout({ children, currentPageName }) {
@@ -45,10 +44,6 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Achievement Toast monitor (solo estudiantes) */}
-      {user && user.role !== 'admin' && user.role !== 'docente' &&
-      <AchievementToast userEmail={user.email} />
-      }
       {/* Header */}
       <header className={`bg-white border-b sticky top-0 z-50 ${isImmersivePage ? 'hidden' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -176,9 +171,7 @@ export default function Layout({ children, currentPageName }) {
             </nav>
 
             {/* Gamification HUD (solo estudiantes) */}
-            {user && user.role !== 'admin' && user.role !== 'docente' &&
-            <GamificationHUD userEmail={user.email} />
-            }
+            {user?.role === 'user' && <GamificationHUD userEmail={user.email} />}
 
             {/* User Menu */}
             <div className="flex items-center gap-3">
