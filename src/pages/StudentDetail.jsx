@@ -50,6 +50,7 @@ function MateriasTab({ studentEmail, subjects }) {
     queryFn: () => base44.entities.UserProgress.filter({ user_email: studentEmail }),
     enabled: !!studentEmail,
     staleTime: 0,
+    gcTime: 3 * 60 * 1000,
     refetchOnMount: true,
     refetchOnReconnect: true,
   });
@@ -59,6 +60,7 @@ function MateriasTab({ studentEmail, subjects }) {
     queryFn: () => base44.entities.SubjectProgress.filter({ user_email: studentEmail }),
     enabled: !!studentEmail,
     staleTime: 0,
+    gcTime: 3 * 60 * 1000,
     refetchOnMount: true,
     refetchOnReconnect: true,
   });
@@ -271,12 +273,14 @@ export default function StudentDetail() {
     });
   }, [studentEmail]);
 
-  // Datos base — siempre frescos
+  // AUDIT: Datos por alumno — staleTime=0 + gcTime corto para no acumular N entradas
+  // (una por cada alumno visitado). Se liberan al salir de la vista.
   const { data: students = [], isLoading: loadingStudent } = useQuery({
     queryKey: ['student', studentEmail],
     queryFn: () => base44.entities.User.filter({ email: studentEmail }),
     enabled: !!studentEmail,
     staleTime: 0,
+    gcTime: 3 * 60 * 1000,
     refetchOnMount: true,
     refetchOnReconnect: true,
   });
@@ -286,33 +290,37 @@ export default function StudentDetail() {
     queryFn: () => base44.entities.UserProgress.filter({ user_email: studentEmail }),
     enabled: !!studentEmail,
     staleTime: 0,
+    gcTime: 3 * 60 * 1000,
     refetchOnMount: true,
     refetchOnReconnect: true,
   });
 
-  // Subjects — estático, no cambia frecuentemente
+  // Subjects — estático, reutiliza cache global.
   const { data: subjects = [] } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => base44.entities.Subject.list('level'),
     staleTime: 30 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
-  // SubjectProgress — necesario para boleta y tab general
+  // SubjectProgress — por alumno, gcTime corto.
   const { data: subjectProgress = [] } = useQuery({
     queryKey: ['studentSubjectProgress', studentEmail],
     queryFn: () => base44.entities.SubjectProgress.filter({ user_email: studentEmail }),
     enabled: !!studentEmail,
     staleTime: 0,
+    gcTime: 3 * 60 * 1000,
     refetchOnMount: true,
     refetchOnReconnect: true,
   });
 
-  // Colegiaturas del nivel actual (solo para card de cabecera)
+  // Colegiaturas del nivel actual — por alumno, gcTime corto.
   const { data: paymentPlans = [] } = useQuery({
     queryKey: ['studentPaymentPlans', studentEmail],
     queryFn: () => base44.entities.LevelPaymentPlan.filter({ user_email: studentEmail }),
     enabled: !!studentEmail,
     staleTime: 0,
+    gcTime: 3 * 60 * 1000,
     refetchOnMount: true,
     refetchOnReconnect: true,
   });

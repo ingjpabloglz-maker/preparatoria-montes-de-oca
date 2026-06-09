@@ -22,10 +22,12 @@ export default function ManageStudents() {
   const [levelFilter, setLevelFilter] = useState('all');
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
+  // AUDIT: gcTime corto — datasets grandes liberados al salir de esta página.
   const { data: allUsers = [] } = useQuery({
     queryKey: ['allUsers'],
     queryFn: () => base44.entities.User.list(),
     staleTime: 5 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
@@ -33,6 +35,7 @@ export default function ManageStudents() {
     queryKey: ['allProgress'],
     queryFn: () => base44.entities.UserProgress.list(),
     staleTime: 5 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 

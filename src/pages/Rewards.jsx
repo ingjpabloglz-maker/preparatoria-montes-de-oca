@@ -69,17 +69,21 @@ export default function Rewards() {
     setBuyingShield(false);
   };
 
+  // AUDIT: achievements son estáticos — staleTime Infinity + gcTime largo están bien.
   const { data: allAchievements = [] } = useQuery({
     queryKey: ['achievements'],
     queryFn: () => base44.entities.Achievement.list(),
     staleTime: Infinity,
+    gcTime: 30 * 60 * 1000,
   });
 
+  // AUDIT: userAchievements por email — gcTime corto para no acumular si el email cambia.
   const { data: userAchievements = [] } = useQuery({
     queryKey: ['userAchievements', user?.email],
     queryFn: () => base44.entities.UserAchievement.filter({ user_email: user?.email }),
     enabled: !!user?.email && isStudent,
     staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 

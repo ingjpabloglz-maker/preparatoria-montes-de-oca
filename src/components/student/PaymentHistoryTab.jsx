@@ -61,19 +61,23 @@ export default function PaymentHistoryTab({ studentEmail }) {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
 
+  // AUDIT: queries per-student con gcTime corto — se liberan al cerrar el tab.
   const { data: payments = [], isLoading } = useQuery({
     queryKey: ['studentPayments', studentEmail],
     queryFn: () => base44.entities.Payment.filter({ user_email: studentEmail }),
     enabled: !!studentEmail,
     staleTime: 0,
+    gcTime: 3 * 60 * 1000,
     refetchOnMount: true,
     refetchOnReconnect: true
   });
 
+  // Reutiliza cache global de subjects.
   const { data: subjects = [] } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => base44.entities.Subject.list('level'),
-    staleTime: 30 * 60 * 1000
+    staleTime: 30 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const { data: paymentPlans = [] } = useQuery({
@@ -81,6 +85,7 @@ export default function PaymentHistoryTab({ studentEmail }) {
     queryFn: () => base44.entities.LevelPaymentPlan.filter({ user_email: studentEmail }),
     enabled: !!studentEmail,
     staleTime: 0,
+    gcTime: 3 * 60 * 1000,
     refetchOnMount: true
   });
 

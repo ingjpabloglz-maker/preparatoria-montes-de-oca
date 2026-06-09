@@ -38,29 +38,37 @@ export default function Level() {
       const levels = await base44.entities.LevelConfig.filter({ level_number: levelNum });
       return levels[0] || { level_number: levelNum, name: `Nivel ${levelNum}`, time_limit_days: 180 };
     },
+    staleTime: 30 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
+  // AUDIT: 'levelSubjects' separado de 'subjects' para evitar colisión con query global.
+  // staleTime corto para reflejar cambios de contenido.
   const { data: subjects = [] } = useQuery({
     queryKey: ['levelSubjects', levelNum],
     queryFn: () => base44.entities.Subject.filter({ level: levelNum }, 'order'),
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
+  // AUDIT: Reutiliza la misma key que StudentDashboard — comparten cache correctamente.
   const { data: userProgress, refetch: refetchProgress } = useQuery({
     queryKey: ['userProgress', user?.email],
     queryFn: () => base44.entities.UserProgress.filter({ user_email: user?.email }),
     enabled: !!user?.email,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: subjectProgress = [] } = useQuery({
     queryKey: ['subjectProgress', user?.email],
     queryFn: () => base44.entities.SubjectProgress.filter({ user_email: user?.email }),
     enabled: !!user?.email,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const progress = userProgress?.[0];

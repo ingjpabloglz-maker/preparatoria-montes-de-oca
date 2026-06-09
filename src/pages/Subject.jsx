@@ -35,9 +35,12 @@ export default function Subject() {
       return subjects[0];
     },
     enabled: !!subjectId,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
-  // ─── Estado de evaluación: fuente de verdad es el BACKEND ────────────────────
+  // AUDIT: evalStatus es crítico, staleTime=0 garantiza siempre estado fresco del backend.
+  // gcTime corto evita acumular una entrada por cada (email, subjectId) visitado.
   const { data: evalStatus, isLoading: evalLoading, refetch: refetchEvalStatus } = useQuery({
     queryKey: ['evalStatus', user?.email, subjectId],
     queryFn: async () => {
@@ -45,6 +48,8 @@ export default function Subject() {
       return res.data;
     },
     enabled: !!user?.email && !!subjectId,
+    staleTime: 0,
+    gcTime: 2 * 60 * 1000,
   });
 
   const handleTestComplete = useCallback(async (score, passed, sessionToken, answers, lessonId) => {
@@ -58,7 +63,9 @@ export default function Subject() {
     });
     setTakingTest(false);
     await refetchEvalStatus();
-    queryClient.invalidateQueries(['subject']);
+    // AUDIT: invalidar solo la key exacta, no todas las queries 'subject'
+    queryClient.invalidateQueries({ queryKey: ['evalStatus', user?.email, subjectId] });
+    queryClient.invalidateQueries({ queryKey: ['subjectProgress', user?.email] });
     return res?.data;
   }, [refetchEvalStatus, queryClient, subjectId]);
 

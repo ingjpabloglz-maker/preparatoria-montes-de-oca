@@ -48,8 +48,12 @@ export function useSubjectRealProgress(userEmail, subjectId) {
  */
 export function useMultiSubjectProgress(userEmail, subjectIds = []) {
   // Cargar todas las lecciones de los subjects de este nivel
+  // AUDIT: queryKey estabilizada con array ordenado para evitar cardinality explosiva
+  // si subjectIds llega en orden diferente cada render.
+  const stableSubjectKey = [...subjectIds].sort().join(',');
+
   const { data: allLessons = [], isLoading: loadingLessons } = useQuery({
-    queryKey: ['allLessonsForSubjects', subjectIds.join(',')],
+    queryKey: ['allLessonsForSubjects', stableSubjectKey],
     queryFn: async () => {
       if (!subjectIds.length) return [];
       // Traer lecciones para cada subject en paralelo
@@ -65,7 +69,7 @@ export function useMultiSubjectProgress(userEmail, subjectIds = []) {
 
   // Cargar todo el lessonProgress del usuario para estos subjects
   const { data: allLessonProgress = [], isLoading: loadingProgress } = useQuery({
-    queryKey: ['allLessonProgressForSubjects', userEmail, subjectIds.join(',')],
+    queryKey: ['allLessonProgressForSubjects', userEmail, stableSubjectKey],
     queryFn: async () => {
       if (!subjectIds.length || !userEmail) return [];
       const results = await Promise.all(
