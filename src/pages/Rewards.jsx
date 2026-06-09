@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Trophy, Star, Flame, Zap, Swords, Target, BookOpen, Award, Lock, Droplets, CalendarDays, Sparkles, Shield } from 'lucide-react';
+import { getStreakStatus } from '@/lib/streakStatus';
 import { Link } from 'react-router-dom';
 import { useGamificationProfile } from '@/hooks/useGamification';
 import { useHasCompletedSurpriseExam } from '@/hooks/useSurpriseExamStatus';
@@ -163,7 +164,11 @@ export default function Rewards() {
             <CardContent className="p-4 flex items-center gap-3">
               <Flame className="w-8 h-8 text-orange-500" />
               <div>
-                <p className="text-2xl font-bold text-orange-700">{profile?.streak_days || 0}</p>
+                <p className="text-2xl font-bold text-orange-700">
+                  {getStreakStatus(profile?.last_study_date_normalized, profile?.streak_shields || 0) === 'lost'
+                    ? 0
+                    : (profile?.streak_days || 0)}
+                </p>
                 <p className="text-xs text-orange-500">Racha actual</p>
               </div>
             </CardContent>

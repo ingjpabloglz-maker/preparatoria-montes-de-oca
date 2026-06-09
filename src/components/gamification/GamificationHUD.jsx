@@ -21,8 +21,8 @@ export default function GamificationHUD({ userEmail }) {
 
   if (!profile) return null;
 
-  const streakStatus = getStreakStatus(profile.last_study_date_normalized);
-  const streakDays = profile.streak_days || 0;
+  const streakStatus = getStreakStatus(profile.last_study_date_normalized, profile.streak_shields || 0);
+  const streakDays = streakStatus === 'lost' ? 0 : (profile.streak_days || 0);
 
   const streakStyle = {
     normal:  'bg-orange-100 text-orange-600',
