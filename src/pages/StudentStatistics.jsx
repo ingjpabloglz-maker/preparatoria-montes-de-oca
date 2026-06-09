@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import {
   Users, TrendingUp, AlertTriangle, XCircle, Download,
-  Flame, Star, Zap, BookOpen
+  Flame, Zap, BookOpen
 } from "lucide-react";
 import AdminGuard from '@/components/auth/AdminGuard';
 import {
@@ -18,155 +18,26 @@ import {
   LineChart, Line, CartesianGrid, Cell
 } from 'recharts';
 
-const formatName = (u) => {
-  const parts = [u.apellido_paterno, u.apellido_materno, u.nombres].filter(Boolean);
-  return parts.length > 0 ? parts.join(' ') : (u.full_name || 'Sin nombre');
-};
-
 const LEVEL_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'];
 
-// Calcula días transcurridos desde una fecha ISO
-const daysSince = (isoDate) => {
-  if (!isoDate) return 999;
-  const diff = Date.now() - new Date(isoDate).getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
-};
-
 export default function StudentStatistics() {
-  const { data: allUsers = [] } = useQuery({
-    queryKey: ['allUsers'],
-    queryFn: () => base44.entities.User.list(),
-    staleTime: 0,
+  const { data: stats = {}, isLoading } = useQuery({
+    queryKey: ['student-statistics-consolidated'],
+    queryFn: () => base44.functions.invoke('getStudentStatistics').then(r => r.data),
+    staleTime: 60 * 1000,
     refetchOnWindowFocus: true,
   });
-
-  const { data: allProgress = [] } = useQuery({
-    queryKey: ['allProgress'],
-    queryFn: () => base44.entities.UserProgress.list(),
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-  });
-
-  const { data: allGamification = [] } = useQuery({
-    queryKey: ['allGamification'],
-    queryFn: () => base44.entities.GamificationProfile.list(),
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-  });
-
-  const { data: allSubjectProgress = [] } = useQuery({
-    queryKey: ['allSubjectProgress'],
-    queryFn: () => base44.entities.SubjectProgress.list(),
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-  });
-
-  const { data: subjects = [] } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: () => base44.entities.Subject.list('level'),
-    staleTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-
-  // ─── getAdminStats ───────────────────────────────────────────────
-  const stats = useMemo(() => {
-    const students = allUsers.filter(u => u.role === 'user');
-    const studentEmails = new Set(students.map(u => u.email));
-    const total_students = students.length;
-
-    const enriched = students.map(u => {
-      const prog = allProgress.find(p => p.user_email === u.email);
-      const gam = allGamification.find(g => g.user_email === u.email);
-      const lastStudy = gam?.last_study_date_normalized;
-      const days = daysSince(lastStudy);
-      return {
-        ...u,
-        name: formatName(u),
-        level: prog?.current_level || 1,
-        progress: Math.round(prog?.total_progress_percent || 0),
-        blocked: prog?.blocked_due_to_time || false,
-        xp: gam?.xp_points || 0,
-        streak: gam?.streak_days || 0,
-        completedSubjects: (prog?.completed_subjects || []).length,
-        lastStudy,
-        daysSinceActivity: days,
-      };
-    });
-
-    const active_today = enriched.filter(s => s.daysSinceActivity <= 1).length;
-    const at_risk = enriched.filter(s => s.daysSinceActivity >= 2 && s.daysSinceActivity <= 5).length;
-    const inactive = enriched.filter(s => s.daysSinceActivity >= 6).length;
-
-    const avg_xp = total_students > 0
-      ? Math.round(enriched.reduce((a, s) => a + s.xp, 0) / total_students)
-      : 0;
-    const avg_streak = total_students > 0
-      ? Math.round(enriched.reduce((a, s) => a + s.streak, 0) / total_students)
-      : 0;
-
-    // Distribución por nivel (solo niveles con alumnos)
-    const levelDist = [1, 2, 3, 4, 5, 6].map(lvl => {
-      const inLevel = allProgress.filter(p => p.current_level === lvl && studentEmails.has(p.user_email));
-      const avgProg = inLevel.length > 0
-        ? Math.round(inLevel.reduce((a, p) => a + (p.total_progress_percent || 0), 0) / inLevel.length)
-        : 0;
-      return { level: `N${lvl}`, alumnos: inLevel.length, progreso: avgProg };
-    }).filter(d => d.alumnos > 0);
-
-    // Alumnos en riesgo (2–5 días) ordenados por mayor inactividad
-    const atRiskList = enriched
-      .filter(s => s.daysSinceActivity >= 2)
-      .sort((a, b) => b.daysSinceActivity - a.daysSinceActivity)
-      .slice(0, 15);
-
-    // Top 10 por XP
-    const topByXP = [...enriched].sort((a, b) => b.xp - a.xp).slice(0, 10);
-
-    // Top 10 por racha
-    const topByStreak = [...enriched].sort((a, b) => b.streak - a.streak).slice(0, 10);
-
-    // Materias completadas (solo las que tienen > 0)
-    const subjectCompletions = subjects.map(s => ({
-      name: s.name,
-      level: s.level,
-      completions: allSubjectProgress.filter(sp => sp.subject_id === s.id && sp.test_passed).length,
-    })).filter(s => s.completions > 0).sort((a, b) => b.completions - a.completions);
-
-    // Actividad "semanal" simulada desde last_study_date (últimos 7 días)
-    const weekActivity = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      const label = d.toLocaleDateString('es-MX', { weekday: 'short' });
-      const count = enriched.filter(s => s.daysSinceActivity === (6 - i)).length;
-      return { day: label, activos: count };
-    });
-
-    return {
-      total_students, active_today, at_risk, inactive,
-      avg_xp, avg_streak,
-      levelDist, atRiskList, topByXP, topByStreak,
-      subjectCompletions, weekActivity,
-    };
-  }, [allUsers, allProgress, allGamification, allSubjectProgress, subjects]);
 
   // ─── Export CSV ───────────────────────────────────────────────────
   const exportCSV = () => {
     const rows = [
-      ['Nombre', 'Email', 'Nivel', 'Progreso (%)', 'XP', 'Racha', 'Días sin actividad', 'Bloqueado'],
+      ['Nombre', 'Email', 'Nivel', 'XP', 'Racha', 'Días sin actividad', 'Bloqueado'],
     ];
-    const students = allUsers.filter(u => u.role === 'user').map(u => {
-      const prog = allProgress.find(p => p.user_email === u.email);
-      const gam = allGamification.find(g => g.user_email === u.email);
-      return [
-        formatName(u), u.email,
-        prog?.current_level || 1,
-        Math.round(prog?.total_progress_percent || 0),
-        gam?.xp_points || 0,
-        gam?.streak_days || 0,
-        daysSince(gam?.last_study_date_normalized),
-        prog?.blocked_due_to_time ? 'Sí' : 'No',
-      ];
-    });
+    const students = (stats.raw_students || []).map(s => [
+      s.name, s.email, s.level, s.xp, s.streak,
+      s.daysSinceActivity >= 999 ? 'Sin registro' : s.daysSinceActivity,
+      s.blocked ? 'Sí' : 'No',
+    ]);
     const csv = [...rows, ...students]
       .map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
       .join('\n');
@@ -184,6 +55,16 @@ export default function StudentStatistics() {
     if (days <= 5) return 'bg-amber-100 text-amber-800';
     return 'bg-red-100 text-red-800';
   };
+
+  if (isLoading) {
+    return (
+      <AdminGuard>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+        </div>
+      </AdminGuard>
+    );
+  }
 
   return (
     <AdminGuard>
