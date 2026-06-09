@@ -24,15 +24,32 @@
       "default": 0,
       "description": "Lecciones completadas hacia esta meta"
     },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "completed",
+        "rewarded",
+        "failed",
+        "archived"
+      ],
+      "default": "active",
+      "description": "State machine formal. active=en progreso; completed=alcanz\u00f3 target, pendiente de recompensa; rewarded=recompensa otorgada; failed=expir\u00f3 sin completar; archived=cerrada hist\u00f3ricamente"
+    },
     "completed": {
       "type": "boolean",
       "default": false,
-      "description": "Si se alcanz\u00f3 el target"
+      "description": "Legacy: true si se alcanz\u00f3 el target. Usar status en lugar de este campo."
     },
     "reward_claimed": {
       "type": "boolean",
       "default": false,
-      "description": "Si las recompensas ya fueron otorgadas"
+      "description": "Legacy: true si las recompensas ya fueron otorgadas. Usar status=rewarded en lugar de este campo."
+    },
+    "archived": {
+      "type": "boolean",
+      "default": false,
+      "description": "Legacy: true si la meta fue cerrada. Usar status=archived en lugar de este campo."
     },
     "reward_xp": {
       "type": "number",
@@ -47,28 +64,39 @@
     "started_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Timestamp de creaci\u00f3n de la meta"
+      "description": "Timestamp UTC de creaci\u00f3n de la meta"
     },
     "expires_at": {
       "type": "string",
       "format": "date-time",
-      "description": "started_at + 7 d\u00edas (rolling window)"
+      "description": "started_at + 7 d\u00edas exactos en UTC (rolling window). Autoridad absoluta del backend."
     },
     "completed_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Timestamp cuando se complet\u00f3 la meta"
+      "description": "Timestamp UTC cuando se complet\u00f3 la meta (progress >= target)"
     },
-    "archived": {
-      "type": "boolean",
-      "default": false,
-      "description": "Si la meta fue archivada (expir\u00f3 o fue reemplazada)"
+    "rewarded_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp UTC cuando se otorg\u00f3 la recompensa"
+    },
+    "failed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp UTC cuando la meta fue marcada como fallida (expir\u00f3 sin completar)"
+    },
+    "archived_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp UTC cuando la meta fue archivada definitivamente"
     }
   },
   "required": [
     "user_email",
     "target",
     "started_at",
-    "expires_at"
+    "expires_at",
+    "status"
   ]
 }

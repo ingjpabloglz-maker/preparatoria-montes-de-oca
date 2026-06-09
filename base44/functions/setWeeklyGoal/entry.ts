@@ -1,103 +1,173 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const MIN_TARGET = 5;
+const MAX_TARGET = 50;
+const ROLLING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 días exactos en ms UTC
+
 const SERVICE_ACCOUNT_RE = /^service\+|@no-reply\.base44\.com$|^bot\+|^automation\+|^system\+/i;
-function requireStudentRole(user, fnName) {
-  const email = user?.email || 'anonymous';
-  const role = user?.role || 'none';
-  if (!user || user.role !== 'user' || SERVICE_ACCOUNT_RE.test(email)) {
-    return Response.json({ status: 'ignored', message: 'Operación exclusiva para alumnos.', blocked_role: role }, { status: 403 });
-  }
-  return null;
+
+// Recompensas por número de meta en el ciclo (anti-farming hard cap en 2)
+const GOAL_REWARDS = [
+  { xp: 50, stars: 3 },  // Meta 1
+  { xp: 25, stars: 1 },  // Meta 2
+  // Meta 3+: { xp: 0, stars: 0 }
+];
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function getRewardForGoalNumber(n) {
+  return GOAL_REWARDS[n - 1] || { xp: 0, stars: 0 };
 }
 
-// Calcula el week_cycle_id a partir de un ISO timestamp: "YYYY-Www"
+// week_cycle_id: "YYYY-Www" basado en número de semana ISO del año en UTC
 function getWeekCycleId(isoTimestamp) {
   const d = new Date(isoTimestamp);
-  // Usar número de semana ISO basado en la fecha local de Matamoros
-  const localStr = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Matamoros',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(d);
-  const [year, month, day] = localStr.split('-').map(Number);
-  // Calcular semana ISO (simplificado: usar fecha YYYY + número de semana del año)
-  const date = new Date(Date.UTC(year, month - 1, day));
-  const dayOfYear = Math.floor((date - new Date(Date.UTC(year, 0, 1))) / 86400000);
+  const year = d.getUTCFullYear();
+  const startOfYear = new Date(Date.UTC(year, 0, 1));
+  const dayOfYear = Math.floor((d - startOfYear) / 86400000);
   const weekNum = Math.ceil((dayOfYear + 1) / 7);
   return `${year}-W${String(weekNum).padStart(2, '0')}`;
 }
 
-// Recompensas según número de meta en el ciclo (anti-farming)
-// Meta 1: 50 XP + 3 ⭐ | Meta 2: 25 XP + 1 ⭐ | Meta 3+: 0
-const GOAL_REWARDS = [
-  { xp: 50, stars: 3 },   // goal_number_in_cycle = 1
-  { xp: 25, stars: 1 },   // goal_number_in_cycle = 2
-];
-function getRewardForGoalNumber(goalNumber) {
-  const idx = goalNumber - 1;
-  return GOAL_REWARDS[idx] || { xp: 0, stars: 0 };
+function auditLog(event, fields) {
+  console.log(JSON.stringify({
+    event,
+    ...fields,
+    timestamp: new Date().toISOString(),
+  }));
 }
 
-const MIN_TARGET = 5; // Mínimo obligatorio para evitar farming de metas micro
-
+// ─── HANDLER ──────────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const blocked = requireStudentRole(user, 'setWeeklyGoal');
-  if (blocked) return blocked;
+  const email = user?.email || '';
+  const role  = user?.role  || 'none';
+
+  if (!user || role !== 'user' || SERVICE_ACCOUNT_RE.test(email)) {
+    return Response.json({ status: 'ignored', message: 'Operación exclusiva para alumnos.', blocked_role: role }, { status: 403 });
+  }
 
   const body = await req.json();
   const { goal } = body;
 
-  if (!goal || typeof goal !== 'number' || goal < MIN_TARGET || goal > 50) {
-    return Response.json({ error: `La meta debe ser un número entre ${MIN_TARGET} y 50` }, { status: 400 });
+  if (
+    !goal ||
+    typeof goal !== 'number' ||
+    !Number.isInteger(goal) ||
+    goal < MIN_TARGET ||
+    goal > MAX_TARGET
+  ) {
+    return Response.json({
+      error: `La meta debe ser un número entero entre ${MIN_TARGET} y ${MAX_TARGET}.`,
+    }, { status: 400 });
   }
 
   const user_email = user.email;
-  const nowIso = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const nowIso    = new Date().toISOString();
+  // expires_at siempre como UTC absoluto para resistir DST y cambios de timezone del dispositivo
+  const expiresAt = new Date(Date.now() + ROLLING_WINDOW_MS).toISOString();
   const weekCycleId = getWeekCycleId(nowIso);
 
-  // 1. Archivar meta activa anterior (si existe y no está archivada)
-  const activeSessions = await base44.asServiceRole.entities.WeeklyGoalSession.filter({
+  // ── RACE CONDITION GUARD: verificar si ya existe una meta activa ────────────
+  // Esta es la validación atómica que previene doble creación por:
+  // - doble click
+  // - mobile retry
+  // - reconnection replay
+  // - requests duplicados
+  const currentActive = await base44.asServiceRole.entities.WeeklyGoalSession.filter({
     user_email,
-    archived: false,
+    status: 'active',
   });
 
-  for (const session of activeSessions) {
-    await base44.asServiceRole.entities.WeeklyGoalSession.update(session.id, {
+  if (currentActive.length > 0) {
+    const existing = currentActive[0];
+    // Verificar que no haya expirado de facto (estado corrupto reparable aquí)
+    const isExpired = new Date(existing.expires_at) <= new Date();
+    if (!isExpired) {
+      // Meta activa vigente → rechazar creación duplicada
+      auditLog('WEEKLY_GOAL_DUPLICATE_BLOCKED', {
+        user_email,
+        existing_session_id: existing.id,
+        existing_target: existing.target,
+        existing_progress: existing.progress,
+        expires_at: existing.expires_at,
+      });
+      return Response.json({
+        error: 'Ya tienes una meta semanal activa. Complétala o espera a que expire antes de crear una nueva.',
+        existing_session: {
+          id: existing.id,
+          target: existing.target,
+          progress: existing.progress,
+          expires_at: existing.expires_at,
+          status: existing.status,
+        },
+      }, { status: 409 });
+    }
+
+    // Sesión activa pero ya expirada → transición automática a 'failed'
+    await base44.asServiceRole.entities.WeeklyGoalSession.update(existing.id, {
+      status: 'failed',
       archived: true,
-      completed_at: session.completed_at || nowIso,
+      failed_at: nowIso,
+      archived_at: nowIso,
+    });
+    auditLog('WEEKLY_GOAL_FAILED', {
+      user_email,
+      session_id: existing.id,
+      target: existing.target,
+      progress: existing.progress,
+      goal_number_in_cycle: existing.goal_number_in_cycle,
+      started_at: existing.started_at,
+      expires_at: existing.expires_at,
     });
   }
 
-  // 2. Calcular número de meta en este ciclo semanal (para anti-farming de recompensas)
+  // ── Contar metas no fallidas del ciclo actual para calcular goal_number ─────
+  // Solo contamos: active, completed, rewarded (las que "contaron" en el ciclo)
   const sessionsThisCycle = await base44.asServiceRole.entities.WeeklyGoalSession.filter({
     user_email,
     week_cycle_id: weekCycleId,
   });
-  const goalNumberInCycle = sessionsThisCycle.length + 1;
-
+  const validSessionsInCycle = sessionsThisCycle.filter(s =>
+    ['active', 'completed', 'rewarded'].includes(s.status)
+  );
+  const goalNumberInCycle = validSessionsInCycle.length + 1;
   const reward = getRewardForGoalNumber(goalNumberInCycle);
 
-  // 3. Crear nueva sesión
+  // ── Crear nueva sesión con estado formal 'active' ──────────────────────────
   const newSession = await base44.asServiceRole.entities.WeeklyGoalSession.create({
     user_email,
     week_cycle_id: weekCycleId,
     goal_number_in_cycle: goalNumberInCycle,
     target: goal,
     progress: 0,
+    status: 'active',
     completed: false,
     reward_claimed: false,
+    archived: false,
     reward_xp: reward.xp,
     reward_stars: reward.stars,
     started_at: nowIso,
     expires_at: expiresAt,
-    archived: false,
   });
 
-  // 4. Actualizar GamificationProfile con referencia a la sesión activa (para compatibilidad)
+  auditLog('WEEKLY_GOAL_CREATED', {
+    user_email,
+    session_id: newSession.id,
+    target: goal,
+    progress: 0,
+    reward_xp: reward.xp,
+    reward_stars: reward.stars,
+    goal_number_in_cycle: goalNumberInCycle,
+    week_cycle_id: weekCycleId,
+    started_at: nowIso,
+    expires_at: expiresAt,
+  });
+
+  // ── Sincronizar GamificationProfile (campos legacy para compatibilidad UI) ──
   const gamArr = await base44.asServiceRole.entities.GamificationProfile.filter({ user_email });
   const gam = gamArr[0];
   const profileUpdate = {

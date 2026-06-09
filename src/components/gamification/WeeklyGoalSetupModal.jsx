@@ -50,6 +50,11 @@ export default function WeeklyGoalSetupModal({ onComplete, onDismiss, goalNumber
     setError('');
     const res = await base44.functions.invoke('setWeeklyGoal', { goal: finalGoal });
     setSaving(false);
+    // HTTP 409: ya existe una meta activa (race condition o doble click)
+    if (res?.status === 409 || res?.data?.existing_session) {
+      onComplete({ status: 'ok', existing: true, ...res.data });
+      return;
+    }
     if (res?.data?.status === 'ok') {
       onComplete(res.data);
     } else {

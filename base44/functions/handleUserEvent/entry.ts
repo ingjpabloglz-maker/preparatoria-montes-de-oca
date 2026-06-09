@@ -200,88 +200,131 @@ function updateTreeGrowth(newGrowthPoints, newStreakDays, gam, event_type, nowIs
   return { newTreeStage, newGrowthStreak, newTreeEnergy, newVitality, newGrowthFlow };
 }
 
-// ─── BLOQUE 6: Gestionar meta semanal (WeeklyGoalSession) ────────────────────
-// Recompensas escalonadas anti-farming por ciclo semanal
-const WEEKLY_GOAL_REWARDS = [
-  { xp: 50, stars: 3 },   // Meta 1 del ciclo
-  { xp: 25, stars: 1 },   // Meta 2 del ciclo
-  // Meta 3+ → { xp: 0, stars: 0 } → solo progreso visual
-];
+// ─── BLOQUE 6: Gestionar meta semanal (WeeklyGoalSession) — STATE MACHINE ────
+// Estado formal: active → completed → rewarded → archived
+//                active → failed → archived
+// Solo lesson_completed avanza el progreso.
+// Backend es la única autoridad de expiración y recompensas.
+
+function weeklyGoalAuditLog(event, fields) {
+  console.log(JSON.stringify({ event, ...fields, timestamp: new Date().toISOString() }));
+}
 
 async function manageWeeklyGoal(base44, user_email, gam, event_type, nowIso) {
-  let weeklyBonusXP = 0;
-  let weeklyBonusStars = 0;
-  let weeklyGoalJustCompleted = false;
-
   // Solo lesson_completed avanza la meta
   if (event_type !== 'lesson_completed') {
-    return {
-      weeklyBonusXP: 0, weeklyBonusStars: 0, weeklyGoalJustCompleted: false,
-      activeSession: null,
-    };
+    return { weeklyBonusXP: 0, weeklyBonusStars: 0, weeklyGoalJustCompleted: false, activeSession: null };
   }
 
-  // Buscar sesión activa (no archivada)
+  const now = new Date(nowIso);
+
+  // Buscar sesión con status='active' (fuente de verdad del state machine)
   const activeSessions = await base44.asServiceRole.entities.WeeklyGoalSession.filter({
-    user_email, archived: false,
+    user_email,
+    status: 'active',
   });
 
-  const now = new Date(nowIso);
   let activeSession = activeSessions[0] || null;
 
-  // Si la sesión activa expiró → archivarla automáticamente y no otorgar recompensa
+  // ── Detectar y reparar sesiones activas expiradas (corrupción de estado) ──
+  if (activeSessions.length > 1) {
+    // Corrupción: múltiples activas → dejar la más reciente, fallar el resto
+    weeklyGoalAuditLog('WEEKLY_GOAL_CORRUPTION_FIXED', {
+      user_email,
+      issue: 'multiple_active_sessions',
+      count: activeSessions.length,
+      kept_session_id: activeSessions[activeSessions.length - 1].id,
+    });
+    // Ordenar por started_at descendente → el más reciente es el activo
+    activeSessions.sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
+    activeSession = activeSessions[0];
+    for (const s of activeSessions.slice(1)) {
+      const isSExpired = new Date(s.expires_at) <= now;
+      await base44.asServiceRole.entities.WeeklyGoalSession.update(s.id, {
+        status: isSExpired ? 'failed' : 'archived',
+        archived: true,
+        failed_at: isSExpired ? nowIso : undefined,
+        archived_at: nowIso,
+      });
+    }
+  }
+
+  // ── Si la sesión activa expiró → transición a 'failed' ──────────────────
   if (activeSession) {
     const expiresAt = new Date(activeSession.expires_at);
     if (now >= expiresAt) {
       await base44.asServiceRole.entities.WeeklyGoalSession.update(activeSession.id, {
+        status: 'failed',
         archived: true,
-        completed_at: activeSession.completed_at || nowIso,
+        failed_at: nowIso,
+        archived_at: nowIso,
+      });
+      weeklyGoalAuditLog('WEEKLY_GOAL_FAILED', {
+        user_email,
+        session_id: activeSession.id,
+        target: activeSession.target,
+        progress: activeSession.progress,
+        goal_number_in_cycle: activeSession.goal_number_in_cycle,
+        started_at: activeSession.started_at,
+        expires_at: activeSession.expires_at,
       });
       activeSession = null;
     }
   }
 
+  // Sin sesión activa válida → no hay meta
   if (!activeSession) {
-    // Sin sesión activa: no hay meta → GamificationProfile debe reflejar esto
-    return {
-      weeklyBonusXP: 0, weeklyBonusStars: 0, weeklyGoalJustCompleted: false,
-      activeSession: null,
-    };
+    return { weeklyBonusXP: 0, weeklyBonusStars: 0, weeklyGoalJustCompleted: false, activeSession: null };
   }
 
-  // Avanzar progreso de la sesión activa
+  // ── Avanzar progreso (cap en target*2 para robustez) ────────────────────
   const newProgress = Math.min((activeSession.progress || 0) + 1, activeSession.target * 2);
-  const justCompleted = newProgress >= activeSession.target && !activeSession.completed;
+  const justCompleted = newProgress >= activeSession.target && activeSession.status === 'active';
 
+  let weeklyBonusXP = 0;
+  let weeklyBonusStars = 0;
+  let weeklyGoalJustCompleted = false;
   const sessionUpdate = { progress: newProgress };
 
-  if (justCompleted && !activeSession.reward_claimed) {
-    const rewardIdx = (activeSession.goal_number_in_cycle || 1) - 1;
-    const reward = WEEKLY_GOAL_REWARDS[rewardIdx] || { xp: 0, stars: 0 };
+  if (justCompleted) {
+    // Las recompensas ya están fijadas en la sesión desde su creación (anti-farming)
+    // Solo se otorgan si aún no se reclamaron (idempotencia)
+    const rewardAlreadyClaimed = ['rewarded', 'completed'].includes(activeSession.status) && activeSession.reward_claimed;
 
-    weeklyBonusXP = reward.xp;
-    weeklyBonusStars = reward.stars;
-    weeklyGoalJustCompleted = true;
+    if (!rewardAlreadyClaimed) {
+      weeklyBonusXP = activeSession.reward_xp || 0;
+      weeklyBonusStars = activeSession.reward_stars || 0;
+      weeklyGoalJustCompleted = true;
 
-    sessionUpdate.completed = true;
-    sessionUpdate.completed_at = nowIso;
-    sessionUpdate.reward_claimed = true;
-    // reward_xp y reward_stars ya están guardados en la sesión desde su creación
-  } else if (justCompleted && activeSession.reward_claimed) {
-    // Ya se cobró la recompensa → solo marcar completada sin bonus
-    weeklyGoalJustCompleted = true;
-    sessionUpdate.completed = true;
-    sessionUpdate.completed_at = activeSession.completed_at || nowIso;
+      // Transición: active → rewarded (si hay recompensa) o → completed (si no hay)
+      const nextStatus = (weeklyBonusXP > 0 || weeklyBonusStars > 0) ? 'rewarded' : 'completed';
+      sessionUpdate.status = nextStatus;
+      sessionUpdate.completed = true;
+      sessionUpdate.completed_at = nowIso;
+      sessionUpdate.reward_claimed = true;
+      if (nextStatus === 'rewarded') sessionUpdate.rewarded_at = nowIso;
+
+      weeklyGoalAuditLog(nextStatus === 'rewarded' ? 'WEEKLY_GOAL_REWARDED' : 'WEEKLY_GOAL_COMPLETED', {
+        user_email,
+        session_id: activeSession.id,
+        target: activeSession.target,
+        progress: newProgress,
+        reward_xp: weeklyBonusXP,
+        reward_stars: weeklyBonusStars,
+        goal_number_in_cycle: activeSession.goal_number_in_cycle,
+        started_at: activeSession.started_at,
+        expires_at: activeSession.expires_at,
+      });
+    } else {
+      // Recompensa ya otorgada (idempotencia) → solo actualizar progreso
+      weeklyGoalJustCompleted = true;
+    }
   }
 
   await base44.asServiceRole.entities.WeeklyGoalSession.update(activeSession.id, sessionUpdate);
-
   const updatedSession = { ...activeSession, ...sessionUpdate };
 
-  return {
-    weeklyBonusXP, weeklyBonusStars, weeklyGoalJustCompleted,
-    activeSession: updatedSession,
-  };
+  return { weeklyBonusXP, weeklyBonusStars, weeklyGoalJustCompleted, activeSession: updatedSession };
 }
 
 // ─── BLOQUE 7: Gestionar datos de examen sorpresa ────────────────────────────
