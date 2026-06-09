@@ -84,6 +84,7 @@ export default function Lesson() {
   });
 
   const [lessonStartedAt] = useState(new Date().toISOString());
+  const [gamificationResult, setGamificationResult] = useState(null);
 
   const saveProgressMutation = useMutation({
     mutationFn: async ({ answersPayload }) => {
@@ -115,6 +116,8 @@ export default function Lesson() {
         passed,
         activity_duration_seconds: 30,
       });
+
+      setGamificationResult(result);
 
       // Eventos del asistente
       dispatchAssistantEvent('lesson_completed', { score });
@@ -286,6 +289,7 @@ export default function Lesson() {
             isMiniEval={lesson.is_mini_eval}
             answers={answers}
             activities={activities}
+            gamificationResult={gamificationResult}
             onContinue={handleGoBack}
             onRetry={handleStart}
           />

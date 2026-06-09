@@ -5,7 +5,7 @@ import { CheckCircle2, XCircle, Trophy, RotateCcw, ArrowRight, Star, Zap, Flame,
 
 export default function LessonResults({
   lesson, correctCount, totalCount, score, passed,
-  isMiniEval, answers, activities, onContinue, onRetry
+  isMiniEval, answers, activities, gamificationResult, onContinue, onRetry
 }) {
   const totalTime = answers.reduce((s, a) => s + (a.timeSpent || 0), 0);
   const avgTime = answers.length ? Math.round(totalTime / answers.length) : 0;
@@ -95,6 +95,56 @@ export default function LessonResults({
         </div>
         <Progress value={score} className="h-2.5 bg-white/10" />
       </div>
+
+      {/* Recompensas obtenidas */}
+      {gamificationResult && (gamificationResult.xp_earned > 0 || gamificationResult.stars_earned > 0 || gamificationResult.water_tokens_earned > 0) && (
+        <div className="w-full max-w-sm bg-white/10 border border-white/20 rounded-2xl p-4 mb-5">
+          <p className="text-xs text-white/50 uppercase tracking-wider text-center mb-3">Recompensas obtenidas</p>
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            {gamificationResult.xp_earned > 0 && (
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-2xl">⚡</span>
+                <span className="text-lg font-bold text-yellow-300">+{gamificationResult.xp_earned}</span>
+                <span className="text-xs text-white/50">XP</span>
+              </div>
+            )}
+            {gamificationResult.stars_earned > 0 && (
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-2xl">⭐</span>
+                <span className="text-lg font-bold text-amber-300">+{gamificationResult.stars_earned}</span>
+                <span className="text-xs text-white/50">Estrellas</span>
+              </div>
+            )}
+            {gamificationResult.water_tokens_earned > 0 && (
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-2xl">💧</span>
+                <span className="text-lg font-bold text-blue-300">+{gamificationResult.water_tokens_earned}</span>
+                <span className="text-xs text-white/50">Agua</span>
+              </div>
+            )}
+          </div>
+          {gamificationResult.multiplier > 1 && (
+            <p className="text-center text-xs text-orange-300 mt-2">
+              🔥 Multiplicador de racha ×{gamificationResult.multiplier?.toFixed(1)}
+            </p>
+          )}
+          {gamificationResult.streak_days > 1 && (
+            <p className="text-center text-xs text-orange-200 mt-1">
+              Racha de {gamificationResult.streak_days} días consecutivos
+            </p>
+          )}
+          {gamificationResult.leveled_up && (
+            <p className="text-center text-xs text-purple-300 font-semibold mt-2">
+              🎉 ¡Subiste al Nivel {gamificationResult.level}!
+            </p>
+          )}
+          {gamificationResult.weekly_goal_completed && (
+            <p className="text-center text-xs text-green-300 font-semibold mt-2">
+              🎯 ¡Meta semanal completada! +50 XP bonus
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Mini Eval result indicator */}
       {isMiniEval && (
