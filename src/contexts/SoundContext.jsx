@@ -13,7 +13,8 @@ const SoundContext = createContext({
 
 export function SoundProvider({ children }) {
   const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
-    return localStorage.getItem('sound_enabled') === 'true';
+    const stored = localStorage.getItem('sound_enabled');
+    return stored === null ? true : stored === 'true';
   });
   const [volume, setVolumeState] = useState(() => {
     return localStorage.getItem('sound_volume') || 'medium';
