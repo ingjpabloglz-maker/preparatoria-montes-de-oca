@@ -1,0 +1,74 @@
+{
+  "name": "WeeklyGoalSession",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del alumno"
+    },
+    "week_cycle_id": {
+      "type": "string",
+      "description": "Identificador del ciclo semanal: YYYY-Www (ej: 2026-W23) basado en fecha de inicio"
+    },
+    "goal_number_in_cycle": {
+      "type": "number",
+      "description": "N\u00famero de meta dentro del ciclo (1, 2, 3...). Solo las primeras 2 son recompensadas.",
+      "default": 1
+    },
+    "target": {
+      "type": "number",
+      "description": "N\u00famero de lecciones objetivo (m\u00ednimo 5)"
+    },
+    "progress": {
+      "type": "number",
+      "default": 0,
+      "description": "Lecciones completadas hacia esta meta"
+    },
+    "completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si se alcanz\u00f3 el target"
+    },
+    "reward_claimed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si las recompensas ya fueron otorgadas"
+    },
+    "reward_xp": {
+      "type": "number",
+      "default": 0,
+      "description": "XP bonus otorgado al completar esta meta"
+    },
+    "reward_stars": {
+      "type": "number",
+      "default": 0,
+      "description": "Estrellas bonus otorgadas al completar esta meta"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de creaci\u00f3n de la meta"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "started_at + 7 d\u00edas (rolling window)"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp cuando se complet\u00f3 la meta"
+    },
+    "archived": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la meta fue archivada (expir\u00f3 o fue reemplazada)"
+    }
+  },
+  "required": [
+    "user_email",
+    "target",
+    "started_at",
+    "expires_at"
+  ]
+}

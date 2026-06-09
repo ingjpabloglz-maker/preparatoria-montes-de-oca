@@ -200,78 +200,87 @@ function updateTreeGrowth(newGrowthPoints, newStreakDays, gam, event_type, nowIs
   return { newTreeStage, newGrowthStreak, newTreeEnergy, newVitality, newGrowthFlow };
 }
 
-// ─── BLOQUE 6: Gestionar meta semanal ────────────────────────────────────────
-function manageWeeklyGoal(gam, event_type, todayString, matamorosNow) {
-  let weeklyProgress = gam?.weekly_goal_progress ?? 0;
-  const weeklyTarget = gam?.weekly_goal_target ?? null;
-  const prevWeeklyStart = gam?.weekly_goal_start_date ?? null;
-  let weeklyStartDate = prevWeeklyStart;
+// ─── BLOQUE 6: Gestionar meta semanal (WeeklyGoalSession) ────────────────────
+// Recompensas escalonadas anti-farming por ciclo semanal
+const WEEKLY_GOAL_REWARDS = [
+  { xp: 50, stars: 3 },   // Meta 1 del ciclo
+  { xp: 25, stars: 1 },   // Meta 2 del ciclo
+  // Meta 3+ → { xp: 0, stars: 0 } → solo progreso visual
+];
 
-  // Si hay meta pero no hay fecha de inicio → inicializar ahora
-  if (weeklyTarget && !weeklyStartDate) {
-    weeklyStartDate = todayString;
-  }
-
-  let weeklyCompleted = gam?.weekly_goal_completed ?? false;
-  let weeklyRewardClaimed = gam?.weekly_goal_reward_claimed ?? false;
-  let weeklyGoalJustCompleted = false;
-  let weeklyHistory = gam?.weekly_goal_history ?? [];
+async function manageWeeklyGoal(base44, user_email, gam, event_type, nowIso) {
   let weeklyBonusXP = 0;
   let weeklyBonusStars = 0;
+  let weeklyGoalJustCompleted = false;
 
-  if (weeklyTarget && weeklyStartDate) {
-    const startDayNum   = toDayNumber(weeklyStartDate);
-    const todayDayNum   = toDayNumber(todayString);
-    const daysSinceStart = todayDayNum - startDayNum; // Aproximación en días (numérica)
+  // Solo lesson_completed avanza la meta
+  if (event_type !== 'lesson_completed') {
+    return {
+      weeklyBonusXP: 0, weeklyBonusStars: 0, weeklyGoalJustCompleted: false,
+      activeSession: null,
+    };
+  }
 
-    // Usar ms para calcular expiración de 7 días de forma precisa
-    const startMs     = new Date(weeklyStartDate + 'T00:00:00').getTime();
-    const nowMs       = matamorosNow.getTime();
-    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-    const weekExpired = (nowMs - startMs) >= sevenDaysMs;
+  // Buscar sesión activa (no archivada)
+  const activeSessions = await base44.asServiceRole.entities.WeeklyGoalSession.filter({
+    user_email, archived: false,
+  });
 
-    if (weekExpired) {
-      const endDate = getLocalDateString(new Date(startMs + sevenDaysMs));
-      const wasCompleted = weeklyProgress >= weeklyTarget;
-      weeklyHistory = [...weeklyHistory, {
-        start_date: weeklyStartDate,
-        end_date: endDate,
-        goal: weeklyTarget,
-        progress: weeklyProgress,
-        completed: wasCompleted,
-      }];
-      if (weeklyHistory.length > 52) weeklyHistory = weeklyHistory.slice(-52);
+  const now = new Date(nowIso);
+  let activeSession = activeSessions[0] || null;
 
-      // Recompensa por semana expirada si se completó y no se cobró
-      if (wasCompleted && !weeklyRewardClaimed) {
-        weeklyBonusXP += 50;
-        weeklyBonusStars += 3;
-      }
-
-      weeklyProgress = 0;
-      weeklyStartDate = todayString;
-      weeklyCompleted = false;
-      weeklyRewardClaimed = false;
-    }
-
-    if (event_type === 'lesson_completed') {
-      weeklyProgress = Math.min(weeklyProgress + 1, weeklyTarget * 2);
-      if (weeklyProgress >= weeklyTarget && !weeklyCompleted) {
-        weeklyCompleted = true;
-        weeklyGoalJustCompleted = true;
-        if (!weeklyRewardClaimed) {
-          weeklyBonusXP += 50;
-          weeklyBonusStars += 3;
-          weeklyRewardClaimed = true;
-        }
-      }
+  // Si la sesión activa expiró → archivarla automáticamente y no otorgar recompensa
+  if (activeSession) {
+    const expiresAt = new Date(activeSession.expires_at);
+    if (now >= expiresAt) {
+      await base44.asServiceRole.entities.WeeklyGoalSession.update(activeSession.id, {
+        archived: true,
+        completed_at: activeSession.completed_at || nowIso,
+      });
+      activeSession = null;
     }
   }
 
+  if (!activeSession) {
+    // Sin sesión activa: no hay meta → GamificationProfile debe reflejar esto
+    return {
+      weeklyBonusXP: 0, weeklyBonusStars: 0, weeklyGoalJustCompleted: false,
+      activeSession: null,
+    };
+  }
+
+  // Avanzar progreso de la sesión activa
+  const newProgress = Math.min((activeSession.progress || 0) + 1, activeSession.target * 2);
+  const justCompleted = newProgress >= activeSession.target && !activeSession.completed;
+
+  const sessionUpdate = { progress: newProgress };
+
+  if (justCompleted && !activeSession.reward_claimed) {
+    const rewardIdx = (activeSession.goal_number_in_cycle || 1) - 1;
+    const reward = WEEKLY_GOAL_REWARDS[rewardIdx] || { xp: 0, stars: 0 };
+
+    weeklyBonusXP = reward.xp;
+    weeklyBonusStars = reward.stars;
+    weeklyGoalJustCompleted = true;
+
+    sessionUpdate.completed = true;
+    sessionUpdate.completed_at = nowIso;
+    sessionUpdate.reward_claimed = true;
+    // reward_xp y reward_stars ya están guardados en la sesión desde su creación
+  } else if (justCompleted && activeSession.reward_claimed) {
+    // Ya se cobró la recompensa → solo marcar completada sin bonus
+    weeklyGoalJustCompleted = true;
+    sessionUpdate.completed = true;
+    sessionUpdate.completed_at = activeSession.completed_at || nowIso;
+  }
+
+  await base44.asServiceRole.entities.WeeklyGoalSession.update(activeSession.id, sessionUpdate);
+
+  const updatedSession = { ...activeSession, ...sessionUpdate };
+
   return {
-    weeklyProgress, weeklyTarget, weeklyStartDate, weeklyCompleted,
-    weeklyRewardClaimed, weeklyGoalJustCompleted, weeklyHistory,
-    weeklyBonusXP, weeklyBonusStars,
+    weeklyBonusXP, weeklyBonusStars, weeklyGoalJustCompleted,
+    activeSession: updatedSession,
   };
 }
 
@@ -530,10 +539,8 @@ Deno.serve(async (req) => {
     const { newTreeStage, newGrowthStreak, newTreeEnergy, newVitality, newGrowthFlow } = updateTreeGrowth(newGrowthPoints, newStreakDays, gam, event_type, nowIso);
     const treeLevelUp                                                    = newTreeStage > (gam?.tree_stage ?? 0);
     const {
-      weeklyProgress, weeklyTarget, weeklyStartDate, weeklyCompleted,
-      weeklyRewardClaimed, weeklyGoalJustCompleted, weeklyHistory,
-      weeklyBonusXP, weeklyBonusStars,
-    } = manageWeeklyGoal(gam, event_type, todayString, matamorosNow);
+      weeklyBonusXP, weeklyBonusStars, weeklyGoalJustCompleted, activeSession,
+    } = await manageWeeklyGoal(base44, user_email, gam, event_type, nowIso);
     const { surpriseIds, lastSurpriseExamDate }                          = handleSurpriseExamData(gam, isSurpriseExam, event_data, todayString);
 
     const finalXP    = newXP + weeklyBonusXP;
@@ -583,12 +590,12 @@ Deno.serve(async (req) => {
       last_tree_update: nowIso,
       last_sync_timestamp: nowIso,
       last_change_event: lastChangeEvent,
-      weekly_goal_progress: weeklyProgress,
-      weekly_goal_target: weeklyTarget,
-      weekly_goal_start_date: weeklyStartDate,
-      weekly_goal_completed: weeklyCompleted,
-      weekly_goal_reward_claimed: weeklyRewardClaimed,
-      weekly_goal_history: weeklyHistory,
+      // Sincronizar campos legacy de GamificationProfile con la sesión activa
+      weekly_goal_target: activeSession?.target ?? gam?.weekly_goal_target ?? null,
+      weekly_goal_progress: activeSession?.progress ?? 0,
+      weekly_goal_start_date: activeSession ? activeSession.started_at?.substring(0, 10) : null,
+      weekly_goal_completed: activeSession?.completed ?? false,
+      weekly_goal_reward_claimed: activeSession?.reward_claimed ?? false,
     };
 
     if (gam) {

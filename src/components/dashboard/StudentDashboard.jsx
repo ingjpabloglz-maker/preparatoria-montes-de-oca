@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPageUrl } from '@/utils';
@@ -66,6 +66,41 @@ export default function StudentDashboard({ user }) {
   });
 
   const { data: gamProfile, refetch: refetchGamProfile } = useGamificationProfile(user.email);
+
+  // ── Estado del modal de metas semanales (guards anti-loop) ────────────────
+  const [showGoalModal, setShowGoalModal] = React.useState(false);
+  const [goalModalDismissed, setGoalModalDismissed] = React.useState(false);
+  const [goalModalPending, setGoalModalPending] = React.useState(false);
+  const [goalNumberInCycle, setGoalNumberInCycle] = React.useState(1);
+  const [activeGoalSession, setActiveGoalSession] = React.useState(null);
+
+  // Cargar sesión activa de WeeklyGoalSession
+  const { data: activeGoalSessions } = useQuery({
+    queryKey: ['weeklyGoalSession', user.email],
+    queryFn: () => base44.entities.WeeklyGoalSession.filter({ user_email: user.email, archived: false }),
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  React.useEffect(() => {
+    if (!activeGoalSessions) return;
+    const now = new Date();
+    // Filtrar sesiones no expiradas
+    const valid = activeGoalSessions.filter(s => new Date(s.expires_at) > now);
+    setActiveGoalSession(valid[0] || null);
+  }, [activeGoalSessions]);
+
+  // Abrir modal automáticamente si no hay sesión activa válida y no fue descartado
+  React.useEffect(() => {
+    if (!gamProfile || goalModalDismissed || goalModalPending) return;
+    const now = new Date();
+    const hasValid = activeGoalSessions?.some(s => new Date(s.expires_at) > now);
+    if (!hasValid) {
+      // Calcular cuántas metas completadas en el ciclo actual para mostrar recompensas correctas
+      setGoalNumberInCycle((activeGoalSessions?.length ?? 0) + 1);
+      setShowGoalModal(true);
+    }
+  }, [gamProfile?.user_email, activeGoalSessions, goalModalDismissed, goalModalPending]);
 
   const { message: assistantMsg, visible: assistantVisible, dismiss: dismissAssistant, handleCTA: assistantHandleCTA } = useAssistant({
     userEmail: user.email,
@@ -291,16 +326,38 @@ export default function StudentDashboard({ user }) {
 
         <HeroBanner user={user} gamProfile={gamProfile} nextSubject={nextSubject} onContinue={goToNextSubject} />
 
-        {gamProfile && !gamProfile.weekly_goal_target && (
-          <WeeklyGoalSetupModal onComplete={() => refetchGamProfile()} />
+        {showGoalModal && !goalModalPending && (
+          <WeeklyGoalSetupModal
+            goalNumberInCycle={goalNumberInCycle}
+            onComplete={(data) => {
+              setShowGoalModal(false);
+              setGoalModalPending(false);
+              queryClient.invalidateQueries({ queryKey: ['weeklyGoalSession', user.email] });
+              refetchGamProfile();
+            }}
+            onDismiss={() => {
+              setShowGoalModal(false);
+              setGoalModalDismissed(true);
+            }}
+          />
         )}
 
         <NextStepCard nextSubject={nextSubject} onGo={goToNextSubject} />
 
-        {gamProfile && gamProfile.weekly_goal_target && (
+        {(activeGoalSession || gamProfile?.weekly_goal_target) && (
           <Card className="border-0 shadow-md">
             <CardContent className="p-5">
-              <WeeklyGoal profile={gamProfile} />
+              <WeeklyGoal
+                profile={gamProfile}
+                activeGoalSession={activeGoalSession}
+                onNewGoal={() => {
+                  const nextGoalNum = (activeGoalSessions?.length ?? 0) + 1;
+                  setGoalNumberInCycle(nextGoalNum);
+                  setGoalModalDismissed(false);
+                  setGoalModalPending(false);
+                  setShowGoalModal(true);
+                }}
+              />
             </CardContent>
           </Card>
         )}
