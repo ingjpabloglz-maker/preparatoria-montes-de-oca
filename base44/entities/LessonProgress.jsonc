@@ -46,6 +46,16 @@
       "type": "string",
       "format": "date-time",
       "description": "Fecha de finalizaci\u00f3n"
+    },
+    "rewards_granted": {
+      "type": "boolean",
+      "default": false,
+      "description": "TRUE si ya se otorgaron recompensas por esta lecci\u00f3n. Anti-farming: nunca volver a otorgar premios si es true."
+    },
+    "rewards_granted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp UTC cuando se otorgaron las recompensas por primera vez."
     }
   },
   "required": [

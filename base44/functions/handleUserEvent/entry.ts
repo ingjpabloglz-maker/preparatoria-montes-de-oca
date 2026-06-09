@@ -574,8 +574,50 @@ Deno.serve(async (req) => {
     const todayString = getLocalDateString(matamorosNow); // YYYY-MM-DD en zona horaria Matamoros (correcto)
     const isSurpriseExam = event_type === 'surprise_exam_completed';
 
+    // ─── 6. ANTI-FARMING: Verificar si la lección ya fue recompensada ────────────
+    // Idempotencia total: si rewards_granted === true en LessonProgress, no dar nada.
+    let isRepeat = false;
+    let rewardsBlocked = false;
+    const isLessonEvent = ['lesson_completed', 'mini_eval_passed'].includes(event_type);
+
+    if (isLessonEvent && event_data.lesson_id) {
+      const lpArr = await base44.asServiceRole.entities.LessonProgress.filter({
+        user_email,
+        lesson_id: event_data.lesson_id,
+      });
+      const lp = lpArr[0];
+      if (lp?.rewards_granted === true) {
+        isRepeat = true;
+        rewardsBlocked = true;
+        console.log(JSON.stringify({
+          event: 'LESSON_REWARD_BLOCKED_REPEAT',
+          user_email,
+          lesson_id: event_data.lesson_id,
+          rewards_granted_at: lp.rewards_granted_at,
+          timestamp: nowIso,
+        }));
+      }
+    }
+
+    // ─── 6b. BLOQUEAR RECOMPENSAS SI NO APROBÓ ───────────────────────────────
+    if (isLessonEvent && event_data.passed === false) {
+      rewardsBlocked = true;
+      console.log(JSON.stringify({
+        event: 'LESSON_REWARD_DENIED_NOT_PASSED',
+        user_email,
+        lesson_id: event_data.lesson_id,
+        score: event_data.score,
+        timestamp: nowIso,
+      }));
+    }
+
     // ─── 6. CALCULAR TODOS LOS VALORES DE GAMIFICACIÓN ───────────────────────
-    const { baseXP, baseStars, baseWater }                               = calculateBaseAwards(event_type, event_data);
+    // Si rewardsBlocked, anular premios base para esta lección
+    const rawAwards = calculateBaseAwards(event_type, event_data);
+    const { baseXP, baseStars, baseWater } = rewardsBlocked
+      ? { baseXP: 0, baseStars: 0, baseWater: 0 }
+      : rawAwards;
+
     const { newStreakDays, streakBroke }                                  = calculateStreak(gam, todayString);
     const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays);
     const newGrowthPoints = (gam?.tree_growth_points ?? 0) + baseWater;
@@ -583,7 +625,9 @@ Deno.serve(async (req) => {
     const treeLevelUp                                                    = newTreeStage > (gam?.tree_stage ?? 0);
     const {
       weeklyBonusXP, weeklyBonusStars, weeklyGoalJustCompleted, activeSession,
-    } = await manageWeeklyGoal(base44, user_email, gam, event_type, nowIso);
+    } = rewardsBlocked
+      ? { weeklyBonusXP: 0, weeklyBonusStars: 0, weeklyGoalJustCompleted: false, activeSession: null }
+      : await manageWeeklyGoal(base44, user_email, gam, event_type, nowIso);
     const { surpriseIds, lastSurpriseExamDate }                          = handleSurpriseExamData(gam, isSurpriseExam, event_data, todayString);
 
     const finalXP    = newXP + weeklyBonusXP;
@@ -650,6 +694,33 @@ Deno.serve(async (req) => {
     // ─── 8. EVALUAR LOGROS ────────────────────────────────────────────────────
     const newlyUnlocked = await processAchievements(base44, user_email, event_type, newStreakDays, finalStars, nowIso);
 
+    // ─── 8b. MARCAR rewards_granted EN LessonProgress (idempotencia total) ────
+    if (isLessonEvent && event_data.lesson_id && !rewardsBlocked) {
+      const lpArr2 = await base44.asServiceRole.entities.LessonProgress.filter({
+        user_email,
+        lesson_id: event_data.lesson_id,
+      });
+      const lp2 = lpArr2[0];
+      if (lp2 && !lp2.rewards_granted) {
+        await base44.asServiceRole.entities.LessonProgress.update(lp2.id, {
+          rewards_granted: true,
+          rewards_granted_at: nowIso,
+        });
+        console.log(JSON.stringify({
+          event: 'LESSON_REWARD_GRANTED',
+          user_email,
+          lesson_id: event_data.lesson_id,
+          attempt_id: event_data.attempt_id,
+          score: event_data.score,
+          passed: event_data.passed,
+          xp_earned: earnedXP + weeklyBonusXP,
+          stars_earned: baseStars + weeklyBonusStars,
+          water_tokens_earned: baseWater,
+          timestamp: nowIso,
+        }));
+      }
+    }
+
     // ─── 9. ACTUALIZAR MÉTRICAS ───────────────────────────────────────────────
     await updateUserMetrics(base44, user_email, metrics, currentMinute, todayString, streakBroke, nowIso);
 
@@ -662,12 +733,39 @@ Deno.serve(async (req) => {
     const xpNeededForNext = finalNextXP - finalMinXP;
     const progressPercent = Math.max(0, Math.min(100, Math.round((xpIntoLevel / xpNeededForNext) * 100)));
 
+    // Calcular streak bonus para display en frontend
+    const streakBonus = Math.round(earnedXP * (multiplier - 1));
+    const perfectScoreBonus = (event_data.score >= 100 && !rewardsBlocked) ? 5 : 0;
+
+    console.log(JSON.stringify({
+      event: rewardsBlocked && isRepeat ? 'LESSON_REWARD_BLOCKED_REPEAT'
+           : rewardsBlocked ? 'LESSON_REWARD_DENIED_NOT_PASSED'
+           : isLessonEvent ? 'LESSON_REWARD_GRANTED' : 'EVENT_PROCESSED',
+      user_email,
+      lesson_id: event_data.lesson_id,
+      xp_earned: earnedXP + weeklyBonusXP,
+      stars_earned: baseStars + weeklyBonusStars,
+      water_tokens_earned: baseWater,
+      is_repeat: isRepeat,
+      rewards_granted: !rewardsBlocked,
+      timestamp: nowIso,
+    }));
+
     return Response.json({
       status: 'ok',
       streak_days: newStreakDays,
       streak_broke: streakBroke,
-      streak_saved_by_shield: false, // shields are managed by decayTreeState, not here
+      streak_saved_by_shield: false,
+      // Recompensas desglosadas para display inmediato en LessonResults
       xp_earned: earnedXP + weeklyBonusXP,
+      stars_earned: baseStars + weeklyBonusStars,
+      water_tokens_earned: baseWater,
+      weekly_bonus_xp: weeklyBonusXP,
+      weekly_bonus_stars: weeklyBonusStars,
+      streak_bonus: streakBonus,
+      perfect_score_bonus: perfectScoreBonus,
+      is_repeat: isRepeat,
+      rewards_granted: !rewardsBlocked,
       total_xp: finalXP,
       total_stars: finalStars,
       level: finalLevel,

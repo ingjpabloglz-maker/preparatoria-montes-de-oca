@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, XCircle, Trophy, RotateCcw, ArrowRight, Star, Zap, Flame, Clock } from "lucide-react";
+import { CheckCircle2, XCircle, Trophy, RotateCcw, ArrowRight, Flame, Clock } from "lucide-react";
 
 export default function LessonResults({
   lesson, correctCount, totalCount, score, passed,
@@ -14,6 +14,7 @@ export default function LessonResults({
     else acc.cur = 0;
     return acc;
   }, { cur: 0, max: 0 }).max;
+
   const getScoreColor = () => {
     if (score >= 80) return 'from-green-400 to-emerald-500';
     if (score >= 60) return 'from-amber-400 to-orange-500';
@@ -26,6 +27,7 @@ export default function LessonResults({
       return { title: 'Casi lo logras 💪', sub: 'Necesitas al menos 60% para desbloquear el siguiente módulo. ¡Inténtalo de nuevo!' };
     }
     if (passed) {
+      if (score >= 100) return { title: '¡Perfecto absoluto! 🏆', sub: '¡Puntaje perfecto! Eres increíble.' };
       if (score >= 80) return { title: '¡Perfecto! ⭐', sub: 'Dominaste esta lección.' };
       return { title: '¡Buen trabajo! 👍', sub: 'Lección aprobada. Sigue así.' };
     }
@@ -33,6 +35,22 @@ export default function LessonResults({
   };
 
   const { title, sub } = getMessage();
+  const isRepeat = gamificationResult?.is_repeat === true;
+  const rewardsGranted = gamificationResult?.rewards_granted === true;
+
+  // Desglose de recompensas
+  const xpBase = gamificationResult ? (gamificationResult.xp_earned || 0) - (gamificationResult.weekly_bonus_xp || 0) - (gamificationResult.streak_bonus || 0) : 0;
+  const streakBonus = gamificationResult?.streak_bonus || 0;
+  const weeklyBonusXP = gamificationResult?.weekly_bonus_xp || 0;
+  const weeklyBonusStars = gamificationResult?.weekly_bonus_stars || 0;
+  const starsBase = (gamificationResult?.stars_earned || 0) - weeklyBonusStars;
+  const waterEarned = gamificationResult?.water_tokens_earned || 0;
+  const hasRewards = rewardsGranted && (
+    (gamificationResult?.xp_earned > 0) ||
+    (gamificationResult?.stars_earned > 0) ||
+    waterEarned > 0
+  );
+  const hasBonus = streakBonus > 0 || weeklyBonusXP > 0 || weeklyBonusStars > 0 || gamificationResult?.perfect_score_bonus > 0;
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 flex flex-col items-center text-center py-4">
@@ -63,7 +81,7 @@ export default function LessonResults({
         </div>
       </div>
 
-      {/* Extra stats: tiempo y streak */}
+      {/* Extra stats */}
       {(totalTime > 0 || maxStreak >= 2) && (
         <div className="grid grid-cols-2 gap-3 w-full max-w-sm mb-6">
           {totalTime > 0 && (
@@ -96,53 +114,94 @@ export default function LessonResults({
         <Progress value={score} className="h-2.5 bg-white/10" />
       </div>
 
-      {/* Recompensas obtenidas */}
-      {gamificationResult && (gamificationResult.xp_earned > 0 || gamificationResult.stars_earned > 0 || gamificationResult.water_tokens_earned > 0) && (
-        <div className="w-full max-w-sm bg-white/10 border border-white/20 rounded-2xl p-4 mb-5">
-          <p className="text-xs text-white/50 uppercase tracking-wider text-center mb-3">Recompensas obtenidas</p>
-          <div className="flex items-center justify-center gap-4 flex-wrap">
-            {gamificationResult.xp_earned > 0 && (
+      {/* === RECOMPENSAS OBTENIDAS === */}
+      {hasRewards && (
+        <div className="w-full max-w-sm bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-2xl p-4 mb-4">
+          <p className="text-xs text-white/50 uppercase tracking-wider text-center mb-4">Recompensas obtenidas</p>
+
+          {/* Recompensas base */}
+          <div className="flex items-center justify-center gap-6 flex-wrap mb-3">
+            {(xpBase + streakBonus + weeklyBonusXP) > 0 && (
               <div className="flex flex-col items-center gap-1">
-                <span className="text-2xl">⚡</span>
-                <span className="text-lg font-bold text-yellow-300">+{gamificationResult.xp_earned}</span>
+                <span className="text-3xl">⚡</span>
+                <span className="text-xl font-bold text-yellow-300">+{gamificationResult.xp_earned}</span>
                 <span className="text-xs text-white/50">XP</span>
               </div>
             )}
-            {gamificationResult.stars_earned > 0 && (
+            {(starsBase + weeklyBonusStars) > 0 && (
               <div className="flex flex-col items-center gap-1">
-                <span className="text-2xl">⭐</span>
-                <span className="text-lg font-bold text-amber-300">+{gamificationResult.stars_earned}</span>
+                <span className="text-3xl">⭐</span>
+                <span className="text-xl font-bold text-amber-300">+{gamificationResult.stars_earned}</span>
                 <span className="text-xs text-white/50">Estrellas</span>
               </div>
             )}
-            {gamificationResult.water_tokens_earned > 0 && (
+            {waterEarned > 0 && (
               <div className="flex flex-col items-center gap-1">
-                <span className="text-2xl">💧</span>
-                <span className="text-lg font-bold text-blue-300">+{gamificationResult.water_tokens_earned}</span>
+                <span className="text-3xl">💧</span>
+                <span className="text-xl font-bold text-blue-300">+{waterEarned}</span>
                 <span className="text-xs text-white/50">Agua</span>
               </div>
             )}
           </div>
-          {gamificationResult.multiplier > 1 && (
-            <p className="text-center text-xs text-orange-300 mt-2">
-              🔥 Multiplicador de racha ×{gamificationResult.multiplier?.toFixed(1)}
+
+          {/* Bonuses desglosados */}
+          {hasBonus && (
+            <div className="border-t border-white/10 pt-3 space-y-1.5">
+              {streakBonus > 0 && (
+                <div className="flex items-center justify-between text-xs px-1">
+                  <span className="text-orange-300 flex items-center gap-1">
+                    🔥 Racha ×{gamificationResult.multiplier?.toFixed(1)}
+                  </span>
+                  <span className="text-yellow-300 font-semibold">+{streakBonus} XP</span>
+                </div>
+              )}
+              {weeklyBonusXP > 0 && (
+                <div className="flex items-center justify-between text-xs px-1">
+                  <span className="text-green-300 flex items-center gap-1">🎯 Meta semanal</span>
+                  <span className="text-yellow-300 font-semibold">+{weeklyBonusXP} XP</span>
+                </div>
+              )}
+              {weeklyBonusStars > 0 && (
+                <div className="flex items-center justify-between text-xs px-1">
+                  <span className="text-green-300 flex items-center gap-1">🎯 Meta semanal</span>
+                  <span className="text-amber-300 font-semibold">+{weeklyBonusStars} ⭐</span>
+                </div>
+              )}
+              {gamificationResult?.perfect_score_bonus > 0 && (
+                <div className="flex items-center justify-between text-xs px-1">
+                  <span className="text-purple-300 flex items-center gap-1">🏆 Puntuación perfecta</span>
+                  <span className="text-yellow-300 font-semibold">+{gamificationResult.perfect_score_bonus} XP</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Logros especiales */}
+          {gamificationResult?.leveled_up && (
+            <p className="text-center text-xs text-purple-300 font-semibold mt-2 pt-2 border-t border-white/10">
+              🎉 ¡Subiste al Nivel {gamificationResult.level}!
             </p>
           )}
-          {gamificationResult.streak_days > 1 && (
+          {gamificationResult?.weekly_goal_completed && !weeklyBonusXP && (
+            <p className="text-center text-xs text-green-300 font-semibold mt-2">
+              🎯 ¡Meta semanal completada!
+            </p>
+          )}
+          {gamificationResult?.streak_days > 1 && (
             <p className="text-center text-xs text-orange-200 mt-1">
               Racha de {gamificationResult.streak_days} días consecutivos
             </p>
           )}
-          {gamificationResult.leveled_up && (
-            <p className="text-center text-xs text-purple-300 font-semibold mt-2">
-              🎉 ¡Subiste al Nivel {gamificationResult.level}!
-            </p>
-          )}
-          {gamificationResult.weekly_goal_completed && (
-            <p className="text-center text-xs text-green-300 font-semibold mt-2">
-              🎯 ¡Meta semanal completada! +50 XP bonus
-            </p>
-          )}
+        </div>
+      )}
+
+      {/* Mensaje lección repetida (no error, solo informativo) */}
+      {isRepeat && (
+        <div className="w-full max-w-sm bg-white/5 border border-white/15 rounded-xl p-3.5 mb-4 text-center">
+          <p className="text-xs text-white/60 leading-relaxed">
+            Ya habías completado esta lección anteriormente.<br />
+            Tu progreso académico sigue guardado, pero esta lección ya no otorga recompensas adicionales.
+          </p>
         </div>
       )}
 
@@ -156,7 +215,7 @@ export default function LessonResults({
           <div className="flex items-center gap-2 justify-center">
             {passed
               ? <><Trophy className="w-4 h-4 text-green-400" /><span className="text-sm font-semibold text-green-300">Módulo desbloqueado</span></>
-              : <><Zap className="w-4 h-4 text-amber-400" /><span className="text-sm font-semibold text-amber-300">Mínimo requerido: 60%</span></>
+              : <><Flame className="w-4 h-4 text-amber-400" /><span className="text-sm font-semibold text-amber-300">Mínimo requerido: 60%</span></>
             }
           </div>
         </div>

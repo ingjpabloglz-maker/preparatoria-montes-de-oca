@@ -19,7 +19,7 @@ export default function Lesson() {
   const lessonId = urlParams.get('id');
 
   const [user, setUser] = useState(null);
-  const [phase, setPhase] = useState('intro'); // 'intro' | 'activity' | 'results'
+  const [phase, setPhase] = useState('intro'); // 'intro' | 'activity' | 'grading' | 'results'
   const [currentActivityIndex, setCurrentActivityIndex] = useState(0);
   const [answers, setAnswers] = useState([]); // { activityId, correct, points, userAnswer, timeSpent, attemptNumber }
   const [consecutiveCorrect, setConsecutiveCorrect] = useState(0);
@@ -105,19 +105,24 @@ export default function Lesson() {
       const score = data?.score ?? 0;
       const passed = data?.passed ?? false;
 
-      // Gamificación — handleUserEvent SOLO para XP/streak/árbol, no para guardar progreso
+      // Recompensas SOLO si aprueba. Si no aprueba → activity_submitted (sin premios)
       const eventType = lesson?.is_mini_eval
         ? (passed ? 'mini_eval_passed' : 'activity_submitted')
-        : 'lesson_completed';
+        : (passed ? 'lesson_completed' : 'activity_submitted');
 
-      const result = await dispatchUserEvent(eventType, {
-        lesson_id: lessonId,
-        score,
-        passed,
-        activity_duration_seconds: 30,
-      });
+      // Esperar mínimo 700ms para evitar flicker/flash antes de mostrar resultados
+      const [result] = await Promise.all([
+        dispatchUserEvent(eventType, {
+          lesson_id: lessonId,
+          score,
+          passed,
+          activity_duration_seconds: 30,
+        }),
+        new Promise(res => setTimeout(res, 700)),
+      ]);
 
       setGamificationResult(result);
+      setPhase('results');
 
       // Eventos del asistente
       dispatchAssistantEvent('lesson_completed', { score });
@@ -130,7 +135,7 @@ export default function Lesson() {
       if (result?.leveled_up) {
         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
         toast.success(`¡Subiste al Nivel ${result.level}! 🎉`, { duration: 4000 });
-      } else if (result?.streak_days > 1) {
+      } else if (result?.streak_days > 1 && result?.rewards_granted) {
         toast(`🔥 Racha de ${result.streak_days} días — x${result.multiplier?.toFixed(1)} XP`, { duration: 3000 });
       }
       if (result?.tree_level_up) {
@@ -139,7 +144,7 @@ export default function Lesson() {
       }
       if (result?.weekly_goal_completed) {
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.5 } });
-        toast.success('🎯 ¡Meta semanal completada! +50 XP bonus', { duration: 4000 });
+        toast.success('🎯 ¡Meta semanal completada!', { duration: 4000 });
       }
       if (result?.newly_unlocked_achievements?.length > 0) {
         confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
@@ -165,8 +170,9 @@ export default function Lesson() {
         attempt_number: a.attemptNumber ?? 1,
       }));
 
+      // Ir a fase grading PRIMERO — resultados solo cuando todo esté listo
+      setPhase('grading');
       saveProgressMutation.mutate({ answersPayload });
-      setPhase('results');
     }
   };
 
@@ -277,6 +283,21 @@ export default function Lesson() {
         {/* Tutor IA (solo materias difíciles, solo en fase de explicación) */}
         {showAiTutor && phase === 'intro' && user && (
           <AiTutorChat lesson={lesson} userEmail={user.email} />
+        )}
+
+        {phase === 'grading' && (
+          <div className="flex flex-col items-center justify-center min-h-[400px] text-center gap-6 animate-in fade-in duration-300">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full border-4 border-white/10 border-t-blue-400 animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-2xl">⚡</span>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white mb-2">Evaluando respuestas...</h3>
+              <p className="text-white/50 text-sm">Calculando recompensas</p>
+            </div>
+          </div>
         )}
 
         {phase === 'results' && (
