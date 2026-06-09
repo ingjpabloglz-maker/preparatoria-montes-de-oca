@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Volume2, Bell, User, CreditCard } from "lucide-react";
+import { ArrowLeft, Volume2, Bell, User, CreditCard, Volume1, VolumeX } from "lucide-react";
 import ProfileForm from '../components/profile/ProfileForm';
 import InstallmentsTab from '../components/profile/InstallmentsTab';
 import { useSound } from '@/contexts/SoundContext';
@@ -14,7 +14,7 @@ import { useSound } from '@/contexts/SoundContext';
 export default function Profile() {
   const [user, setUser] = useState(null);
   const [gamProfile, setGamProfile] = useState(null);
-  const { isSoundEnabled, toggleSound } = useSound();
+  const { isSoundEnabled, volume, toggleSound, setVolume } = useSound();
 
   useEffect(() => {
     base44.auth.me().then(setUser);
@@ -84,6 +84,30 @@ export default function Profile() {
                   </div>
                   <Switch checked={isSoundEnabled} onCheckedChange={toggleSound} />
                 </div>
+
+                {isSoundEnabled && (
+                  <div className="flex items-center justify-between pl-6">
+                    <div className="flex items-center gap-2">
+                      <Volume1 className="w-4 h-4 text-gray-400" />
+                      <Label className="text-sm text-gray-600">Volumen</Label>
+                    </div>
+                    <div className="flex gap-1">
+                      {['low', 'medium', 'high'].map((level) => (
+                        <button
+                          key={level}
+                          onClick={() => setVolume(level)}
+                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                            volume === level
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
+                        >
+                          {level === 'low' ? 'Bajo' : level === 'medium' ? 'Medio' : 'Alto'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {gamProfile && (
                   <div className="flex items-center justify-between">
