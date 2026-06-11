@@ -80,32 +80,32 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
     setCurpError(null);
     const payload = { ...form };
 
-    if (mode === 'admin') {
-      // Admin: llama al backend con target_user_id para validación server-side
-      const res = await base44.functions.invoke('validateAndSaveProfile', {
-        ...payload,
-        target_user_id: targetUserId || user?.id,
-      });
-      if (res.data?.error) {
-        setCurpError(res.data.error);
+    try {
+      if (mode === 'admin') {
+        await base44.functions.invoke('validateAndSaveProfile', {
+          ...payload,
+          target_user_id: targetUserId || user?.id,
+        });
+        await onAdminUpdate?.(payload);
+      } else {
+        await base44.functions.invoke('validateAndSaveProfile', payload);
         setSaving(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+        onSaved?.();
         return;
       }
-      await onAdminUpdate?.(payload);
-    } else {
-      // Alumno: llama al backend que valida CURP y luego hace updateMe
-      const res = await base44.functions.invoke('validateAndSaveProfile', payload);
-      if (res.data?.error) {
-        setCurpError(res.data.error);
-        setSaving(false);
-        return;
-      }
-      onSaved?.();
+      setSaving(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      const errorMsg =
+        err?.response?.data?.error ||
+        err?.message ||
+        'Ocurrió un error al guardar. Verifica tus datos e intenta de nuevo.';
+      setCurpError(errorMsg);
+      setSaving(false);
     }
-
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
   };
 
   const handleClear = async (field) => {
@@ -226,6 +226,13 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
             </div>
           ))}
         </div>
+
+        {curpError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 flex items-start gap-2">
+            <span className="text-red-500 mt-0.5 flex-shrink-0">⚠️</span>
+            <span>{curpError}</span>
+          </div>
+        )}
 
         <Button
           onClick={handleSave}
