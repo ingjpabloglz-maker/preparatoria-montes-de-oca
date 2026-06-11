@@ -20,6 +20,7 @@ import AuditDashboard from './pages/AuditDashboard';
 import StudentRecord from './pages/StudentRecord';
 import TeacherDashboard from './pages/TeacherDashboard';
 import WelcomeGate from './pages/WelcomeGate';
+import OnboardingProfile from './pages/OnboardingProfile';
 import ManageActivities from './pages/ManageActivities';
 import FinalExamOnline from './pages/FinalExamOnline';
 import Subject from './pages/Subject';
@@ -60,18 +61,25 @@ const AuthenticatedApp = () => {
   const { showWarning, updateActivity } = useInactivityLogout();
   const [level1Loading, setLevel1Loading] = React.useState(true);
   const [level1Unlocked, setLevel1Unlocked] = React.useState(false);
+  const [profileCompleted, setProfileCompleted] = React.useState(false);
 
   const checkLevel1Access = React.useCallback(async () => {
     if (!user || user.role !== 'user') {
+      setProfileCompleted(true);
       setLevel1Unlocked(true);
       setLevel1Loading(false);
       return;
     }
     try {
-      const payments = await base44.entities.Payment.filter({ user_email: user.email, level: 1, status: 'used' });
+      const [payments, profiles] = await Promise.all([
+        base44.entities.Payment.filter({ user_email: user.email, level: 1, status: 'used' }),
+        base44.entities.UserProfile.filter({ user_email: user.email }),
+      ]);
       setLevel1Unlocked(payments.length > 0);
+      setProfileCompleted(profiles.length > 0 && profiles[0]?.profile_completed === true);
     } catch (_) {
       setLevel1Unlocked(false);
+      setProfileCompleted(false);
     }
     setLevel1Loading(false);
   }, [user]);
@@ -94,6 +102,10 @@ const AuthenticatedApp = () => {
 
   if (authError?.type === 'user_not_registered') {
     return <UserNotRegisteredError />;
+  }
+
+  if (user?.role === 'user' && !profileCompleted) {
+    return <OnboardingProfile user={user} onProfileCompleted={() => setProfileCompleted(true)} />;
   }
 
   if (user?.role === 'user' && !level1Unlocked) {
