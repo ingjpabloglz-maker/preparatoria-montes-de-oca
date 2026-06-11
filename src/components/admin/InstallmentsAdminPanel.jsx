@@ -149,6 +149,11 @@ export default function InstallmentsAdminPanel() {
 
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
+          ) : !filterEmail.trim() ? (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-400 gap-2">
+              <Search className="w-8 h-8" />
+              <p className="text-sm">Busca un alumno para ver sus colegiaturas</p>
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -202,6 +207,7 @@ export default function InstallmentsAdminPanel() {
               </TableBody>
             </Table>
           )}
+          
         </CardContent>
       </Card>
     </div>
