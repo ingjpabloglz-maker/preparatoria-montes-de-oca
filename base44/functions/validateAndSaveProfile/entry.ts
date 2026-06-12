@@ -169,6 +169,15 @@ Deno.serve(async (req) => {
     const full_name = parts.length > 0 ? parts.join(' ') : emailToSync;
     const profile_completed = !!(updatePayload.nombres && updatePayload.apellido_paterno && updatePayload.curp && updatePayload.telefono_personal && updatePayload.correo_contacto);
 
+    // Preservar el rol original del perfil; nunca sobreescribir con el rol del admin que edita
+    let preservedRole = 'user';
+    if (targetProfileId) {
+      const existingProfile = await base44.asServiceRole.entities.UserProfile.get(targetProfileId).catch(() => null);
+      preservedRole = existingProfile?.role || 'user';
+    } else {
+      preservedRole = user.role || 'user';
+    }
+
     const profilePayload = {
       user_email: emailToSync,
       nombres: updatePayload.nombres || '',
@@ -181,7 +190,7 @@ Deno.serve(async (req) => {
       telefono_personal: updatePayload.telefono_personal || '',
       telefono_tutor: updatePayload.telefono_tutor || '',
       correo_contacto: updatePayload.correo_contacto || '',
-      role: user.role || 'user',
+      role: preservedRole,
       status: 'active',
       profile_completed,
       last_synced_at: new Date().toISOString(),
