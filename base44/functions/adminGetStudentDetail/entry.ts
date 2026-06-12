@@ -62,6 +62,8 @@ Deno.serve(async (req) => {
       nombres: studentProfile.nombres || '',
       curp: studentProfile.curp || '',
       telefono: studentProfile.telefono_personal || '',
+      telefono_personal: studentProfile.telefono_personal || '',
+      correo_contacto: studentProfile.correo_contacto || '',
       domicilio: studentProfile.domicilio || '',
       fecha_nacimiento: studentProfile.fecha_nacimiento || '',
       status: studentProfile.status || 'active',
