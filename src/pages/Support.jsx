@@ -191,7 +191,7 @@ export default function Support() {
               </p>
               <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-700">
                 <Clock className="w-3.5 h-3.5" />
-                <span>Horario de atención: Lunes a Viernes, 8:00 AM – 3:00 PM</span>
+                <span>Horario de atención: Lunes a Domingo, 9:00 AM – 2:00 PM</span>
               </div>
             </div>
           </div>
