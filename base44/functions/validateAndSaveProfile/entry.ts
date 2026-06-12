@@ -141,27 +141,30 @@ Deno.serve(async (req) => {
     curp_validated_at: new Date().toISOString(),
   };
 
-  const targetEmail = target_user_id
-    ? null // Se resolverá abajo
-    : user.email;
-
+  // Resolver el email del alumno objetivo
+  let targetEmail = user.email;
+  let targetProfileId = null;
   if (target_user_id) {
-    await base44.asServiceRole.entities.User.update(target_user_id, updatePayload);
+    // target_user_id es el ID del registro UserProfile (student.id desde el frontend)
+    const profile = await base44.asServiceRole.entities.UserProfile.get(target_user_id).catch(() => null);
+    if (!profile) {
+      return Response.json({ error: 'No se encontró el perfil del alumno' }, { status: 404 });
+    }
+    targetEmail = profile.user_email;
+    targetProfileId = profile.id;
   } else {
     await base44.auth.updateMe(updatePayload);
   }
 
-  // Sincronizar UserProfile solo para alumnos (role 'user'), no para admins ni docentes
-  const effectiveRole = target_user_id
-    ? (await base44.asServiceRole.entities.UserProfile.filter({ user_email: targetEmail }).then(r => r[0]?.role).catch(() => null)) || 'user'
-    : user.role;
+  // Solo procesar UserProfile para alumnos (role 'user')
+  const effectiveRole = target_user_id ? 'user' : user.role;
 
   if (effectiveRole !== 'user') {
     return Response.json({ success: true, curp_validated: true });
   }
 
   try {
-    const emailToSync = targetEmail || user.email;
+    const emailToSync = targetEmail;
     const parts = [updatePayload.apellido_paterno, updatePayload.apellido_materno, updatePayload.nombres].filter(Boolean);
     const full_name = parts.length > 0 ? parts.join(' ') : emailToSync;
     const profile_completed = !!(updatePayload.nombres && updatePayload.apellido_paterno && updatePayload.curp && updatePayload.telefono_personal && updatePayload.correo_contacto);
@@ -184,11 +187,16 @@ Deno.serve(async (req) => {
       last_synced_at: new Date().toISOString(),
     };
 
-    const existing = await base44.asServiceRole.entities.UserProfile.filter({ user_email: emailToSync });
-    if (existing.length > 0) {
-      await base44.asServiceRole.entities.UserProfile.update(existing[0].id, profilePayload);
+    const profileIdToUpdate = targetProfileId || null;
+    if (profileIdToUpdate) {
+      await base44.asServiceRole.entities.UserProfile.update(profileIdToUpdate, profilePayload);
     } else {
-      await base44.asServiceRole.entities.UserProfile.create(profilePayload);
+      const existing = await base44.asServiceRole.entities.UserProfile.filter({ user_email: emailToSync });
+      if (existing.length > 0) {
+        await base44.asServiceRole.entities.UserProfile.update(existing[0].id, profilePayload);
+      } else {
+        await base44.asServiceRole.entities.UserProfile.create(profilePayload);
+      }
     }
   } catch (_) { /* sync no-op: no bloquea el flujo principal */ }
 
