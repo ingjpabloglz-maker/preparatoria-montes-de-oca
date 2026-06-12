@@ -38,6 +38,17 @@ const GamificationHUD = React.lazy(() => import('@/components/gamification/Gamif
 export default function Layout({ children, currentPageName }) {
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileName, setProfileName] = useState(null);
+
+  useEffect(() => {
+    if (user?.role !== 'user') return;
+    base44.entities.UserProfile.filter({ user_email: user.email })
+      .then(profiles => {
+        const p = profiles?.[0];
+        if (p?.nombres) setProfileName(p.nombres);
+      })
+      .catch(() => {});
+  }, [user?.email]);
 
   const isAdmin = user?.role === 'admin';
   const isDocente = user?.role === 'docente';
@@ -189,14 +200,14 @@ export default function Layout({ children, currentPageName }) {
                         <User className="w-4 h-4 text-blue-600" />
                       </div>
                       <span className="hidden sm:block max-w-[120px] truncate">
-                        {user.full_name?.split(' ')[0] || 'Usuario'}
+                        {profileName || user.full_name?.split(' ')[0] || 'Usuario'}
                       </span>
                       <ChevronDown className="w-4 h-4 text-gray-400" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     <div className="px-3 py-2">
-                      <p className="font-medium truncate">{user.full_name}</p>
+                      <p className="font-medium truncate">{profileName || user.full_name}</p>
                       <p className="text-sm text-gray-500 truncate">{user.email}</p>
                       <Badge variant="outline" className="mt-1 text-xs">
                         {user.role === 'admin' ? 'Administrador' : user.role === 'docente' ? 'Docente' : 'Estudiante'}
