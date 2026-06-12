@@ -48,7 +48,7 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
   const [curpError, setCurpError] = useState(null);
 
   const handleChange = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+    setForm(prev => ({ ...prev, [field]: value.toUpperCase() }));
   };
 
   const handlePhoneChange = (field, value) => {
