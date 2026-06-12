@@ -67,6 +67,17 @@ export default function StudentDashboard({ user }) {
 
   const { data: gamProfile, refetch: refetchGamProfile } = useGamificationProfile(user.email);
 
+  const { data: userProfileArr } = useQuery({
+    queryKey: ['userProfile', user.email],
+    queryFn: () => base44.entities.UserProfile.filter({ user_email: user.email }),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+  const userProfile = userProfileArr?.[0];
+  const displayUser = userProfile?.nombres
+    ? { ...user, full_name: [userProfile.nombres, userProfile.apellido_paterno, userProfile.apellido_materno].filter(Boolean).join(' ') }
+    : user;
+
   // ── Estado del modal de metas semanales (guards anti-loop) ────────────────
   const [showGoalModal, setShowGoalModal] = React.useState(false);
   const [goalModalDismissed, setGoalModalDismissed] = React.useState(false);
@@ -324,7 +335,7 @@ export default function StudentDashboard({ user }) {
           </div>
         )}
 
-        <HeroBanner user={user} gamProfile={gamProfile} nextSubject={nextSubject} onContinue={goToNextSubject} />
+        <HeroBanner user={displayUser} gamProfile={gamProfile} nextSubject={nextSubject} onContinue={goToNextSubject} />
 
         {showGoalModal && !goalModalPending && (
           <WeeklyGoalSetupModal
