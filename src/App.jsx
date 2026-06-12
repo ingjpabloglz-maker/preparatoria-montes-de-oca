@@ -25,6 +25,7 @@ import ManageActivities from './pages/ManageActivities';
 import FinalExamOnline from './pages/FinalExamOnline';
 import Subject from './pages/Subject';
 import LegalPage from './pages/LegalPage';
+import Support from './pages/Support';
 
 // Páginas públicas y autenticación
 import LandingPage from './pages/LandingPage';
@@ -140,6 +141,7 @@ const AuthenticatedApp = () => {
         <Route path="ManageActivities" element={<LayoutWrapper currentPageName="ManageActivities"><ManageActivities /></LayoutWrapper>} />
         <Route path="FinalExamOnline" element={<FinalExamOnline />} />
         <Route path="Subject/:id" element={<LayoutWrapper currentPageName="Subject"><Subject /></LayoutWrapper>} />
+        <Route path="Support" element={<LayoutWrapper currentPageName="Support"><Support /></LayoutWrapper>} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </>

@@ -220,6 +220,13 @@ export default function Layout({ children, currentPageName }) {
                       <User className="w-4 h-4 mr-2" />
                       Editar Perfil
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                    onClick={() => window.location.href = createPageUrl('Support')}
+                    className="cursor-pointer">
+                    
+                      <span className="w-4 h-4 mr-2 text-base leading-none">🎧</span>
+                      Asistencia y Soporte
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                     onClick={() => base44.auth.logout()}
