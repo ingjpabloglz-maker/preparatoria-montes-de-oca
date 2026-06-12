@@ -227,6 +227,14 @@ export default function Layout({ children, currentPageName }) {
                       <span className="w-4 h-4 mr-2 text-base leading-none">🎧</span>
                       Asistencia y Soporte
                     </DropdownMenuItem>
+                    {user?.role === 'user' && (
+                      <DropdownMenuItem
+                      onClick={() => window.location.href = '/app/FAQ'}
+                      className="cursor-pointer">
+                        <span className="w-4 h-4 mr-2 text-base leading-none">❓</span>
+                        Preguntas Frecuentes
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                     onClick={() => base44.auth.logout()}

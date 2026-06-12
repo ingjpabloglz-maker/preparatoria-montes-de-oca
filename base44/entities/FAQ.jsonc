@@ -1,0 +1,39 @@
+{
+  "name": "FAQ",
+  "type": "object",
+  "properties": {
+    "pregunta": {
+      "type": "string",
+      "description": "La pregunta frecuente"
+    },
+    "respuesta": {
+      "type": "string",
+      "description": "Respuesta en formato markdown"
+    },
+    "categoria": {
+      "type": "string",
+      "enum": [
+        "Lecciones y Actividades",
+        "Gamificaci\u00f3n",
+        "Pagos y Colegiaturas",
+        "Ex\u00e1menes",
+        "Soporte"
+      ],
+      "description": "Categor\u00eda de la pregunta"
+    },
+    "imagen_url": {
+      "type": "string",
+      "description": "URL de imagen de apoyo visual (opcional)"
+    },
+    "orden": {
+      "type": "number",
+      "default": 0,
+      "description": "Orden de aparici\u00f3n dentro de la categor\u00eda"
+    }
+  },
+  "required": [
+    "pregunta",
+    "respuesta",
+    "categoria"
+  ]
+}

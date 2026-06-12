@@ -26,6 +26,8 @@ import FinalExamOnline from './pages/FinalExamOnline';
 import Subject from './pages/Subject';
 import LegalPage from './pages/LegalPage';
 import Support from './pages/Support';
+import FAQ from './pages/FAQ';
+import FAQAdmin from './pages/FAQAdmin';
 
 // Páginas públicas y autenticación
 import LandingPage from './pages/LandingPage';
@@ -142,6 +144,8 @@ const AuthenticatedApp = () => {
         <Route path="FinalExamOnline" element={<FinalExamOnline />} />
         <Route path="Subject/:id" element={<LayoutWrapper currentPageName="Subject"><Subject /></LayoutWrapper>} />
         <Route path="Support" element={<LayoutWrapper currentPageName="Support"><Support /></LayoutWrapper>} />
+        <Route path="FAQ" element={<LayoutWrapper currentPageName="FAQ"><FAQ /></LayoutWrapper>} />
+        <Route path="FAQAdmin" element={<LayoutWrapper currentPageName="FAQAdmin"><FAQAdmin /></LayoutWrapper>} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </>

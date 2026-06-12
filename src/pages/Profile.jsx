@@ -6,7 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Volume2, Bell, User, CreditCard, Volume1, Play } from "lucide-react";
+import { ArrowLeft, Volume2, Bell, User, CreditCard, Volume1, Play, HelpCircle } from "lucide-react";
+import { Link } from 'react-router-dom';
+
+const OWNER_EMAIL = 'ing.jpablo.glz@gmail.com';
 import ProfileForm from '../components/profile/ProfileForm';
 import InstallmentsTab from '../components/profile/InstallmentsTab';
 import { useSound } from '@/contexts/SoundContext';
@@ -33,6 +36,7 @@ export default function Profile() {
   };
 
   const isStudent = user?.role === 'user';
+  const isOwner = user?.email === OWNER_EMAIL;
 
   if (!user) {
     return (
@@ -50,6 +54,14 @@ export default function Profile() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">Mi Perfil</h1>
+          {isOwner && (
+            <Link to="/app/FAQAdmin" className="ml-auto">
+              <Button variant="outline" size="sm" className="gap-2">
+                <HelpCircle className="w-4 h-4" />
+                Gestión FAQs
+              </Button>
+            </Link>
+          )}
         </div>
 
         <Tabs defaultValue={window.location.hash === '#installments' ? 'installments' : 'profile'}>
