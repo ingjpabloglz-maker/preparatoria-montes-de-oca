@@ -151,7 +151,15 @@ Deno.serve(async (req) => {
     await base44.auth.updateMe(updatePayload);
   }
 
-  // Sincronizar UserProfile (entidad personalizada accesible para todos los admins)
+  // Sincronizar UserProfile solo para alumnos (role 'user'), no para admins ni docentes
+  const effectiveRole = target_user_id
+    ? (await base44.asServiceRole.entities.UserProfile.filter({ user_email: targetEmail }).then(r => r[0]?.role).catch(() => null)) || 'user'
+    : user.role;
+
+  if (effectiveRole !== 'user') {
+    return Response.json({ success: true, curp_validated: true });
+  }
+
   try {
     const emailToSync = targetEmail || user.email;
     const parts = [updatePayload.apellido_paterno, updatePayload.apellido_materno, updatePayload.nombres].filter(Boolean);
