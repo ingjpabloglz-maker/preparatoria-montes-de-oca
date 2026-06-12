@@ -32,7 +32,7 @@ export default function ManageAdmins() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-users', 'admin'] }),
   });
 
-  const PROTECTED_EMAIL = 'inj.jpablo.glz@gmail.com';
+  const PROTECTED_EMAIL = 'ing.jpablo.glz@gmail.com';
 
   const allAdmins = (data?.users || []).filter(u => u.email !== PROTECTED_EMAIL);
 
