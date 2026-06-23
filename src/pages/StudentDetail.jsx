@@ -12,8 +12,11 @@ import {
 } from "@/components/ui/table";
 import {
   ArrowLeft, User, Mail, CheckCircle2, XCircle, Trash2,
-  RefreshCw, FileText, Loader2, GraduationCap,
+  RefreshCw, FileText, Loader2, GraduationCap, FastForward,
 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -250,6 +253,91 @@ function BoletasTab({ studentEmail, studentName, currentLevel, adminEmail, subje
   );
 }
 
+// ── Tab: Alumno Avanzado ──────────────────────────────────────────────────────
+function AdvancedLevelTab({ studentEmail, currentLevel, onSuccess }) {
+  const [targetLevel, setTargetLevel] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+
+  const handleAssign = async () => {
+    if (!targetLevel) return;
+    setLoading(true);
+    try {
+      const res = await base44.functions.invoke('assignAdvancedLevel', {
+        user_email: studentEmail,
+        target_level: parseInt(targetLevel),
+      });
+      toast.success(res.data.message);
+      setConfirmed(false);
+      setTargetLevel('');
+      onSuccess?.();
+    } catch (err) {
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FastForward className="w-5 h-5 text-orange-500" />
+          Asignar Nivel de Inicio Avanzado
+        </CardTitle>
+        <p className="text-sm text-gray-500">
+          Para alumnos que acreditan niveles anteriores. Se marcarán como completados todos los niveles previos al seleccionado,
+          incluyendo materias, pagos y colegiaturas.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+          <strong>Nivel actual del alumno: {currentLevel}</strong><br />
+          Al asignar un nuevo nivel de inicio, se reemplazará el progreso actual.
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+          <div className="space-y-1 flex-1">
+            <label className="text-sm font-medium text-gray-700">Nivel de inicio asignado</label>
+            <Select value={targetLevel} onValueChange={(v) => { setTargetLevel(v); setConfirmed(false); }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar nivel..." />
+              </SelectTrigger>
+              <SelectContent>
+                {[2, 3, 4, 5, 6].map(lvl => (
+                  <SelectItem key={lvl} value={String(lvl)}>
+                    Nivel {lvl} (niveles 1-{lvl - 1} se marcarán como completados)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {targetLevel && !confirmed && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 space-y-2">
+            <p>
+              ¿Confirmas asignar al alumno directamente al <strong>Nivel {targetLevel}</strong>?
+              Los niveles 1 al {parseInt(targetLevel) - 1} quedarán marcados como completados automáticamente.
+            </p>
+            <Button size="sm" variant="destructive" onClick={() => setConfirmed(true)}>
+              Sí, confirmar asignación
+            </Button>
+          </div>
+        )}
+
+        {confirmed && (
+          <Button onClick={handleAssign} disabled={loading} className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700">
+            {loading
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</>
+              : <><FastForward className="w-4 h-4 mr-2" />Asignar Nivel {targetLevel}</>}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function StudentDetail() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -376,6 +464,10 @@ export default function StudentDetail() {
               <TabsTrigger value="pagos">
                 Pagos
               </TabsTrigger>
+              <TabsTrigger value="avanzado">
+                <FastForward className="w-4 h-4 mr-1.5" />
+                Nivel Avanzado
+              </TabsTrigger>
             </TabsList>
 
             {/* Tab General */}
@@ -414,6 +506,17 @@ export default function StudentDetail() {
             <TabsContent value="pagos" className="mt-4">
               {activeTab === 'pagos' && (
                 <PaymentHistoryTab studentEmail={studentEmail} />
+              )}
+            </TabsContent>
+
+            {/* Tab Nivel Avanzado */}
+            <TabsContent value="avanzado" className="mt-4">
+              {activeTab === 'avanzado' && (
+                <AdvancedLevelTab
+                  studentEmail={studentEmail}
+                  currentLevel={currentLevel}
+                  onSuccess={() => queryClient.invalidateQueries({ queryKey: ['admin-student-detail', studentEmail] })}
+                />
               )}
             </TabsContent>
           </Tabs>
