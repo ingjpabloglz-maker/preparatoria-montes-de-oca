@@ -390,7 +390,11 @@ export default function StudentDashboard({ user }) {
                 <BookOpen className="w-5 h-5 text-blue-600" />
                 {completedSubjectsCount === currentLevelSubjects.length && currentLevelSubjects.length > 0
                   ? '¡Completaste todas las materias de este nivel!'
-                  : `Te ${currentLevelSubjects.length - completedSubjectsCount === 1 ? 'falta 1 materia' : `faltan ${currentLevelSubjects.length - completedSubjectsCount} materias`} para avanzar`
+                  : (() => {
+                      const currentLevelCompleted = currentLevelSubjects.filter(s => subjectProgress.find(p => p.subject_id === s.id)?.test_passed).length;
+                      const rem = Math.max(0, currentLevelSubjects.length - currentLevelCompleted);
+                      return rem === 1 ? 'Te falta 1 materia para avanzar' : `Te faltan ${rem} materias para avanzar`;
+                    })()
                 }
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
