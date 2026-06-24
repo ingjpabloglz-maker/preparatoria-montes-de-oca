@@ -6,14 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserCircle, Save, Trash2 } from "lucide-react";
 
-const CURP_REGEX = /^[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[A-Z0-9]{2}$/;
-
-function validateCurp(value) {
-  if (!value) return null; // optional
-  if (value.length !== 18) return 'La CURP debe tener exactamente 18 caracteres';
-  if (!CURP_REGEX.test(value)) return 'Formato de CURP inválido';
-  return null;
-}
 
 const TEXT_FIELDS = [
   { key: 'nombres', label: 'Nombres', required: true, type: 'text' },
@@ -63,15 +55,13 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
   };
 
   const handleCurpChange = (value) => {
-    const upper = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 18);
-    setForm(prev => ({ ...prev, curp: upper }));
-    setCurpError(validateCurp(upper));
+    setForm(prev => ({ ...prev, curp: value.toUpperCase() }));
   };
 
   const isValid = () => {
     const requiredOk = form.nombres && form.apellido_paterno && form.telefono_personal && form.correo_contacto;
     const phonesOk = validatePhone(form.telefono_personal) && validatePhone(form.telefono_tutor);
-    const curpOk = form.curp.length === 18 && !validateCurp(form.curp);
+    const curpOk = form.curp.length > 0;
     return requiredOk && phonesOk && curpOk;
   };
 
@@ -165,17 +155,9 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
                 <Input
                   value={form.curp}
                   onChange={(e) => handleCurpChange(e.target.value)}
-                  placeholder="Ej: GOMJ960101HNLPRN09"
-                  maxLength={18}
-                  className={`font-mono uppercase ${curpError ? 'border-red-400' : form.curp.length === 18 && !curpError ? 'border-green-400' : ''}`}
+                  placeholder="Ingresa la CURP"
+                  className="font-mono uppercase"
                 />
-                {curpError && <p className="text-xs text-red-500 mt-1">{curpError}</p>}
-                {!curpError && form.curp.length > 0 && form.curp.length < 18 && (
-                  <p className="text-xs text-gray-400 mt-1">{form.curp.length} / 18 caracteres</p>
-                )}
-                {!curpError && form.curp.length === 18 && (
-                  <p className="text-xs text-green-600 mt-1">✓ CURP válida</p>
-                )}
               </div>
               {mode === 'admin' && form.curp && (
                 <Button
@@ -226,13 +208,6 @@ export default function ProfileForm({ user, onSaved, onAdminUpdate, onAdminClear
             </div>
           ))}
         </div>
-
-        {curpError && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 flex items-start gap-2">
-            <span className="text-red-500 mt-0.5 flex-shrink-0">⚠️</span>
-            <span>{curpError}</span>
-          </div>
-        )}
 
         <Button
           onClick={handleSave}
