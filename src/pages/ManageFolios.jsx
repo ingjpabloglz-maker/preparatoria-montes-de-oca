@@ -109,7 +109,7 @@ export default function ManageFolios() {
   const [ticketPayment, setTicketPayment] = useState(null);
   const [ticketOpen, setTicketOpen] = useState(false);
 
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('available');
   const [nameFilter, setNameFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
