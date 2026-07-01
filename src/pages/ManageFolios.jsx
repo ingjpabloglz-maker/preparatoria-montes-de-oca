@@ -28,7 +28,9 @@ import {
   Trash2,
   Copy,
   Printer,
-  Search
+  Search,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
 import AdminGuard from '../components/auth/AdminGuard';
@@ -106,6 +108,11 @@ export default function ManageFolios() {
 
   const [ticketPayment, setTicketPayment] = useState(null);
   const [ticketOpen, setTicketOpen] = useState(false);
+
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [nameFilter, setNameFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const queryClient = useQueryClient();
 
@@ -190,6 +197,28 @@ export default function ManageFolios() {
   };
 
   const needsLevel = bulkFolioType !== 'extraordinary_test';
+
+  const filteredPayments = payments.filter(p => {
+    const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
+    const matchesName = nameFilter.trim().length === 0 ||
+      (p.student_name || '').toLowerCase().includes(nameFilter.toLowerCase()) ||
+      (p.user_email || '').toLowerCase().includes(nameFilter.toLowerCase());
+    return matchesStatus && matchesName;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredPayments.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedPayments = filteredPayments.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const handleStatusFilterChange = (v) => {
+    setStatusFilter(v);
+    setCurrentPage(1);
+  };
+
+  const handleNameFilterChange = (v) => {
+    setNameFilter(v);
+    setCurrentPage(1);
+  };
 
   if (!isVerified) {
     return (
@@ -387,6 +416,28 @@ export default function ManageFolios() {
               <CardTitle>Lista de Folios</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Filtrar por nombre o correo del alumno..."
+                    value={nameFilter}
+                    onChange={(e) => handleNameFilterChange(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+                  <SelectTrigger className="sm:w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="available">Disponibles</SelectItem>
+                    <SelectItem value="used">Usados</SelectItem>
+                    <SelectItem value="expired">Expirados</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -399,7 +450,7 @@ export default function ManageFolios() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payments.map((payment) => (
+                  {paginatedPayments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -475,8 +526,43 @@ export default function ManageFolios() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {paginatedPayments.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-gray-400 py-6">
+                        No se encontraron folios
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
+
+              {filteredPayments.length > 0 && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-gray-500">
+                    Página {safePage} de {totalPages} · {filteredPayments.length} folio{filteredPayments.length !== 1 ? 's' : ''}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={safePage <= 1}
+                      onClick={() => setCurrentPage(safePage - 1)}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={safePage >= totalPages}
+                      onClick={() => setCurrentPage(safePage + 1)}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
           </TabsContent>
