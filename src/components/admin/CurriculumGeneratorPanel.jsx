@@ -283,7 +283,9 @@ export default function CurriculumGeneratorPanel({ subject, onComplete }) {
   }, [jobId, status]);
 
   useEffect(() => {
-    if (showLogs && logsEndRef.current) logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (showLogs && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }, [jobRecord?.logs, showLogs]);
 
   const handlePreview = async () => {
