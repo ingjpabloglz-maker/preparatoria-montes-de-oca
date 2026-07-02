@@ -12,7 +12,7 @@ export default function ThreadCard({ thread }) {
     : formatDistanceToNow(new Date(thread.created_date), { addSuffix: true, locale: es });
 
   return (
-    <Link to={`/Forum/thread/${thread.id}`}>
+    <Link to={`/app/Forum/thread/${thread.id}`}>
       <Card className={`border hover:shadow-md transition-all cursor-pointer ${thread.is_pinned ? 'border-amber-300 bg-amber-50/50 hover:border-amber-400' : 'hover:border-blue-300'}`}>
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-3">
