@@ -120,7 +120,7 @@ export default function ForumThread() {
       is_deleted: true,
       deleted_by: user.email, deleted_at: new Date().toISOString(),
     }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["forumThreads"] }); window.location.href = '/Forum'; },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["forumThreads"] }); window.location.href = '/app/Forum'; },
   });
 
   const resolvedMutation = useMutation({
@@ -146,7 +146,7 @@ export default function ForumThread() {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
         <p className="text-gray-500">Hilo no encontrado.</p>
-        <Link to="/Forum"><Button variant="outline">Volver al foro</Button></Link>
+        <Link to="/app/Forum"><Button variant="outline">Volver al foro</Button></Link>
       </div>
     );
   }
@@ -154,7 +154,7 @@ export default function ForumThread() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto p-6 space-y-6">
-        <Link to="/Forum" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
+        <Link to="/app/Forum" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
           <ArrowLeft className="w-4 h-4" />
           Volver al foro
         </Link>
