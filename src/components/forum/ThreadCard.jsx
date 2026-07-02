@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { MessageCircle, Eye, Clock } from "lucide-react";
+import { MessageCircle, Eye, Clock, Pin } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import RoleBadge from "./RoleBadge";
@@ -13,11 +13,17 @@ export default function ThreadCard({ thread }) {
 
   return (
     <Link to={`/Forum/thread/${thread.id}`}>
-      <Card className="border hover:border-blue-300 hover:shadow-md transition-all cursor-pointer">
+      <Card className={`border hover:shadow-md transition-all cursor-pointer ${thread.is_pinned ? 'border-amber-300 bg-amber-50/50 hover:border-amber-400' : 'hover:border-blue-300'}`}>
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
+                {thread.is_pinned && (
+                  <span className="flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                    <Pin className="w-3 h-3" />
+                    Fijado
+                  </span>
+                )}
                 <ThreadStatusBadge status={thread.status} />
                 <span className="text-xs text-gray-400">Nivel {thread.level_required}+</span>
               </div>

@@ -91,6 +91,11 @@
     "resolved_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "is_pinned": {
+      "type": "boolean",
+      "default": false,
+      "description": "Hilo fijado siempre al principio del foro (ej. bienvenida)"
     }
   },
   "required": [

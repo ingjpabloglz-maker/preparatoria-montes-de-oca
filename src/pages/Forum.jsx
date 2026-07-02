@@ -77,10 +77,12 @@ export default function Forum() {
       return t.title?.toLowerCase().includes(q) || t.content?.toLowerCase().includes(q);
     })
     .filter(t => {
+      if (t.is_pinned) return true;
       if (filter === "unanswered") return (t.replies_count || 0) === 0;
       if (filter === "resolved") return t.status === "resolved";
       return true;
-    });
+    })
+    .sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
 
   const forumContent = (
     <div className="min-h-screen bg-gray-50">
