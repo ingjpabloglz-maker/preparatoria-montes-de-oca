@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
         const { user_email, subject_id } = sp;
         if (!subject_id || !user_email) { skipped++; continue; }
 
-        const subjectLessons = (lessonsBySubject[subject_id] || []).filter(l => !l.is_mini_eval);
+        const subjectLessons = lessonsBySubject[subject_id] || [];
         const totalCount = subjectLessons.length;
         if (totalCount === 0) { skipped++; continue; }
 
@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
             last_activity: new Date().toISOString(),
           });
           updated++;
+          await new Promise(resolve => setTimeout(resolve, 400));
         } else {
           skipped++;
         }

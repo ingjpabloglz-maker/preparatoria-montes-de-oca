@@ -330,12 +330,10 @@ Deno.serve(async (req) => {
       base44.asServiceRole.entities.CourseLesson.filter({ subject_id }),
       base44.asServiceRole.entities.LessonProgress.filter({ user_email, subject_id, completed: true }),
     ]);
-    const totalCount = allLessons.filter(l => !l.is_mini_eval).length;
+    const totalCount = allLessons.length;
     if (totalCount > 0) {
-      const completedCount = completedLessons.filter(lp => {
-        const lesson = allLessons.find(l => l.id === lp.lesson_id);
-        return lesson && !lesson.is_mini_eval;
-      }).length;
+      const completedIds = new Set(allLessons.map(l => l.id));
+      const completedCount = completedLessons.filter(lp => completedIds.has(lp.lesson_id)).length;
       const progress_percent = Math.round((completedCount / totalCount) * 100);
 
       const spFresh = await base44.asServiceRole.entities.SubjectProgress.filter({ user_email, subject_id });
