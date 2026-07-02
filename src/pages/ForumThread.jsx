@@ -26,8 +26,7 @@ export default function ForumThread() {
   // Incrementar vistas
   useEffect(() => {
     if (!id) return;
-    base44.entities.ForumThread.filter({ id }).then((results) => {
-      const t = results?.[0];
+    base44.entities.ForumThread.get(id).then((t) => {
       if (t) base44.entities.ForumThread.update(id, { views_count: (t.views_count || 0) + 1 });
     }).catch(() => {});
   }, [id]);
@@ -35,8 +34,11 @@ export default function ForumThread() {
   const { data: thread, isLoading: loadingThread } = useQuery({
     queryKey: ["forumThread", id],
     queryFn: async () => {
-      const results = await base44.entities.ForumThread.filter({ id });
-      return results?.[0] || null;
+      try {
+        return await base44.entities.ForumThread.get(id);
+      } catch (_) {
+        return null;
+      }
     },
     enabled: !!id,
   });
