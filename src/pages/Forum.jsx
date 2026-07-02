@@ -70,7 +70,7 @@ export default function Forum() {
   const isPrivileged = user?.role === 'admin' || user?.role === 'docente';
 
   const filtered = threads
-    .filter(t => isPrivileged || (t.level_required || 1) <= userLevel)
+    .filter(t => t.is_pinned || isPrivileged || (t.level_required || 1) <= userLevel)
     .filter(t => {
       if (!search) return true;
       const q = search.toLowerCase();
