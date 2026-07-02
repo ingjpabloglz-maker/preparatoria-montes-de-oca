@@ -87,9 +87,9 @@ export default function CourseMap() {
     refetchOnWindowFocus: false,
   });
 
-  // Calcular progreso general
-  const totalLessons = lessons.filter(l => !l.is_mini_eval).length;
-  const completedLessons = lessonProgressList.filter(lp => lp.completed && !lessons.find(l => l.id === lp.lesson_id)?.is_mini_eval).length;
+  // Calcular progreso general (incluye todas las lecciones generadas: normales + mini evaluaciones)
+  const totalLessons = lessons.length;
+  const completedLessons = lessonProgressList.filter(lp => lp.completed).length;
   const overallProgress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
   // Determinar qué módulos están desbloqueados
