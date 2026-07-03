@@ -198,6 +198,7 @@ function App() {
               <Route path="/ManageFolios" element={<Navigate to="/app/ManageFolios" replace />} />
               <Route path="/ManageStudents" element={<Navigate to="/app/ManageStudents" replace />} />
               <Route path="/ManageAdmins" element={<Navigate to="/app/ManageAdmins" replace />} />
+              <Route path="/ManageNotifications" element={<Navigate to="/app/ManageNotifications" replace />} />
               <Route path="/ManageSubjects" element={<Navigate to="/app/ManageSubjects" replace />} />
               <Route path="/StudentDetail" element={<Navigate to="/app/StudentDetail" replace />} />
               <Route path="/StudentStatistics" element={<Navigate to="/app/StudentStatistics" replace />} />

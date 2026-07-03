@@ -181,7 +181,7 @@ export default function Layout({ children, currentPageName }) {
                       Auditoría
                     </Button>
                   </Link>
-                  <Link to="/ManageNotifications">
+                  <Link to="/app/ManageNotifications">
                     <Button
                     variant={currentPageName === 'ManageNotifications' ? 'secondary' : 'ghost'}
                     size="sm">
