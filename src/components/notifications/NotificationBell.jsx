@@ -123,7 +123,7 @@ export default function NotificationBell() {
           </div>
 
           {/* Lista */}
-          <div className="max-h-[400px] overflow-y-auto">
+          <div className="max-h-[480px] overflow-y-auto">
             {loading ? (
               <div className="p-8 text-center text-sm text-gray-400">Cargando...</div>
             ) : notifications.length === 0 ? (
@@ -151,7 +151,7 @@ export default function NotificationBell() {
                       <p className={cn("text-sm leading-snug", !n.is_read ? "font-semibold text-gray-900" : "font-medium text-gray-600")}>
                         {n.title}
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 whitespace-pre-wrap">{n.message}</p>
                       <p className="text-[10px] text-gray-400 mt-1">
                         {formatDistanceToNow(new Date(n.created_date), { addSuffix: true, locale: es })}
                       </p>
