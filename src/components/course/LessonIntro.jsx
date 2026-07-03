@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { BookOpen, ClipboardList, CheckCircle2, Star, Zap, Info, Lightbulb, FlaskConical } from "lucide-react";
+import { BookOpen, ClipboardList, CheckCircle2, Star, Zap, Info, Lightbulb, FlaskConical, Clock } from "lucide-react";
 import VisualBlockRenderer from './VisualBlockRenderer';
 import EducationalImages from './EducationalImages';
+
+const READING_TIME_SECONDS = 90; // 1:30 minuto de lectura obligatoria
 
 // ─── Detección de materia ─────────────────────────────────────────────────────
 function detectSubjectType(subjectName = '') {
@@ -301,6 +303,23 @@ function StructuredExplanation({ explanation, subjectName }) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function LessonIntro({ lesson, activitiesCount, isMiniEval, alreadyCompleted, previousScore, onStart, subjectName }) {
+  const [timeRemaining, setTimeRemaining] = useState(READING_TIME_SECONDS);
+
+  useEffect(() => {
+    // Sin temporizador para mini-evaluaciones (no tienen lectura previa)
+    if (isMiniEval) return;
+    if (timeRemaining <= 0) return;
+    const interval = setInterval(() => {
+      setTimeRemaining(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isMiniEval, timeRemaining]);
+
+  const canStart = isMiniEval || timeRemaining === 0;
+  const minutes = Math.floor(timeRemaining / 60);
+  const seconds = timeRemaining % 60;
+  const timerDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
   return (
     <div className="flex flex-col items-center text-center py-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
       {/* Icon */}
@@ -348,16 +367,30 @@ export default function LessonIntro({ lesson, activitiesCount, isMiniEval, alrea
         )}
       </div>
 
+      {/* Temporizador de lectura obligatoria (solo lecciones, no mini-evals) */}
+      {!isMiniEval && !canStart && (
+        <div className="flex items-center gap-2 text-amber-300 text-sm mb-3 bg-amber-500/10 border border-amber-500/30 rounded-full px-4 py-2">
+          <Clock className="w-4 h-4" />
+          <span>Lectura obligatoria: {timerDisplay}</span>
+        </div>
+      )}
+
       <Button
         onClick={onStart}
+        disabled={!canStart}
         size="lg"
-        className={`w-full max-w-sm h-14 text-base font-bold rounded-2xl shadow-lg transition-transform hover:scale-[1.02] ${
-          isMiniEval
-            ? 'bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0'
-            : 'bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-600 hover:to-violet-700 text-white border-0'
+        className={`w-full max-w-sm h-14 text-base font-bold rounded-2xl shadow-lg transition-all ${
+          !canStart
+            ? 'bg-slate-700/60 text-white/40 cursor-not-allowed border-0 hover:scale-100'
+            : isMiniEval
+              ? 'bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0 hover:scale-[1.02]'
+              : 'bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-600 hover:to-violet-700 text-white border-0 hover:scale-[1.02]'
         }`}
       >
-        {alreadyCompleted ? '🔄 Repetir lección' : '🚀 Comenzar'}
+        {canStart
+          ? (alreadyCompleted ? '🔄 Repetir lección' : '🚀 Comenzar')
+          : `⏳ ${timerDisplay}`
+        }
       </Button>
     </div>
   );

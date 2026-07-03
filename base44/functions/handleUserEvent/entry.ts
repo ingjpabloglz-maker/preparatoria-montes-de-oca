@@ -669,7 +669,7 @@ Deno.serve(async (req) => {
 
     const { newStreakDays, streakBroke }                                  = calculateStreak(gam, todayString);
     const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, adjustedBaseXP, adjustedBaseStars, adjustedBaseWater, newStreakDays);
-    const newGrowthPoints = (gam?.tree_growth_points ?? 0) + baseWater;
+    const newGrowthPoints = (gam?.tree_growth_points ?? 0) + adjustedBaseWater;
     const { newTreeStage, newGrowthStreak, newTreeEnergy, newVitality, newGrowthFlow } = updateTreeGrowth(newGrowthPoints, newStreakDays, gam, event_type, nowIso);
     const treeLevelUp                                                    = newTreeStage > (gam?.tree_stage ?? 0);
     const {
@@ -763,8 +763,8 @@ Deno.serve(async (req) => {
           score: event_data.score,
           passed: event_data.passed,
           xp_earned: earnedXP + weeklyBonusXP,
-          stars_earned: baseStars + weeklyBonusStars,
-          water_tokens_earned: baseWater,
+          stars_earned: adjustedBaseStars + weeklyBonusStars,
+          water_tokens_earned: adjustedBaseWater,
           timestamp: nowIso,
         }));
       }
@@ -793,8 +793,8 @@ Deno.serve(async (req) => {
       user_email,
       lesson_id: event_data.lesson_id,
       xp_earned: earnedXP + weeklyBonusXP,
-      stars_earned: baseStars + weeklyBonusStars,
-      water_tokens_earned: baseWater,
+      stars_earned: adjustedBaseStars + weeklyBonusStars,
+      water_tokens_earned: adjustedBaseWater,
       is_repeat: isRepeat,
       rewards_granted: !rewardsBlocked,
       timestamp: nowIso,
@@ -807,8 +807,8 @@ Deno.serve(async (req) => {
       streak_saved_by_shield: false,
       // Recompensas desglosadas para display inmediato en LessonResults
       xp_earned: earnedXP + weeklyBonusXP,
-      stars_earned: baseStars + weeklyBonusStars,
-      water_tokens_earned: baseWater,
+      stars_earned: adjustedBaseStars + weeklyBonusStars,
+      water_tokens_earned: adjustedBaseWater,
       weekly_bonus_xp: weeklyBonusXP,
       weekly_bonus_stars: weeklyBonusStars,
       streak_bonus: streakBonus,
