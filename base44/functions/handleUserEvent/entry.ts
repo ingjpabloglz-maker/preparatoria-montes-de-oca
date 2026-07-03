@@ -169,9 +169,9 @@ async function getDailyMarathonMultiplier(base44, user_email, todayString) {
   });
 
   const countToday = todayRewarded.length; // lecciones ya recompensadas hoy (antes de esta)
-  if (countToday < 7) return { multiplier: 1.0, dailyCount: countToday };
-  if (countToday < 12) return { multiplier: 0.5, dailyCount: countToday };
-  return { multiplier: 0.0, dailyCount: countToday };
+  if (countToday < 5) return { multiplier: 1.0, dailyCount: countToday };   // lecciones 1-5: 100% XP
+  if (countToday < 8) return { multiplier: 0.5, dailyCount: countToday };   // lecciones 6-8: 50% XP
+  return { multiplier: 0.0, dailyCount: countToday };                        // lecciones 9+: 0% XP
 }
 
 // ─── BLOQUE 4: Calcular puntos de gamificación ───────────────────────────────
@@ -660,10 +660,12 @@ Deno.serve(async (req) => {
       }
     }
     const adjustedBaseXP = Math.round(baseXP * marathonMultiplier);
-    // Estrellas y agua: se dejan de otorgar después de 10 lecciones completadas diarias
-    const starWaterMultiplier = (isLessonEvent && !rewardsBlocked && dailyLessonCount >= 10) ? 0.0 : 1.0;
-    const adjustedBaseStars = baseStars * starWaterMultiplier;
-    const adjustedBaseWater = baseWater * starWaterMultiplier;
+    // Estrellas: se dejan de otorgar a partir de la lección 9 (countToday >= 8)
+    const starMultiplier = (isLessonEvent && !rewardsBlocked && dailyLessonCount >= 8) ? 0.0 : 1.0;
+    // Agua/tokens: se dejan de otorgar a partir de la lección 6 (countToday >= 5)
+    const waterMultiplier = (isLessonEvent && !rewardsBlocked && dailyLessonCount >= 5) ? 0.0 : 1.0;
+    const adjustedBaseStars = baseStars * starMultiplier;
+    const adjustedBaseWater = baseWater * waterMultiplier;
 
     const { newStreakDays, streakBroke }                                  = calculateStreak(gam, todayString);
     const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, adjustedBaseXP, adjustedBaseStars, adjustedBaseWater, newStreakDays);
