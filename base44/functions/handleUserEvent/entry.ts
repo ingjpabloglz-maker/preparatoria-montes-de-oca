@@ -660,9 +660,13 @@ Deno.serve(async (req) => {
       }
     }
     const adjustedBaseXP = Math.round(baseXP * marathonMultiplier);
+    // Estrellas y agua: se dejan de otorgar después de 10 lecciones completadas diarias
+    const starWaterMultiplier = (isLessonEvent && !rewardsBlocked && dailyLessonCount >= 10) ? 0.0 : 1.0;
+    const adjustedBaseStars = baseStars * starWaterMultiplier;
+    const adjustedBaseWater = baseWater * starWaterMultiplier;
 
     const { newStreakDays, streakBroke }                                  = calculateStreak(gam, todayString);
-    const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, adjustedBaseXP, baseStars, baseWater, newStreakDays);
+    const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, adjustedBaseXP, adjustedBaseStars, adjustedBaseWater, newStreakDays);
     const newGrowthPoints = (gam?.tree_growth_points ?? 0) + baseWater;
     const { newTreeStage, newGrowthStreak, newTreeEnergy, newVitality, newGrowthFlow } = updateTreeGrowth(newGrowthPoints, newStreakDays, gam, event_type, nowIso);
     const treeLevelUp                                                    = newTreeStage > (gam?.tree_stage ?? 0);
