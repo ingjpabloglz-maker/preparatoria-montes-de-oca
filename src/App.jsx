@@ -28,6 +28,7 @@ import LegalPage from './pages/LegalPage';
 import Support from './pages/Support';
 import FAQ from './pages/FAQ';
 import FAQAdmin from './pages/FAQAdmin';
+import ManageNotifications from './pages/ManageNotifications';
 
 // Páginas públicas y autenticación
 import LandingPage from './pages/LandingPage';
@@ -146,6 +147,7 @@ const AuthenticatedApp = () => {
         <Route path="Support" element={<LayoutWrapper currentPageName="Support"><Support /></LayoutWrapper>} />
         <Route path="FAQ" element={<LayoutWrapper currentPageName="FAQ"><FAQ /></LayoutWrapper>} />
         <Route path="FAQAdmin" element={<LayoutWrapper currentPageName="FAQAdmin"><FAQAdmin /></LayoutWrapper>} />
+        <Route path="ManageNotifications" element={<LayoutWrapper currentPageName="ManageNotifications"><ManageNotifications /></LayoutWrapper>} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </>

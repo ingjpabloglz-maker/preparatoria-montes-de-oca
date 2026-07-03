@@ -1,0 +1,51 @@
+{
+  "name": "UserNotification",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del destinatario"
+    },
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo corto de la notificaci\u00f3n"
+    },
+    "message": {
+      "type": "string",
+      "description": "Contenido del mensaje"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "info",
+        "alert",
+        "announcement"
+      ],
+      "default": "info",
+      "description": "Tipo de notificaci\u00f3n"
+    },
+    "is_read": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el alumno ya la ley\u00f3"
+    },
+    "link": {
+      "type": "string",
+      "description": "URL opcional a donde redirigir al hacer clic"
+    },
+    "sent_by": {
+      "type": "string",
+      "description": "Email del admin que envi\u00f3 la notificaci\u00f3n"
+    },
+    "is_global": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si fue una notificaci\u00f3n global"
+    }
+  },
+  "required": [
+    "user_email",
+    "title",
+    "message"
+  ]
+}

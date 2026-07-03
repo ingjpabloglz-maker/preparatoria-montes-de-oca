@@ -26,8 +26,10 @@ import {
   MessageCircle,
   Shield,
   ClipboardCheck,
-  CreditCard } from
+  CreditCard,
+  Megaphone } from
 "lucide-react";
+import NotificationBell from '@/components/notifications/NotificationBell';
 import { hasPermission } from '@/lib/permissions';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from "@/lib/utils";
@@ -179,9 +181,21 @@ export default function Layout({ children, currentPageName }) {
                       Auditoría
                     </Button>
                   </Link>
+                  <Link to="/ManageNotifications">
+                    <Button
+                    variant={currentPageName === 'ManageNotifications' ? 'secondary' : 'ghost'}
+                    size="sm">
+                    
+                      <Megaphone className="w-4 h-4 mr-2" />
+                      Notificaciones
+                    </Button>
+                  </Link>
                 </>
               }
             </nav>
+
+            {/* Campanita de notificaciones (todos los roles) */}
+            <NotificationBell />
 
             {/* Gamification HUD (solo estudiantes) — lazy: admins/docentes no descargan el bundle */}
             {user?.role === 'user' && (
