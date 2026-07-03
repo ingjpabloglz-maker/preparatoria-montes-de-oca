@@ -204,6 +204,30 @@ export default function LessonResults({
         </div>
       )}
 
+      {/* Anti-maratón: recompensas reducidas por exceso de lecciones diarias */}
+      {gamificationResult?.marathon_multiplier < 1.0 && rewardsGranted && (
+        <div className="w-full max-w-sm bg-amber-500/15 border border-amber-500/40 rounded-2xl p-4 mb-4 text-left">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg">⚠️</span>
+            <span className="text-sm font-semibold text-amber-300">
+              Recompensas reducidas ({Math.round(gamificationResult.marathon_multiplier * 100)}% XP)
+            </span>
+          </div>
+          <p className="text-xs text-white/60 mb-2">
+            Has completado {gamificationResult.daily_lesson_count} lecciones hoy. Para favorecer un aprendizaje real, tus puntos de experiencia disminuyen al continuar:
+          </p>
+          <ul className="text-xs text-white/50 space-y-1 list-disc list-inside">
+            <li><span className="text-white/70">Retención menor:</span> es más probable que olvides gran parte del contenido en pocos días si no lo repasas.</li>
+            <li><span className="text-white/70">Aprendizaje superficial:</span> puedes enfocarte en "terminar muy rápido" en lugar de comprender.</li>
+            <li><span className="text-white/70">Fatiga cognitiva:</span> después de cierto tiempo, tu capacidad de atención y procesamiento disminuye.</li>
+            <li><span className="text-white/70">Menor transferencia:</span> aunque apruebes las actividades, puede costarte aplicar los conocimientos después.</li>
+          </ul>
+          <p className="text-xs text-amber-200/70 mt-2 font-medium">
+            Tus recompensas al 100% se reinician mañana. ¡Tómate tu tiempo!
+          </p>
+        </div>
+      )}
+
       {/* Mensaje lección repetida (no error, solo informativo) */}
       {isRepeat && (
         <div className="w-full max-w-sm bg-white/5 border border-white/15 rounded-xl p-3.5 mb-4 text-center">

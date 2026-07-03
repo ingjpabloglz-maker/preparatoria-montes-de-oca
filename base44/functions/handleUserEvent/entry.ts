@@ -150,6 +150,30 @@ function calculateStreak(gam, todayString) {
   return { newStreakDays: 1, streakBroke: currentStreak > 0 };
 }
 
+// ─── BLOQUE 3b: Anti-maratón diario — multiplicador de XP decreciente ───────
+// Cuenta cuántas lecciones ya fueron recompensadas HOY (zona horaria Matamoros).
+// Umbrales: 1-7 → 100% XP, 8-12 → 50% XP, 13+ → 0% XP
+async function getDailyMarathonMultiplier(base44, user_email, todayString) {
+  const allRewarded = await base44.asServiceRole.entities.LessonProgress.filter({
+    user_email,
+    rewards_granted: true,
+  });
+
+  const todayRewarded = allRewarded.filter(lp => {
+    if (!lp.rewards_granted_at) return false;
+    const localDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Matamoros',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date(lp.rewards_granted_at));
+    return localDate === todayString;
+  });
+
+  const countToday = todayRewarded.length; // lecciones ya recompensadas hoy (antes de esta)
+  if (countToday < 7) return { multiplier: 1.0, dailyCount: countToday };
+  if (countToday < 12) return { multiplier: 0.5, dailyCount: countToday };
+  return { multiplier: 0.0, dailyCount: countToday };
+}
+
 // ─── BLOQUE 4: Calcular puntos de gamificación ───────────────────────────────
 function calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays) {
   // Clamp inferior a 1 para proteger contra streakDays corruptos (ej: negativos)
@@ -618,8 +642,27 @@ Deno.serve(async (req) => {
       ? { baseXP: 0, baseStars: 0, baseWater: 0 }
       : rawAwards;
 
+    // ─── ANTI-MARATÓN: Reducir XP si el alumno excede lecciones diarias ──────
+    let marathonMultiplier = 1.0;
+    let dailyLessonCount = 0;
+    if (isLessonEvent && !rewardsBlocked) {
+      const marathon = await getDailyMarathonMultiplier(base44, user_email, todayString);
+      marathonMultiplier = marathon.multiplier;
+      dailyLessonCount = marathon.dailyCount;
+      if (marathonMultiplier < 1.0) {
+        console.log(JSON.stringify({
+          event: 'MARATHON_XP_REDUCED',
+          user_email,
+          daily_lessons_before_this: dailyLessonCount,
+          multiplier: marathonMultiplier,
+          timestamp: nowIso,
+        }));
+      }
+    }
+    const adjustedBaseXP = Math.round(baseXP * marathonMultiplier);
+
     const { newStreakDays, streakBroke }                                  = calculateStreak(gam, todayString);
-    const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays);
+    const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, adjustedBaseXP, baseStars, baseWater, newStreakDays);
     const newGrowthPoints = (gam?.tree_growth_points ?? 0) + baseWater;
     const { newTreeStage, newGrowthStreak, newTreeEnergy, newVitality, newGrowthFlow } = updateTreeGrowth(newGrowthPoints, newStreakDays, gam, event_type, nowIso);
     const treeLevelUp                                                    = newTreeStage > (gam?.tree_stage ?? 0);
@@ -772,6 +815,8 @@ Deno.serve(async (req) => {
       leveled_up: leveledUp,
       newly_unlocked_achievements: newlyUnlocked,
       multiplier,
+      marathon_multiplier: marathonMultiplier,
+      daily_lesson_count: dailyLessonCount + (isLessonEvent && !rewardsBlocked ? 1 : 0),
       tree_level_up: treeLevelUp,
       new_tree_stage: newTreeStage,
       weekly_goal_completed: weeklyGoalJustCompleted,
