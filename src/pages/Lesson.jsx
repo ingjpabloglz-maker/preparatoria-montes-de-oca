@@ -102,7 +102,7 @@ export default function Lesson() {
       setPhase('activity');
       const errData = error?.response?.data || error?.data || {};
       if (errData?.is_blocked) {
-        toast.error(errData.message || 'Tu avance diario fue bloqueado. Intenta mañana.', { duration: 6000 });
+        toast.error(errData.message || 'Has alcanzado tu límite de lecciones por hoy. Recuerda que la calidad de tu aprendizaje es mucho más importante que la cantidad de lecciones diarias. ¡Tómate un descanso, procesa lo aprendido y vuelve mañana para continuar con éxito!', { duration: 7000 });
       } else {
         toast.error('Ocurrió un error al guardar tu progreso. Intenta nuevamente.', { duration: 5000 });
       }
