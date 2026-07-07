@@ -174,6 +174,49 @@ async function getDailyMarathonMultiplier(base44, user_email, todayString) {
   return { multiplier: 0.0, dailyCount: countToday };                        // lecciones 9+: 0% XP
 }
 
+// ─── BLOQUE 3c: Alerta anti-maratón — notificar al alumno si excede 10 lecciones/día ──
+const MARATHON_ALERT_TITLE = '¡Alerta, hemos notado que avanzas muy rápido!';
+const MARATHON_ALERT_MESSAGE = 'Identificamos actividad inusual en tu cuenta: "Contesta demasiado rápido", "Falla las mismas preguntas", "No revisa teoría o revisa muy rápido", "Termina muchas lecciones en poco tiempo". Esto provoca retención menor, aprendizaje superficial y Fatiga cognitiva. Recuerda que la calidad de tu aprendizaje es más importante que la cantidad de lecciones completadas. Recomendamos establecer un límite de 5 a 8 por día. EVITA este comportamiento, futuras SANSIONES o la INHABILITACIÓN de cuenta.';
+
+async function maybeSendMarathonAlert(base44, user_email, dailyLessonCount, todayString) {
+  // El conteo incluye la lección actual: si supera 10, enviar alerta
+  const totalToday = dailyLessonCount + 1;
+  if (totalToday <= 10) return false;
+
+  // Evitar duplicados: verificar si ya se envió una alerta de maratón hoy
+  const existingAlerts = await base44.asServiceRole.entities.UserNotification.filter({
+    user_email,
+    title: MARATHON_ALERT_TITLE,
+  });
+  const alreadyAlertedToday = existingAlerts.some(n => {
+    if (!n.created_date) return false;
+    const localDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Matamoros',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date(n.created_date));
+    return localDate === todayString;
+  });
+  if (alreadyAlertedToday) return false;
+
+  await base44.asServiceRole.entities.UserNotification.create({
+    user_email,
+    title: MARATHON_ALERT_TITLE,
+    message: MARATHON_ALERT_MESSAGE,
+    type: 'alert',
+    is_read: false,
+    sent_by: 'sistema',
+    is_global: false,
+  });
+
+  console.log(JSON.stringify({
+    event: 'MARATHON_ALERT_SENT',
+    user_email,
+    total_lessons_today: totalToday,
+    timestamp: new Date().toISOString(),
+  }));
+  return true;
+}
+
 // ─── BLOQUE 4: Calcular puntos de gamificación ───────────────────────────────
 function calculateGamificationPoints(gam, baseXP, baseStars, baseWater, newStreakDays) {
   // Clamp inferior a 1 para proteger contra streakDays corruptos (ej: negativos)
@@ -666,6 +709,11 @@ Deno.serve(async (req) => {
     const waterMultiplier = (isLessonEvent && !rewardsBlocked && dailyLessonCount >= 5) ? 0.0 : 1.0;
     const adjustedBaseStars = baseStars * starMultiplier;
     const adjustedBaseWater = baseWater * waterMultiplier;
+
+    // ─── ALERTA ANTI-MARATÓN: notificar al alumno si excede 10 lecciones/día ──
+    if (isLessonEvent && !rewardsBlocked) {
+      await maybeSendMarathonAlert(base44, user_email, dailyLessonCount, todayString);
+    }
 
     const { newStreakDays, streakBroke }                                  = calculateStreak(gam, todayString);
     const { earnedXP, newXP, newStars, newWater, newMaxStreak, multiplier } = calculateGamificationPoints(gam, adjustedBaseXP, adjustedBaseStars, adjustedBaseWater, newStreakDays);
