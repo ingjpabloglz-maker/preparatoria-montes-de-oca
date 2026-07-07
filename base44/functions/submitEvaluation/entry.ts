@@ -67,6 +67,16 @@ function gradeAnswer(activity, user_answer) {
   return { correct: isCorrect, points_obtained: isCorrect ? points : 0, requires_review: requiresReview };
 }
 
+// ─── CANDADO ANTI-MARATÓN DURO (15 lecciones/día) ─────────────────────────────
+const DAILY_LESSON_HARD_LIMIT = 15;
+
+function getMatamorosDateString() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Matamoros',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+}
+
 // ─── FUNCIÓN PRINCIPAL ────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -171,6 +181,41 @@ Deno.serve(async (req) => {
       message: 'El alumno ya egresó. No se permiten más evaluaciones.',
       is_blocked: true,
     }, { status: 403 });
+  }
+
+  // ─── 0.B CANDADO ANTI-MARATÓN DURO: bloquear tras 15 lecciones completadas en el día ─
+  if (type === 'lesson' || type === 'mini_eval') {
+    const todayStr = getMatamorosDateString();
+    const allCompleted = await base44.asServiceRole.entities.LessonProgress.filter({
+      user_email, completed: true,
+    });
+    const completedToday = allCompleted.filter(lp => {
+      if (!lp.completed_at) return false;
+      const localDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Matamoros',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date(lp.completed_at));
+      return localDate === todayStr;
+    });
+    if (completedToday.length >= DAILY_LESSON_HARD_LIMIT) {
+      console.log(JSON.stringify({
+        event: 'MARATHON_HARD_BLOCK',
+        user_email,
+        completed_today: completedToday.length,
+        limit: DAILY_LESSON_HARD_LIMIT,
+        lesson_id,
+        type,
+        subject_id,
+        timestamp: submitted_at,
+      }));
+      return Response.json({
+        error: 'DAILY_LESSON_LIMIT_REACHED',
+        message: 'Has alcanzado el límite de 15 lecciones por día. Tu avance se ha bloqueado para proteger tu aprendizaje. Reinicia mañana para continuar registrando progreso.',
+        is_blocked: true,
+        completed_today: completedToday.length,
+        limit: DAILY_LESSON_HARD_LIMIT,
+      }, { status: 403 });
+    }
   }
 
   // ─── 1. CONTROL DE INTENTOS POR TIPO ────────────────────────────────────────

@@ -98,6 +98,20 @@ export default function Lesson() {
       });
       return res.data;
     },
+    onError: (error) => {
+      setPhase('activity');
+      const errData = error?.response?.data || error?.data || {};
+      if (errData?.is_blocked) {
+        toast.error(errData.message || 'Tu avance diario fue bloqueado. Intenta mañana.', { duration: 6000 });
+      } else {
+        toast.error('Ocurrió un error al guardar tu progreso. Intenta nuevamente.', { duration: 5000 });
+      }
+      setTimeout(() => {
+        if (lesson) {
+          window.location.href = createPageUrl(`CourseMap?id=${lesson.subject_id}`);
+        }
+      }, 2500);
+    },
     onSuccess: async (data) => {
       queryClient.invalidateQueries(['lessonProgress']);
       queryClient.invalidateQueries(['lessonProgressItem']);
