@@ -48,6 +48,24 @@ function gradeAnswer(activity, user_answer) {
     return { correct: isCorrect, points_obtained: isCorrect ? points : 0, requires_review: false };
   }
 
+  // ─── multiple_choice / true_false: extraer letra inicial (A, B, C...) ────────
+  // El alumno puede enviar "A. Evaporación del agua" o "A" — ambos deben validar
+  // contra una respuesta correcta guardada como "A" o "A. Evaporación del agua".
+  const extractOptionLetter = (str) => {
+    const m = String(str).trim().match(/^([A-Za-z])\b\.?\s*/);
+    return m ? m[1].toLowerCase() : null;
+  };
+
+  if (activity.type === 'multiple_choice' || activity.type === 'true_false') {
+    const allValidLetters = [correctMain, ...acceptedList].map(extractOptionLetter).filter(Boolean);
+    const userLetter = extractOptionLetter(user_answer);
+    if (userLetter && allValidLetters.length > 0) {
+      const isCorrect = allValidLetters.includes(userLetter);
+      return { correct: isCorrect, points_obtained: isCorrect ? points : 0, requires_review: false };
+    }
+    // Fallback: comparación normalizada completa (ej. true_false con texto completo)
+  }
+
   // ─── Tipos de respuesta única (string) ───────────────────────────────────────
   const allValid = [correctMain, ...acceptedList].map(a => normalizeAnswer(a));
   const userNorm = normalizeAnswer(user_answer);
