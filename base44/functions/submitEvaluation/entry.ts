@@ -67,8 +67,8 @@ function gradeAnswer(activity, user_answer) {
   return { correct: isCorrect, points_obtained: isCorrect ? points : 0, requires_review: requiresReview };
 }
 
-// ─── CANDADO ANTI-MARATÓN DURO (15 lecciones/día) ─────────────────────────────
-const DAILY_LESSON_HARD_LIMIT = 15;
+// ─── CANDADO ANTI-MARATÓN DURO (12 lecciones/día) ─────────────────────────────
+const DAILY_LESSON_HARD_LIMIT = 12;
 
 function getMatamorosDateString() {
   return new Intl.DateTimeFormat('en-CA', {
