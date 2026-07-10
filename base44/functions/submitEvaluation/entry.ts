@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
     }, { status: 403 });
   }
 
-  // ─── 0.B CANDADO ANTI-MARATÓN DURO: bloquear tras 15 lecciones completadas en el día ─
+  // ─── 0.B CANDADO ANTI-MARATÓN DURO: bloquear tras 12 lecciones completadas en el día ─
   if (type === 'lesson' || type === 'mini_eval') {
     const todayStr = getMatamorosDateString();
     const allCompleted = await base44.asServiceRole.entities.LessonProgress.filter({
