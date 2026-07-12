@@ -89,7 +89,7 @@ export default function NotificationBell() {
     } catch (_) {}
   };
 
-  if (!user) return null;
+  if (!user || user.role !== 'user') return null;
 
   return (
     <div className="relative" ref={dropdownRef}>

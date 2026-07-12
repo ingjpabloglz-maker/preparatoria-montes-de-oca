@@ -32,8 +32,8 @@ Deno.serve(async (req) => {
     if (target_type === 'global') {
       const profiles = await base44.asServiceRole.entities.UserProfile.list();
       recipients = profiles
-        .filter(p => p.status !== 'blocked' && p.user_email)
-        .map(p => p.user_email);
+       .filter(p => p.status !== 'blocked' && p.user_email && p.role === 'user')
+       .map(p => p.user_email);
     } else {
       if (!Array.isArray(target_emails) || target_emails.length === 0) {
         return Response.json({ error: 'Debes seleccionar al menos un alumno' }, { status: 400 });
