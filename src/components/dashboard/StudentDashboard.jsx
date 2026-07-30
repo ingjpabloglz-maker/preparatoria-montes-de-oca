@@ -14,6 +14,7 @@ import SubjectCard from './SubjectCard';
 import HeroBanner from './HeroBanner';
 import NextStepCard from './NextStepCard';
 import FolioValidator from '@/components/payment/FolioValidator';
+import InstallmentBlockScreen from '@/components/payment/InstallmentBlockScreen';
 import WeeklyGoal from '@/components/gamification/WeeklyGoal';
 import WeeklyGoalSetupModal from '@/components/gamification/WeeklyGoalSetupModal';
 import AchievementToast from '@/components/gamification/AchievementToast';
@@ -62,6 +63,13 @@ export default function StudentDashboard({ user }) {
     queryKey: ['userPayments', user.email],
     queryFn: () => base44.entities.Payment.filter({ user_email: user.email }),
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: installments = [] } = useQuery({
+    queryKey: ['levelPaymentPlan', user.email],
+    queryFn: () => base44.entities.LevelPaymentPlan.filter({ user_email: user.email }),
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
@@ -248,6 +256,18 @@ export default function StudentDashboard({ user }) {
   }, [profileComplete, currentLevel, hasLevel1Folio, nextSubject]);
 
   // ── Derived values (no hooks, pueden ir aquí) ─────────────────────────────
+  const overdueInstallment = useMemo(() => {
+    const now = new Date();
+    const levelInstallments = installments
+      .filter(i => i.level === currentLevel)
+      .sort((a, b) => a.installment_number - b.installment_number);
+    const activeUnpaid = levelInstallments.find(i => i.status !== 'paid');
+    if (activeUnpaid && new Date(activeUnpaid.due_date) < now) {
+      return activeUnpaid;
+    }
+    return null;
+  }, [installments, currentLevel]);
+
   const isBlockedByTime = progress?.blocked_due_to_time === true || (daysRemaining !== null && daysRemaining === 0);
 
   // ── Early returns DESPUÉS de todos los hooks ──────────────────────────────
@@ -283,6 +303,18 @@ export default function StudentDashboard({ user }) {
           <FolioValidator levelToUnlock={1} userEmail={user.email} folioType="level_advance" onSuccess={() => window.location.reload()} />
         </div>
       </div>
+    );
+  }
+
+  // Pantalla de bloqueo: colegiatura vencida (PRIORIDAD sobre tiempo agotado)
+  if (overdueInstallment) {
+    return (
+      <InstallmentBlockScreen
+        installmentNumber={overdueInstallment.installment_number}
+        dueDate={overdueInstallment.due_date}
+        userEmail={user.email}
+        onSuccess={() => window.location.reload()}
+      />
     );
   }
 

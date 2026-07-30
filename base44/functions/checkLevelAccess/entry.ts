@@ -96,10 +96,9 @@ Deno.serve(async (req) => {
           await sa.entities.LevelPaymentPlan.update(activeUnpaid.id, { status: 'overdue' });
         }
 
-        // Bloquear acceso
-        if (!progress.blocked_due_to_time) {
-          await sa.entities.UserProgress.update(progress.id, { blocked_due_to_time: true });
-        }
+        // NO marcar blocked_due_to_time: el bloqueo es por colegiatura, no por tiempo.
+        // El frontend distingue ambos casos usando los datos del plan de pagos
+        // y muestra la pantalla correcta ("Colegiatura Vencida" vs "Tiempo Agotado").
 
         return Response.json({
           has_access: false,
