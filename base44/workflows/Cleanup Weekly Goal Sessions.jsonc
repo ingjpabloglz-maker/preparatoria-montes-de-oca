@@ -1,0 +1,44 @@
+{
+  "name": "Cleanup Weekly Goal Sessions",
+  "description": "Transiciona metas expiradas a failed, archiva sesiones cerradas, corrige corrupci\u00f3n de m\u00faltiples activas y compacta registros de m\u00e1s de 180 d\u00edas.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 6,
+      "interval_unit": "days",
+      "interval_anchor": "2026-06-09T08:00:00",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "cleanup_weekly_goal_sessions",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "cleanupWeeklyGoalSessions",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "cleanupWeeklyGoalSessions"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "name": "Tree Decay ",
+  "description": "Aplica decaimiento de tree_energy y tree_vitality a todos los usuarios seg\u00fan tiempo de inactividad. Tambi\u00e9n poda growth_flow de entradas mayores a 7 d\u00edas.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 24,
+      "interval_unit": "hours",
+      "interval_anchor": "2026-04-07T05:00:00",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "tree_decay",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "decayTreeState",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "decayTreeState"
+  }
+}
